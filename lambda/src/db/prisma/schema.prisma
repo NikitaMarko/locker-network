@@ -1,0 +1,195 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  OPERATOR
+  ADMIN
+}
+
+enum StationStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+}
+
+enum LockerSize {
+  S
+  M
+  L
+}
+
+enum LockerStatus {
+  AVAILABLE
+  RESERVED
+  OCCUPIED
+  FAULTY
+  EXPIRED
+}
+
+enum BookingStatus {
+  PENDING
+  ACTIVE
+  ENDED
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum ErrorSeverity {
+  INFO
+  WARN
+  ERROR
+  CRITICAL
+}
+
+model User {
+  userId            String    @id @default(uuid())
+  name              String
+  email             String    @unique
+  password          String
+  phone             String?   @unique
+  role              Role      @default(USER)
+  refreshToken      String?
+  tokenVersion      Int
+  passwordChangedAt DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  bookings  Booking[]
+  auditLogs AuditLog[] @relation("AuditActor")
+}
+
+model LockerStation {
+  stationId String  @id @default(uuid())
+  location  String // default "Tel Aviv"
+  address   String? // "Dizengoff 10"
+
+  status StationStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lockers LockerBox[]
+
+  @@index([location])
+}
+
+model LockerBox {
+  lockerBoxId String @id @default(uuid())
+  stationId   String
+
+  code   String       @unique // "A-01"
+  size   LockerSize
+  status LockerStatus @default(AVAILABLE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  station LockerStation @relation(fields: [stationId], references: [stationId], onDelete: Cascade)
+  device  LockerDevice?
+
+  bookings Booking[]
+  AuditLog AuditLog[]
+
+  @@unique([stationId])
+  @@index([stationId])
+  @@index([status])
+}
+
+enum DeviceOnlineStatus {
+  ONLINE
+  OFFLINE
+}
+
+enum DoorStatus {
+  OPEN
+  CLOSED
+}
+
+enum LockStatus {
+  LOCKED
+  UNLOCKED
+}
+
+model LockerDevice {
+  deviceId String @id @default(uuid())
+
+  lockerBoxId String @unique
+
+  onlineStatus DeviceOnlineStatus @default(ONLINE)
+  doorStatus   DoorStatus         @default(CLOSED)
+  lockStatus   LockStatus         @default(LOCKED)
+
+  lastHeartbeat DateTime?
+  firmware      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lockerBox LockerBox @relation(fields: [lockerBoxId], references: [lockerBoxId], onDelete: Cascade)
+}
+
+model Booking {
+  bookingId   String @id @default(uuid())
+  userId      String
+  lockerBoxId String
+
+  status BookingStatus @default(PENDING)
+
+  startTime       DateTime?
+  expectedEndTime DateTime?
+  endTime         DateTime?
+
+  totalPrice Decimal? @db.Decimal(10, 2)
+
+  correlationId String
+  requestId     String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lockerBox LockerBox @relation(fields: [lockerBoxId], references: [lockerBoxId], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([lockerBoxId])
+  @@index([userId])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?
+  lockerId   String?
+  action     String
+  entityType String
+  entityId   String
+  details    Json?
+  createdAt  DateTime @default(now())
+
+  actor  User?      @relation("AuditActor", fields: [actorId], references: [userId], onDelete: SetNull)
+  locker LockerBox? @relation(fields: [lockerId], references: [lockerBoxId], onDelete: SetNull)
+
+  @@index([actorId])
+  @@index([lockerId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
