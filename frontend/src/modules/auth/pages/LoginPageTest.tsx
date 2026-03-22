@@ -26,9 +26,24 @@ export function LoginPage() {
         }
     }
 
+
     return (
         <div style={{ maxWidth: 400, margin: '60px auto' }}>
             <h1>Вход</h1>
+
+            <div style={{
+                marginTop: '15px',
+                padding: '10px 15px',
+                background: '#f5f5f5',
+                borderRadius: '8px',
+                fontSize: '14px',
+                color: '#444',
+                border: '1px solid #ddd'
+            }}>
+                <p style={{ margin: 0 }}><strong>Тестовый пользователь:</strong></p>
+                <p style={{ margin: 0 }}>Email: <strong>demo@example.com</strong></p>
+                <p style={{ margin: 0 }}>Пароль: <strong>123456</strong></p>
+            </div>
 
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <input
@@ -54,5 +69,6 @@ export function LoginPage() {
                 </button>
             </form>
         </div>
+
     );
 }

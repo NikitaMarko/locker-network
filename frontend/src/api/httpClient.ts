@@ -1,72 +1,35 @@
-// httpClient.ts — МОКОВЫЙ BACKEND
+// src/api/httpClient.ts
 
-const MOCK = true;
+import axios from "axios";
 
-// Моковая база данных в памяти
-let lockers = [
-    { id: "1", status: "FREE" },
-    { id: "2", status: "BUSY" },
-    { id: "3", status: "ERROR" },
-];
+export const http = axios.create({
+    baseURL: "http://localhost:8080", // 👉 сюда поставьте URL backend
+    withCredentials: false,
+});
 
-export const http = {
-    get: async (url: string) => {
-        if (MOCK) {
-            console.log("MOCK GET:", url);
-
-            // Получить все ячейки
-            if (url === "/lockers") {
-                return { data: lockers };
-            }
-
-            // Получить конкретную ячейку
-            if (url.startsWith("/lockers/")) {
-                const id = url.split("/")[2];
-                const locker = lockers.find(l => l.id === id);
-                return { data: locker };
-            }
-        }
-
-        throw new Error("Backend not implemented");
-    },
-
-    post: async (url: string) => {
-        if (MOCK) {
-            console.log("MOCK POST:", url);
-
-            // Бронирование
-            if (url.endsWith("/book")) {
-                const id = url.split("/")[2];
-                lockers = lockers.map(l =>
-                    l.id === id ? { ...l, status: "BUSY" } : l
-                );
-                return { data: { ok: true } };
-            }
-
-            // Освобождение
-            if (url.endsWith("/release")) {
-                const id = url.split("/")[2];
-                lockers = lockers.map(l =>
-                    l.id === id ? { ...l, status: "FREE" } : l
-                );
-                return { data: { ok: true } };
-            }
-
-            // Сброс ошибки
-            if (url.endsWith("/reset-error")) {
-                const id = url.split("/")[2];
-                lockers = lockers.map(l =>
-                    l.id === id ? { ...l, status: "FREE" } : l
-                );
-                return { data: { ok: true } };
-            }
-
-            // Открыть/закрыть (оператор)
-            if (url.endsWith("/open") || url.endsWith("/close")) {
-                return { data: { ok: true } };
-            }
-        }
-
-        throw new Error("Backend not implemented");
+// ---------------------------------------------------------
+// 🔹 Добавляем access_token в каждый запрос
+// ---------------------------------------------------------
+http.interceptors.request.use((config) => {
+    const token = localStorage.getItem("access_token");
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
     }
-};
+    return config;
+});
+
+// ---------------------------------------------------------
+// 🔹 Обработка ошибок (например, 401)
+// ---------------------------------------------------------
+http.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        if (error.response?.status === 401) {
+            // Токен недействителен → выходим из системы
+            localStorage.removeItem("access_token");
+            window.location.href = "/login";
+        }
+
+        return Promise.reject(error);
+    }
+);

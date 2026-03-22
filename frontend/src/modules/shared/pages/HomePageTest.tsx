@@ -16,6 +16,15 @@ export function HomePage() {
             <h1>Smart Locker System</h1>
             <p>Добро пожаловать в систему управления умными ячейками.</p>
 
+            {user && (
+                <div style={{ marginTop: '15px', fontSize: '16px', color: '#444' }}>
+                    <p><strong>Тестовый пользователь:</strong></p>
+                    <p>Имя: <strong>{user.name}</strong></p>
+                    <p>Email: <strong>{user.email}</strong></p>
+                    <p>Роль: <strong>{user.role}</strong></p>
+                </div>
+            )}
+
             {user ? (
                 <Link to="/redirect-by-role" style={{ marginTop: '20px', fontSize: '18px' }}>
                     Перейти в панель

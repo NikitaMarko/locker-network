@@ -1,6 +1,5 @@
-// src/app/providers/AuthProvider.tsx
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import type { User } from "../../modules/shared/types/user";
 import { AuthContext } from "./AuthContext";
@@ -11,26 +10,12 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-
-    // 🔹 Временный пользователь для разработки
-    const fakeUser: User = {
-        userId: "demo-1",
-        email: "demo@example.com",
-        name: "Demo User",
-        role: "USER",
-        phone: "+1234567890",
-    };
-
-    // 🔹 Начальное состояние — пользователь авторизован
-    const [user, setUser] = useState<User | null>(fakeUser);
-
-    // 🔹 Пока backend не подключён — загрузки нет
-    const loading = false;
+    const [user, setUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
 
     // ---------------------------------------------------------
-    // 🔸 Реальный useEffect для продакшена (пока отключён)
+    // Проверяем токен и загружаем текущего пользователя
     // ---------------------------------------------------------
-    /*
     useEffect(() => {
         const token = localStorage.getItem("access_token");
 
@@ -47,38 +32,34 @@ export function AuthProvider({ children }: AuthProviderProps) {
             })
             .finally(() => setLoading(false));
     }, []);
-    */
 
-    // 🔹 login возвращает User
+    // ---------------------------------------------------------
+    // login
+    // ---------------------------------------------------------
     const login = async (email: string, password: string): Promise<User> => {
-        // ВРЕМЕННЫЙ ЛОГИН
-        setUser(fakeUser);
-        return fakeUser;
-
-        /*
-        // Реальный логин
         const res = await http.post("/auth/login", { email, password });
+
         localStorage.setItem("access_token", res.data.accessToken);
         setUser(res.data.user);
+
         return res.data.user;
-        */
     };
 
-    // 🔹 register возвращает User
+    // ---------------------------------------------------------
+    // регистрация
+    // ---------------------------------------------------------
     const register = async (email: string, password: string, name: string): Promise<User> => {
-        // ВРЕМЕННАЯ РЕГИСТРАЦИЯ
-        setUser(fakeUser);
-        return fakeUser;
-
-        /*
-        // Реальная регистрация
         const res = await http.post("/auth/register", { email, password, name });
+
         localStorage.setItem("access_token", res.data.accessToken);
         setUser(res.data.user);
+
         return res.data.user;
-        */
     };
 
+    // ---------------------------------------------------------
+    // Logout
+    // ---------------------------------------------------------
     const logout = () => {
         localStorage.removeItem("access_token");
         setUser(null);
