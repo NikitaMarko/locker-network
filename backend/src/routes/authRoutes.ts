@@ -7,14 +7,19 @@ import {
     signupSchema,
 } from "../validation/authSchemas";
 import * as auth from "../middleware/authMiddleware";
-import {rateLimit} from 'express-rate-limit';
+import {rateLimit, ipKeyGenerator} from 'express-rate-limit';
 
 const loginLimiter = rateLimit({
     max: 5,
     windowMs: 15 * 60 * 1000,  // 15 минут
     skipSuccessfulRequests: true,  // Не считай успешные попытки
     keyGenerator: (req: Request) => {
-        return `${req.body?.email || 'unknown'}:${req.ip}`;
+        const email = req.body?.email || 'unknown';
+        if (!req.ip) {
+            throw new Error('IP is missing');
+        }
+        const ip = ipKeyGenerator(req.ip);
+        return `${email}:${ip}`;
     },
     handler: (req, res) => {
         res.status(429).json({
