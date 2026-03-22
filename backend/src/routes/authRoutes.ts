@@ -1,5 +1,4 @@
-import express from "express";
-
+import express, {Request} from "express";
 import * as authController from "../controllers/authController";
 import {validateRequest} from "../middleware/validateRequest";
 import {
@@ -8,17 +7,14 @@ import {
     signupSchema,
 } from "../validation/authSchemas";
 import * as auth from "../middleware/authMiddleware";
-import {
-    rateLimit,
-    ipKeyGenerator
-} from 'express-rate-limit';
+import {rateLimit} from 'express-rate-limit';
 
 const loginLimiter = rateLimit({
     max: 5,
     windowMs: 15 * 60 * 1000,  // 15 минут
     skipSuccessfulRequests: true,  // Не считай успешные попытки
-    keyGenerator: (req) => {
-        return `${req.body?.email || 'unknown'}:${ipKeyGenerator(req)}`;
+    keyGenerator: (req: Request) => {
+        return `${req.body?.email || 'unknown'}:${req.ip}`;
     },
     handler: (req, res) => {
         res.status(429).json({
