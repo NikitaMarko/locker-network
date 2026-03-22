@@ -41,41 +41,19 @@
       "User": {
         "type": "object",
         "properties": {
-          "userId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string",
-            "format": "email"
-          },
-          "role": {
-            "type": "string",
-            "enum": ["USER", "OPERATOR", "ADMIN"]
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          }
+          "userId": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "email": { "type": "string", "format": "email" },
+          "role": { "type": "string", "enum": ["USER", "OPERATOR", "ADMIN"] },
+          "createdAt": { "type": "string", "format": "date-time" }
         }
       },
       "SignupRequest": {
         "type": "object",
         "required": ["name", "email", "password"],
         "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 2,
-            "example": "John Doe"
-          },
-          "email": {
-            "type": "string",
-            "format": "email",
-            "example": "john@example.com"
-          },
+          "name": { "type": "string", "minLength": 2, "example": "John Doe" },
+          "email": { "type": "string", "format": "email", "example": "john@example.com" },
           "password": {
             "type": "string",
             "minLength": 12,
@@ -88,15 +66,8 @@
         "type": "object",
         "required": ["email", "password"],
         "properties": {
-          "email": {
-            "type": "string",
-            "format": "email",
-            "example": "john@example.com"
-          },
-          "password": {
-            "type": "string",
-            "example": "SecurePass123!"
-          }
+          "email": { "type": "string", "format": "email", "example": "john@example.com" },
+          "password": { "type": "string", "example": "SecurePass123!" }
         }
       },
       "AuthResponse": {
@@ -105,192 +76,219 @@
           "accessToken": {
             "type": "string",
             "description": "JWT access token (use in Authorization header)"
-          },
-          "status": {
-            "type": "string",
-            "example": "success"
           }
         }
       },
       "UserResponse": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "string",
-            "example": "success"
-          },
-          "data": {
-            "$ref": "#/components/schemas/User"
-          }
+          "status": { "type": "string", "example": "success" },
+          "data": { "$ref": "#/components/schemas/User" }
         }
       },
       "LockerBox": {
         "type": "object",
         "properties": {
-          "lockerBoxId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "stationId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "code": {
-            "type": "string",
-            "example": "A-01"
-          },
-          "size": {
-            "type": "string",
-            "enum": ["S", "M", "L"]
-          },
+          "lockerBoxId": { "type": "string", "format": "uuid" },
+          "stationId": { "type": "string", "format": "uuid" },
+          "code": { "type": "string", "example": "A-01" },
+          "size": { "type": "string", "enum": ["S", "M", "L"] },
           "status": {
             "type": "string",
             "enum": ["AVAILABLE", "RESERVED", "OCCUPIED", "FAULTY", "EXPIRED"]
           },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          }
+          "createdAt": { "type": "string", "format": "date-time" }
         }
       },
       "LockerStation": {
         "type": "object",
         "properties": {
-          "stationId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "location": {
-            "type": "string",
-            "example": "Tel Aviv"
-          },
-          "address": {
-            "type": "string",
-            "example": "Dizengoff 10"
-          },
-          "status": {
-            "type": "string",
-            "enum": ["ACTIVE", "INACTIVE", "MAINTENANCE"]
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          }
+          "stationId": { "type": "string", "format": "uuid" },
+          "location": { "type": "string", "example": "Tel Aviv" },
+          "address": { "type": "string", "example": "Dizengoff 10" },
+          "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "MAINTENANCE"] },
+          "createdAt": { "type": "string", "format": "date-time" }
         }
       },
       "Booking": {
         "type": "object",
         "properties": {
-          "bookingId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "userId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "lockerBoxId": {
-            "type": "string",
-            "format": "uuid"
-          },
+          "bookingId": { "type": "string", "format": "uuid" },
+          "userId": { "type": "string", "format": "uuid" },
+          "lockerBoxId": { "type": "string", "format": "uuid" },
           "status": {
             "type": "string",
             "enum": ["PENDING", "ACTIVE", "ENDED", "FAILED", "CANCELLED", "EXPIRED"]
           },
-          "startTime": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "expectedEndTime": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "totalPrice": {
-            "type": "number",
-            "format": "decimal"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          }
+          "startTime": { "type": "string", "format": "date-time" },
+          "expectedEndTime": { "type": "string", "format": "date-time" },
+          "totalPrice": { "type": "number", "format": "decimal" },
+          "createdAt": { "type": "string", "format": "date-time" }
         }
       },
       "AuditLog": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "actorId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "action": {
-            "type": "string",
-            "example": "USER_LOGIN"
-          },
-          "entityType": {
-            "type": "string",
-            "example": "User"
-          },
-          "entityId": {
-            "type": "string",
-            "format": "uuid"
-          },
+          "id": { "type": "string", "format": "uuid" },
+          "actorId": { "type": "string", "format": "uuid", "nullable": true },
+          "lockerId": { "type": "string", "format": "uuid", "nullable": true },
+          "action": { "type": "string", "example": "USER_LOGIN" },
+          "entityType": { "type": "string", "example": "User" },
+          "entityId": { "type": "string", "format": "uuid" },
           "details": {
-            "type": "object"
+            "type": "object",
+            "properties": {
+              "ipAddress": { "type": "string", "example": "192.168.1.1" },
+              "userAgent": { "type": "string" },
+              "correlationId": { "type": "string", "format": "uuid" }
+            }
           },
-          "createdAt": {
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ServiceStatus": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["ok", "error"] },
+          "latencyMs": { "type": "integer", "example": 4 },
+          "error": { "type": "string", "nullable": true }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
             "type": "string",
-            "format": "date-time"
+            "enum": ["ok", "degraded"],
+            "description": "ok — all services healthy, degraded — one or more services unavailable"
+          },
+          "time": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-03-21T14:18:31.141Z"
+          },
+          "source": {
+            "type": "string",
+            "enum": ["lambda", "mock", "mock-fallback"],
+            "description": "lambda — response from AWS Lambda, mock — local check, mock-fallback — lambda failed, fell back to local"
+          },
+          "uptime": {
+            "type": "integer",
+            "description": "Server uptime in seconds",
+            "example": 142
+          },
+          "services": {
+            "type": "object",
+            "properties": {
+              "database": { "$ref": "#/components/schemas/ServiceStatus" },
+              "lambda": { "$ref": "#/components/schemas/ServiceStatus" }
+            }
           }
         }
       },
       "Error": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "string",
-            "example": "error"
-          },
-          "message": {
-            "type": "string"
-          },
-          "statusCode": {
-            "type": "integer"
+          "status": { "type": "string", "example": "error" },
+          "message": { "type": "string" },
+          "statusCode": { "type": "integer" }
+        }
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Missing or invalid access token",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": { "status": "error", "message": "You are not logged in", "statusCode": 401 }
+          }
+        }
+      },
+      "TooManyRequests": {
+        "description": "Rate limit exceeded",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" },
+            "example": { "status": "error", "message": "Too many requests", "statusCode": 429 }
           }
         }
       }
     }
   },
   "tags": [
-    {
-      "name": "Auth",
-      "description": "Authentication endpoints"
-    },
-    {
-      "name": "Users",
-      "description": "User profile endpoints"
-    },
-    {
-      "name": "Lockers",
-      "description": "Locker management"
-    },
-    {
-      "name": "Stations",
-      "description": "Station management"
-    },
-    {
-      "name": "Bookings",
-      "description": "Booking/Reservation endpoints"
-    },
-    {
-      "name": "Audit",
-      "description": "Audit logs"
-    }
+    { "name": "System", "description": "Health and system endpoints" },
+    { "name": "Auth", "description": "Authentication endpoints" },
+    { "name": "Users", "description": "User profile endpoints" },
+    { "name": "Lockers", "description": "Locker management" },
+    { "name": "Stations", "description": "Station management" },
+    { "name": "Bookings", "description": "Booking/Reservation endpoints" },
+    { "name": "Audit", "description": "Audit logs (Admin only)" }
   ],
   "paths": {
+    "/health": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Health check",
+        "description": "Returns service health status.\n\n**Two modes** (controlled by `USE_LAMBDA_HEALTH` env variable):\n- `mock` — Node.js checks PostgreSQL directly\n- `lambda` — delegates to AWS Lambda, falls back to mock if Lambda is unreachable\n\nUsed by load balancers and monitoring systems. No authentication required.",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "All services healthy",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HealthResponse" },
+                "examples": {
+                  "mock": {
+                    "summary": "Mock mode response",
+                    "value": {
+                      "status": "ok",
+                      "time": "2026-03-21T14:18:31.141Z",
+                      "source": "mock",
+                      "uptime": 142,
+                      "services": {
+                        "database": { "status": "ok", "latencyMs": 4 }
+                      }
+                    }
+                  },
+                  "lambda": {
+                    "summary": "Lambda mode response",
+                    "value": {
+                      "status": "ok",
+                      "time": "2026-03-21T14:18:31.141Z",
+                      "source": "lambda",
+                      "uptime": 3600,
+                      "services": {
+                        "database": { "status": "ok", "latencyMs": 12 },
+                        "lambda": { "status": "ok", "latencyMs": 87 }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "One or more services unavailable",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HealthResponse" },
+                "example": {
+                  "status": "degraded",
+                  "time": "2026-03-21T14:18:31.141Z",
+                  "source": "mock-fallback",
+                  "uptime": 142,
+                  "services": {
+                    "database": { "status": "error", "latencyMs": 5001, "error": "Database unreachable" },
+                    "lambda": { "status": "error", "error": "Connection timeout" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/signup": {
       "post": {
         "tags": ["Auth"],
@@ -301,9 +299,7 @@
           "required": true,
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SignupRequest"
-              }
+              "schema": { "$ref": "#/components/schemas/SignupRequest" }
             }
           }
         },
@@ -312,26 +308,29 @@
             "description": "User successfully registered",
             "headers": {
               "Set-Cookie": {
+                "description": "httpOnly refresh token cookie",
                 "schema": {
                   "type": "string",
-                  "example": "refreshToken=...; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=604800"
+                  "example": "refreshToken=eyJ...; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=604800"
                 }
               }
             },
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AuthResponse"
-                }
+                "schema": { "$ref": "#/components/schemas/AuthResponse" }
               }
             }
           },
           "400": {
-            "description": "Bad request or user already exists"
+            "description": "Validation error or user already exists",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "status": "error", "message": "User already exists", "statusCode": 400 }
+              }
+            }
           },
-          "429": {
-            "description": "Too many signup attempts"
-          }
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
         }
       }
     },
@@ -339,15 +338,13 @@
       "post": {
         "tags": ["Auth"],
         "summary": "Authenticate user",
-        "description": "Login with email and password",
+        "description": "Login with email and password. Rate limited to 5 attempts per 15 minutes per email.",
         "operationId": "loginUser",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LoginRequest"
-              }
+              "schema": { "$ref": "#/components/schemas/LoginRequest" }
             }
           }
         },
@@ -356,25 +353,27 @@
             "description": "Successfully authenticated",
             "headers": {
               "Set-Cookie": {
-                "schema": {
-                  "type": "string"
-                }
+                "description": "httpOnly refresh token cookie",
+                "schema": { "type": "string" }
               }
             },
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AuthResponse"
-                }
+                "schema": { "$ref": "#/components/schemas/AuthResponse" },
+                "example": { "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." }
               }
             }
           },
           "401": {
-            "description": "Invalid credentials"
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "status": "error", "message": "Invalid credentials", "statusCode": 401 }
+              }
+            }
           },
-          "429": {
-            "description": "Too many login attempts"
-          }
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
         }
       }
     },
@@ -382,21 +381,38 @@
       "post": {
         "tags": ["Auth"],
         "summary": "Refresh access token",
-        "description": "Get a new access token using refresh token from cookie",
+        "description": "Get a new access token using the `refreshToken` httpOnly cookie. The old refresh token is invalidated and a new one is issued (token rotation). `tokenVersion` is incremented on each refresh.",
         "operationId": "refreshToken",
+        "security": [{ "cookieAuth": [] }],
         "responses": {
           "200": {
             "description": "New access token generated",
+            "headers": {
+              "Set-Cookie": {
+                "description": "New httpOnly refresh token cookie (replaces old one)",
+                "schema": { "type": "string" }
+              }
+            },
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AuthResponse"
-                }
+                "schema": { "$ref": "#/components/schemas/AuthResponse" },
+                "example": { "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." }
               }
             }
           },
           "401": {
-            "description": "Invalid or missing refresh token"
+            "description": "Invalid, expired, or already used refresh token",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "examples": {
+                  "missing": { "value": { "status": "error", "message": "No refresh token", "statusCode": 401 } },
+                  "invalid": { "value": { "status": "error", "message": "Invalid refresh token", "statusCode": 401 } },
+                  "reused": { "value": { "status": "error", "message": "Refresh token already used", "statusCode": 401 } },
+                  "revoked": { "value": { "status": "error", "message": "Token revoked", "statusCode": 401 } }
+                }
+              }
+            }
           }
         }
       }
@@ -406,25 +422,27 @@
         "tags": ["Auth", "Users"],
         "summary": "Get current user profile",
         "operationId": "getCurrentUser",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
+        "security": [{ "bearerAuth": [] }],
         "responses": {
           "200": {
             "description": "Current user data",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserResponse"
+                "schema": { "$ref": "#/components/schemas/UserResponse" },
+                "example": {
+                  "status": "success",
+                  "data": {
+                    "userId": "550e8400-e29b-41d4-a716-446655440000",
+                    "name": "John Doe",
+                    "email": "john@example.com",
+                    "role": "USER",
+                    "createdAt": "2026-03-21T14:18:31.141Z"
+                  }
                 }
               }
             }
           },
-          "401": {
-            "description": "Unauthorized"
-          }
+          "401": { "$ref": "#/components/responses/Unauthorized" }
         }
       }
     },
@@ -432,19 +450,24 @@
       "post": {
         "tags": ["Auth"],
         "summary": "Logout user",
+        "description": "Invalidates refresh token and increments tokenVersion, revoking all active tokens.",
         "operationId": "logoutUser",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
+        "security": [{ "bearerAuth": [] }],
         "responses": {
           "200": {
-            "description": "Successfully logged out"
+            "description": "Successfully logged out",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string", "example": "Logged out" }
+                  }
+                }
+              }
+            }
           },
-          "401": {
-            "description": "Unauthorized"
-          }
+          "401": { "$ref": "#/components/responses/Unauthorized" }
         }
       }
     }

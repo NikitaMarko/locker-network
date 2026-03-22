@@ -69,3 +69,4 @@ uploads/                # User uploads
 # ============================================================================
 .dockerignore           # Docker ignore patterns
 docker-compose.override.yml  # Local docker overrides
+/logs/
