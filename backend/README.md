@@ -1,6 +1,6 @@
 # 🔐 Locker Network Backend
 
-> Secure smart locker management system with JWT authentication, role-based access control, and real-time device monitoring.
+> Secure smart locker management system with JWT authentication, role-based access control, audit logging, and AWS Lambda integration.
 
 ## 📋 Table of Contents
 
@@ -15,8 +15,9 @@
 - [Authentication Flow](#-authentication-flow)
 - [Security](#-security)
 - [Rate Limiting](#-rate-limiting)
+- [Audit Logging](#-audit-logging)
+- [Health Check](#-health-check)
 - [Project Structure](#-project-structure)
-
 
 ---
 
@@ -24,13 +25,15 @@
 
 ```bash
 # Clone repository
-git clone <repo-url> && cd backend
+git clone https://github.com/locker-network-java-30-final-project/locker-network-repository
+cd locker-network-repository/backend
 
 # Install dependencies
 npm install
 
 # Setup environment
 cp .env.example .env
+# Edit .env — replace JWT secrets with strong random values (see Environment Setup)
 
 # Run migrations
 npx prisma migrate dev
@@ -39,8 +42,8 @@ npx prisma migrate dev
 npm run dev
 ```
 
-Server runs on `http://localhost:3555`  
-Swagger docs: `http://localhost:3555/docs`
+Server: `http://localhost:3555`
+Swagger docs: `http://localhost:3555/docs` (development only)
 
 ---
 
@@ -48,182 +51,157 @@ Swagger docs: `http://localhost:3555/docs`
 
 | Component | Technology | Version |
 |-----------|-----------|---------|
-| **Runtime** | Node.js | 18+ |
-| **Language** | TypeScript | 5.7+ |
+| **Runtime** | Node.js | 22+ |
+| **Language** | TypeScript | 5.9+ |
 | **Framework** | Express.js | 5.2+ |
 | **ORM** | Prisma | 5.22+ |
 | **Database** | PostgreSQL | 12+ |
-| **Auth** | JWT (access + refresh) | RS256 |
+| **Auth** | JWT (access + refresh token rotation) | HS256 |
 | **Password Hash** | Argon2 | 0.44+ |
 | **Logging** | Winston | 3.19+ |
 | **Rate Limiting** | express-rate-limit | 8.3+ |
 | **Validation** | Zod | 4.3+ |
-| **Security** | Helmet | 8.1+ |
-| **CORS** | cors | 2.8+ |
+| **Security** | Helmet, HPP, CORS | latest |
+| **API Docs** | Swagger UI (OpenAPI 3.0) | latest |
 
 ---
 
 ## 📦 Installation
 
 ### Prerequisites
-- Node.js 18+ ([download](https://nodejs.org))
-- npm or pnpm
-- PostgreSQL 12+ ([install](https://www.postgresql.org/download))
-- Docker & Docker Compose (optional)
 
-### Step 1: Clone & Install
+- Node.js 22+ ([download](https://nodejs.org))
+- npm
+- PostgreSQL 12+ or Docker
+
+### Install
 
 ```bash
-git clone https://github.com/locker-network-java-30-final-project/locker-network-repository
-cd locker-network-repository/backend
-
-# Using npm
 npm install
-
-# OR using pnpm (faster)
-pnpm install
 ```
 
-### Step 2: Verify Installation
+### Verify
 
 ```bash
-npm --version  # Should be 8+
-node --version # Should be 18+
-tsc --version  # Should be 5.7+
+node --version  # 22+
+npm --version   # 8+
 ```
 
 ---
 
 ## 🔐 Environment Setup
 
-### Create `.env` file
-
 ```bash
 cp .env.example .env
 ```
 
-### Configuration Reference
+### Full `.env` reference
 
 ```env
 # Server
 NODE_ENV=development                    # development | production | test
-PORT=3555                               # API server port
-SERVER_URL=http://localhost:3555        # Full server URL
+PORT=3555
+SERVER_URL=http://localhost:3555
 
-# Database (PostgreSQL)
-DATABASE_URL="postgresql://user:password@localhost:5432/locker_db"
-
-# PostgreSQL Docker (if using docker-compose)
+# Database
+# Note: 5433 = host port mapped to Docker container's 5432
+DATABASE_URL="postgresql://root:root@localhost:5433/locker"
 POSTGRES_USER=root
 POSTGRES_PASSWORD=root
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
 
-# JWT Configuration
-JWT_ACCESS_SECRET=your-super-secret-key-min-32-chars  # Min 32 chars!
-JWT_REFRESH_SECRET=your-refresh-secret-key-min-32-chars
-JWT_EXPIRES_IN=7d                       # Access token TTL
+# JWT — generate secrets with:
+# node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+JWT_ACCESS_SECRET=<min-32-chars>        # HS256, access token signing
+JWT_REFRESH_SECRET=<min-32-chars>       # HS256, refresh token signing
+JWT_ACCESS_EXPIRES_IN=15m               # Access token TTL
+JWT_ACCESS_TOKEN_TTL=15                 # Access token TTL in minutes
+JWT_REFRESH_EXPIRES_IN=7d               # Refresh token TTL
 JWT_REFRESH_TOKEN_TTL=7                 # Refresh token TTL in days
 
-# Frontend
-FRONTEND_URL=http://localhost:5173      # CORS origin
+# Frontend CORS origin
+FRONTEND_URL=http://localhost:5173
 
 # Logging
 LOG_LEVEL=info                          # debug | info | warn | error
+
+# Lambda health check
+USE_LAMBDA_HEALTH=false                 # true = call AWS Lambda, false = check DB directly
+LAMBDA_HEALTH_URL=                      # Required when USE_LAMBDA_HEALTH=true
 ```
 
-### ⚠️ Security Requirements
+### ⚠️ Security requirements
 
-```env
-# ✅ Use strong random secrets (min 32 characters)
-# Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-JWT_ACCESS_SECRET=a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z
-JWT_REFRESH_SECRET=z0y1x2w3v4u5t6s7r8q9p0o1n2m3l4k5j6i7h8g7f6e5d4c3b2a1
+```bash
+# Generate strong secrets (required, min 32 chars):
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
+
+**Never commit `.env` to git.** Use `.env.example` for templates only.
 
 ---
 
 ## 🚀 Running Locally
 
-### Development Mode
+### Development
 
 ```bash
 npm run dev
 ```
 
-Features:
-- Hot reload with `ts-node-dev`
-- Full TypeScript source maps
+- Hot reload via `ts-node-dev`
 - Winston logging to console
+- Swagger UI available at `/docs`
 
-Output:
+Expected output:
 ```
 [INFO] Starting server initialization...
 [INFO] PostgreSQL connected successfully
-[INFO] Server listening on port 3555
+[INFO] App running at http://localhost:3555
 ```
 
-### Production Build
+### Production
 
 ```bash
-# Build
 npm run build
-
-# Run compiled code
 npm start
-```
-
-Generates optimized JavaScript in `dist/` directory.
-
-### Check Health
-
-```bash
-# Basic health check
-curl http://localhost:3555/health
-
-# Get API docs
-curl http://localhost:3555/docs
-
-# Test auth endpoint
-curl -X POST http://localhost:3555/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"SecurePass123!"}'
 ```
 
 ---
 
 ## 🐳 Docker Deployment
 
-### Using Docker Compose
-
 ```bash
-# Start services (PostgreSQL + Backend)
+# Start PostgreSQL + Backend
 docker-compose up -d
 
-# View logs
+# Logs
 docker-compose logs -f backend
 
-# Stop services
+# Stop
 docker-compose down
 
-# Reset (remove volumes)
+# Reset volumes
 docker-compose down -v
 ```
 
-### Service Ports
-- **Backend**: http://localhost:3555
-- **PostgreSQL**: localhost:5433 (not exposed by default)
+### Ports
 
-### Manual Docker Build
+| Service | Host port | Container port |
+|---------|-----------|----------------|
+| Backend | 3555 | 3555 |
+| PostgreSQL | 5433 | 5432 |
+
+### Manual Docker build
 
 ```bash
-# Build image
 docker build -t locker-backend:latest .
 
-# Run container
 docker run -p 3555:3555 \
   -e DATABASE_URL="postgresql://user:pass@host:5432/db" \
-  -e JWT_ACCESS_SECRET="your-secret" \
+  -e JWT_ACCESS_SECRET="your-32-char-secret" \
+  -e JWT_REFRESH_SECRET="your-32-char-secret" \
   locker-backend:latest
 ```
 
@@ -231,191 +209,193 @@ docker run -p 3555:3555 \
 
 ## 🗄️ Database Migrations
 
-### Run Migrations
-
 ```bash
-# Create and run migrations (dev)
+# Dev — create and apply migration
 npx prisma migrate dev --name <migration_name>
 
-# Deploy existing migrations (production)
+# Production — apply existing migrations
 npx prisma migrate deploy
 
-# Reset database (dev only!)
+# Reset (dev only!)
 npx prisma migrate reset
-```
 
-### Generate Prisma Client
-
-```bash
-# Auto-generate types from schema
+# Regenerate Prisma client after schema changes
 npx prisma generate
 
-# Open Prisma Studio (GUI)
+# GUI browser
 npx prisma studio
 ```
 
-### Schema Management
-
-- **Schema file**: `prisma/schema.prisma`
-- **Migrations**: `prisma/migrations/`
-- **Generated client**: `src/prisma/`
+Schema: `prisma/schema.prisma`
+Migrations: `prisma/migrations/`
+Generated client: `src/prisma/`
 
 ---
 
 ## 📚 API Documentation
 
-### Access Swagger UI
+### Swagger UI
 
-- **Development**: http://localhost:3555/docs
+Available in development at: **http://localhost:3555/docs**
 
-### API Base URL
+### Base URL
+
 ```
 http://localhost:3555/api/v1
 ```
 
-### Available Endpoints
+### Endpoints
+
+#### System
+| Method | Path | Description | Auth |
+|--------|------|-------------|------|
+| `GET` | `/health` | Service health check | — |
 
 #### Authentication
-- `POST /auth/signup` - Create new account
-- `POST /auth/login` - Authenticate user
-- `POST /auth/refresh` - Get new access token
-- `POST /auth/logout` - Invalidate tokens
-- `GET /auth/me` - Get current user profile
+| Method | Path | Description | Auth |
+|--------|------|-------------|------|
+| `POST` | `/api/v1/auth/signup` | Register new user | — |
+| `POST` | `/api/v1/auth/login` | Login | — |
+| `POST` | `/api/v1/auth/refresh` | Refresh access token | cookie |
+| `POST` | `/api/v1/auth/logout` | Logout | Bearer |
+| `GET` | `/api/v1/auth/me` | Current user profile | Bearer |
 
-#### Users (Protected)
-- `GET /users/:id` - Get user by ID
-- `PATCH /users/:id` - Update user profile
-- `DELETE /users/:id` - Delete account
+#### Users (coming soon)
+| Method | Path | Description | Auth |
+|--------|------|-------------|------|
+| `GET` | `/api/v1/users/:id` | Get user by ID | Bearer |
+| `PATCH` | `/api/v1/users/:id` | Update profile | Bearer |
+| `DELETE` | `/api/v1/users/:id` | Delete account | Bearer |
 
-#### Lockers (Protected)
-- `GET /lockers/stations` - List all stations
-- `GET /lockers/stations/:id` - Get station
-- `GET /lockers/boxes` - List locker boxes
-- `GET /lockers/boxes/:id` - Get box details
-- `POST /lockers/stations` - Create station (Admin/Operator)
-- `POST /lockers/boxes` - Create locker (Admin/Operator)
+#### Lockers (coming soon)
+| Method | Path | Description | Auth |
+|--------|------|-------------|------|
+| `GET` | `/api/v1/lockers/stations` | List stations | Bearer |
+| `GET` | `/api/v1/lockers/stations/:id` | Get station | Bearer |
+| `POST` | `/api/v1/lockers/stations` | Create station | Admin/Operator |
+| `GET` | `/api/v1/lockers/boxes` | List locker boxes | Bearer |
+| `GET` | `/api/v1/lockers/boxes/:id` | Get box details | Bearer |
+| `POST` | `/api/v1/lockers/boxes` | Create locker box | Admin/Operator |
 
-#### Bookings (Protected)
-- `GET /bookings` - User's bookings
-- `POST /bookings` - Create booking
-- `PATCH /bookings/:id` - Update booking
-- `DELETE /bookings/:id` - Cancel booking
+#### Bookings (coming soon)
+| Method | Path | Description | Auth |
+|--------|------|-------------|------|
+| `GET` | `/api/v1/bookings` | User's bookings | Bearer |
+| `POST` | `/api/v1/bookings` | Create booking | Bearer |
+| `PATCH` | `/api/v1/bookings/:id` | Update booking | Bearer |
+| `DELETE` | `/api/v1/bookings/:id` | Cancel booking | Bearer |
 
-#### Audit (Protected - Admin only)
-- `GET /audit-logs` - View audit logs
+#### Audit (Admin only, coming soon)
+| Method | Path | Description | Auth |
+|--------|------|-------------|------|
+| `GET` | `/api/v1/audit-logs` | View audit logs | Admin |
 
 ---
 
 ## 🔑 Authentication Flow
 
-### JWT Tokens
-
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      Authentication Flow                     │
-└─────────────────────────────────────────────────────────────┘
+1. LOGIN / REGISTER
+   POST /auth/login or /auth/signup
+   ← accessToken in JSON body (store in memory, NOT localStorage)
+   ← refreshToken in httpOnly cookie (browser handles automatically)
 
-1️⃣  USER REGISTRATION / LOGIN
-   ├─ POST /auth/signup or /auth/login
-   ├─ Server validates credentials
-   ├─ Returns: accessToken (JWT, 7d TTL)
-   └─ Sets: refreshToken (httpOnly cookie, 7d TTL)
+2. AUTHENTICATED REQUEST
+   GET /api/v1/auth/me
+   → Authorization: Bearer <accessToken>
 
-2️⃣  ACCESS TOKEN USAGE
-   ├─ Include in Authorization header
-   │  Header: Authorization: Bearer <accessToken>
-   ├─ Valid for all protected endpoints
-   └─ Expires in 7 days
+3. TOKEN EXPIRED (401)
+   POST /auth/refresh  (refreshToken sent automatically via cookie)
+   ← new accessToken in JSON body
+   ← new refreshToken in httpOnly cookie (token rotation)
+   tokenVersion is incremented — all previous tokens revoked
 
-3️⃣  TOKEN EXPIRATION
-   ├─ When accessToken expires (401 Unauthorized)
-   ├─ Use refreshToken from cookie (automatic)
-   └─ POST /auth/refresh → New accessToken
-
-4️⃣  LOGOUT / TOKEN REVOCATION
-   ├─ POST /auth/logout
-   ├─ Invalidates both tokens
-   ├─ Increments tokenVersion
-   └─ New login required
+4. LOGOUT
+   POST /auth/logout
+   → refreshToken deleted from DB
+   → tokenVersion incremented
+   → cookie cleared
 ```
 
-### Token Payload
+### Token payload
 
 ```typescript
 interface TokenPayload {
-  userId: string;      // User UUID
-  jti?: string;         // JWT ID (unique per token)
-  role: Role;         // USER | OPERATOR | ADMIN
-  tokenVersion: number; // Increment on logout
+  userId: string;       // User UUID
+  jti?: string;         // Unique token ID
+  role: Role;           // USER | OPERATOR | ADMIN
+  tokenVersion: number; // Revocation version
 }
 ```
 
-### Example Authentication
+### Token TTL
+
+| Token | TTL | Storage |
+|-------|-----|---------|
+| `accessToken` | 15 minutes | JS memory (Zustand / React state) |
+| `refreshToken` | 7 days | httpOnly cookie |
+
+### curl examples
 
 ```bash
-# 1. Register
+# Register
 curl -X POST http://localhost:3555/api/v1/auth/signup \
   -H "Content-Type: application/json" \
-  -d '{
-    "name": "John Doe",
-    "email": "john@example.com",
-    "password": "SecurePass123!"
-  }'
+  -d '{"name":"John Doe","email":"john@example.com","password":"SecurePass123!"}'
 
-# Response:
-# {
-#   "status": "success",
-#   "accessToken": "eyJhbGciOiJIUzI1NiIs..."
-# }
+# Login
+curl -X POST http://localhost:3555/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"john@example.com","password":"SecurePass123!"}'
 
-# 2. Use token for protected request
-curl -X GET http://localhost:3555/api/v1/auth/me \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..."
+# Protected request
+curl http://localhost:3555/api/v1/auth/me \
+  -H "Authorization: Bearer <accessToken>"
 
-# 3. Refresh token (automatic)
+# Refresh (cookie sent automatically)
 curl -X POST http://localhost:3555/api/v1/auth/refresh \
-  -H "Cookie: refreshToken=..." 
+  --cookie "refreshToken=<token>"
 
-# 4. Logout
+# Logout
 curl -X POST http://localhost:3555/api/v1/auth/logout \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..."
+  -H "Authorization: Bearer <accessToken>"
 ```
 
 ---
 
 ## 🔒 Security
 
-### Password Policy
+### Password policy
 
-- **Minimum length**: 12 characters
-- **Must include**:
-    - Uppercase letter (A-Z)
-    - Lowercase letter (a-z)
-    - Number (0-9)
-    - Special character (!@#$%^&*)
+- Minimum 12 characters
+- Must include: uppercase (A-Z), lowercase (a-z), digit (0-9), special character (`!@#$%^&*`)
+
+### Token security
+
+- **Access token**: short-lived (15m), transmitted via `Authorization` header only
+- **Refresh token**: long-lived (7d), stored in `httpOnly; Secure; SameSite` cookie — inaccessible to JavaScript
+- **Token rotation**: every `/refresh` issues a new refresh token and invalidates the old one
+- **Token revocation**: `tokenVersion` field — incrementing it invalidates all issued tokens immediately
+
+### HTTP security headers (Helmet)
+
+- `Content-Security-Policy`
+- `Strict-Transport-Security` (HSTS, 1 year + preload)
+- `X-Frame-Options`
+- `X-Content-Type-Options`
 
 ---
 
 ## 🚦 Rate Limiting
 
-### Global Limits
+| Endpoint | Limit | Window | Key |
+|----------|-------|--------|-----|
+| `POST /auth/signup` | 5 req | 1 hour | IP |
+| `POST /auth/login` | 5 req | 15 min | email + IP |
+| `POST /auth/refresh` | 100 req | 1 hour | IP (failed only) |
+| All other endpoints | 200 req | 1 hour | IP |
 
-```
-Default: 200 requests/hour per IP
-Headers: X-RateLimit-Limit, X-RateLimit-Remaining
-```
-
-### Per-Endpoint Limits
-
-| Endpoint             | Limit | Window |
-|----------------------|-------|--------|
-| `POST /auth/signup`  | 5 | 1 hour |
-| `POST /auth/login`   | 5 | 15 min (per email) |
-| `POST /auth/refresh` | 100 | 1 hour (failed only) |
-| Other endpoints      | 200 | 1 hour |
-
-### Rate Limit Response
-
+Rate limit response:
 ```json
 {
   "status": "error",
@@ -425,57 +405,114 @@ Headers: X-RateLimit-Limit, X-RateLimit-Remaining
 
 ---
 
+## 📋 Audit Logging
+
+All authentication events are written to the `AuditLog` table in PostgreSQL.
+
+| Action | Trigger |
+|--------|---------|
+| `USER_REGISTER` | Successful signup |
+| `USER_LOGIN` | Successful login |
+| `USER_LOGIN_FAILED` | Wrong password or unknown email |
+| `USER_LOGOUT` | Logout |
+| `TOKEN_REFRESH` | Successful token refresh |
+| `TOKEN_REVOKED` | Token version mismatch detected |
+
+Each log entry includes: `actorId`, `action`, `entityType`, `entityId`, `ipAddress`, `userAgent`, `correlationId`, `createdAt`.
+
+---
+
+## 🏥 Health Check
+
+```bash
+curl http://localhost:3555/health
+```
+
+Response `200 OK`:
+```json
+{
+  "status": "ok",
+  "time": "2026-03-21T14:18:31.141Z",
+  "source": "mock",
+  "uptime": 142,
+  "services": {
+    "database": { "status": "ok", "latencyMs": 4 }
+  }
+}
+```
+
+Response `503 Service Unavailable` (degraded):
+```json
+{
+  "status": "degraded",
+  "time": "2026-03-21T14:18:31.141Z",
+  "source": "mock-fallback",
+  "services": {
+    "database": { "status": "error", "error": "Database unreachable" }
+  }
+}
+```
+
+### Two modes
+
+| `USE_LAMBDA_HEALTH` | Behaviour |
+|---------------------|-----------|
+| `false` (default) | Node.js queries PostgreSQL directly |
+| `true` + valid `LAMBDA_HEALTH_URL` | Delegates to AWS Lambda, falls back to mock on timeout |
+
+---
+
 ## 📁 Project Structure
 
 ```
 backend/
 ├── src/
-│   ├── app.ts                 # Application entry point
-│   ├── server.ts              # Express server setup
+│   ├── app.ts                          # Entry point, graceful shutdown
+│   ├── server.ts                       # Express setup, middleware, routes
 │   ├── config/
-│   │   ├── env.ts            # Environment validation (Zod)
-│   │   └── appConfig.ts       # App configuration
+│   │   ├── env.ts                      # Zod environment validation
+│   │   └── appConfig.ts                # Port, base URL
 │   ├── controllers/
-│   │   └── authController.ts # Route handlers
+│   │   ├── authController.ts           # Auth route handlers
+│   │   └── healthController.ts         # Health route handler
 │   ├── services/
-│   │   ├── AuthServiceImplPostgres.ts  # Business logic
-│   │   ├── prismaService.ts   # DB service
+│   │   ├── AuthServiceImplPostgres.ts  # Auth business logic
+│   │   ├── HealthService.ts            # Health check (mock + lambda)
+│   │   ├── prismaService.ts            # Prisma client wrapper
 │   │   └── dto/
-│   │       └── applDto.ts     # Data Transfer Objects
+│   │       └── applDto.ts              # SignupDto, LoginDto
 │   ├── routes/
-│   │   └── authRoutes.ts     # Route definitions
+│   │   ├── authRoutes.ts               # /api/v1/auth/*
+│   │   └── healthRoutes.ts             # /health
 │   ├── middleware/
-│   │   ├── authMiddleware.ts # JWT verification
-│   │   └── validateRequest.ts # Input validation
+│   │   ├── authMiddleware.ts           # JWT protect middleware
+│   │   └── validateRequest.ts          # Zod request validation
 │   ├── errorHandler/
-│   │   ├── errorHandler.ts   # Global error handler
-│   │   └── HttpError.ts      # Custom error class
+│   │   ├── errorHandler.ts             # Global Express error handler
+│   │   └── HttpError.ts                # Custom HTTP error class
 │   ├── utils/
-│   │   └── jwt.ts            # JWT utilities
+│   │   ├── jwt.ts                      # Token sign, verify, cookie helpers
+│   │   └── audit.ts                    # Audit log writer
 │   ├── validation/
-│   │   └── authSchemas.ts    # Zod schemas
+│   │   └── authSchemas.ts              # Zod schemas for auth endpoints
 │   ├── Logger/
-│   │   └── winston.ts        # Logging configuration
+│   │   └── winston.ts                  # Winston logger configuration
 │   ├── prisma/
-│   │   └── index.js          # Generated Prisma client
+│   │   └── index.js                    # Generated Prisma client
 │   └── types/
-│       └── express.d.ts      # Express type extensions
+│       └── express.d.ts                # Express Request type extensions
 ├── prisma/
-│   ├── schema.prisma         # Database schema
-│   ├── migrations/           # Database migrations
-│   └── seed.ts              # Seed data (optional)
+│   ├── schema.prisma                   # DB schema
+│   ├── migrations/                     # Migration history
+│   └── seed.ts                         # Seed data (optional)
 ├── docs/
-│   └── openapi.json         # OpenAPI 3.0 specification
-├── .env.example             # Environment template
-├── .env                     # Actual environment (git ignored)
-├── .gitignore               # Git ignore rules
-├── docker-compose.yml       # Docker services
-├── Dockerfile               # Container image
-├── package.json             # Dependencies
-├── package-lock.json        # Lock file
-├── tsconfig.json            # TypeScript config
-└── README.md                # This file
+│   └── openapi.json                    # OpenAPI 3.0 spec
+├── .env.example                        # Environment template
+├── .env                                # Local env (git ignored)
+├── .gitignore
+├── docker-compose.yml
+├── Dockerfile
+├── package.json
+├── tsconfig.json
+└── README.md
 ```
-
----
-
