@@ -1,4 +1,4 @@
-import {Response} from "express";
+import {Response, Request} from "express";
 
 import {HttpError} from "../errorHandler/HttpError";
 import * as tokenService from "../utils/jwt"
@@ -6,9 +6,9 @@ import {prismaService} from "./prismaService";
 import {hash, verify} from "argon2";
 import {env} from "../config/env";
 import jwt from "jsonwebtoken";
-import {LoginDto, SignupDto} from "./dto/applDto";
 import { logAudit } from '../utils/audit';
-
+import {TokenPayload} from "../utils/jwt";
+import {SignupDto, LoginDto} from "./dto/applDto";
 export class AuthServiceImplPostgres {
    
     async auth(res: Response, user: TokenPayload) {
@@ -23,7 +23,7 @@ export class AuthServiceImplPostgres {
     }
 
     async register(res: Response, req: Request, dto: SignupDto) {
-        const {name, email, password} = dto;
+        const {name, email, password, phone} = dto;
         const isExists = await prismaService.user.findUnique({
             where: {
                 email,
@@ -37,6 +37,7 @@ export class AuthServiceImplPostgres {
                 name,
                 email,
                 password: await hash(password),
+                phone,
             },
             select: {
                 userId: true,

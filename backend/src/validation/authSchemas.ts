@@ -12,6 +12,7 @@ export const signupSchema = z.object({
         name: z.string().min(2),
         email: z.string().email(),
         password: passwordSchema,
+        phone: z.string().min(10).max(15).optional(),
     }),
 });
 
@@ -23,11 +24,9 @@ export const loginSchema = z.object({
 });
 
 export const refreshSchema = z.object({
-    body: z
-        .object({
-            refreshToken: z.string().min(1).optional(),
-        })
-        .passthrough(),
+    cookies: z.object({
+        refreshToken: z.string().min(1, 'Refresh token is required'),
+    }),
 });
 
 export const updatePasswordSchema = z.object({

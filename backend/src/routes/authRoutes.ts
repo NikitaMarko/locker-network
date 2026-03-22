@@ -8,7 +8,10 @@ import {
     signupSchema,
 } from "../validation/authSchemas";
 import * as auth from "../middleware/authMiddleware";
-import {rateLimit, ipKeyGenerator} from 'express-rate-limit';
+import {
+    rateLimit,
+    ipKeyGenerator
+} from 'express-rate-limit';
 
 const loginLimiter = rateLimit({
     max: 5,

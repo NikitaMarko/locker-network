@@ -9,8 +9,6 @@ import hpp from 'hpp';
 import morgan from "morgan";
 import qs from 'qs';
 import swaggerUi from "swagger-ui-express"
-import swaggerDoc from "../docs/openapi.json";
-
 import {baseUrl, PORT} from "./config/appConfig";
 import {env} from "./config/env";
 import {errorHandler} from "./errorHandler/errorHandler";
@@ -29,7 +27,7 @@ export const createApp = () => {
         contentSecurityPolicy: {
             directives: {
                 defaultSrc: ["'self'"],
-                connectSrc: ["'self'", env.FRONTEND_URL],
+                connectSrc: ["'self'", env.FRONTEND_URL].filter(Boolean) as string[],
                 formAction: ["'self'"],
                 frameAncestors: ["'none'"],
                 objectSrc: ["'none'"],
