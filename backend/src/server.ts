@@ -16,6 +16,7 @@ import {env} from "./config/env";
 import {errorHandler} from "./errorHandler/errorHandler";
 import {logger} from "./Logger/winston";
 import {authRouter} from "./routes/authRoutes";
+import {healthRouter} from "./routes/healthRoutes";
 import { randomUUID } from 'crypto';
 import { HttpError } from './errorHandler/HttpError';
 
@@ -101,13 +102,7 @@ export const createApp = () => {
     const API_PREFIX = '/api/v1';
     app.get('/', (_, res) => res.send('API is running'));
     app.use(`${API_PREFIX}/auth`, authRouter)
-    app.get(`/health`, (_, res) => {
-        res.status(200).json({
-            status: 'ok',
-            time: new Date().toISOString()
-        });
-    });
-
+    app.use(`/health`, healthRouter)
 
 
 
