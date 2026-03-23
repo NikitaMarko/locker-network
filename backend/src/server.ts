@@ -17,6 +17,7 @@ import {authRouter} from "./routes/authRoutes";
 import {healthRouter} from "./routes/healthRoutes";
 import { randomUUID } from 'crypto';
 import { HttpError } from './errorHandler/HttpError';
+import {lockersRoutes} from "./routes/lockersRoutes";
 
 export const createApp = () => {
 
@@ -101,6 +102,7 @@ export const createApp = () => {
     app.get('/', (_, res) => res.send('API is running'));
     app.use(`${API_PREFIX}/auth`, authRouter)
     app.use(`/health`, healthRouter)
+    app.use(`${API_PREFIX}/lockers`, lockersRoutes)
 
 
 

@@ -108,7 +108,7 @@ model LockerBox {
   bookings Booking[]
   AuditLog AuditLog[]
 
-  @@unique([stationId])
+  @@unique([stationId, code])
   @@index([stationId])
   @@index([status])
 }
