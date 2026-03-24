@@ -322,7 +322,6 @@ http://localhost:3555/api/v1
 ```typescript
 interface TokenPayload {
   userId: string;       // User UUID
-  jti?: string;         // Unique token ID
   role: Role;           // USER | OPERATOR | ADMIN
   tokenVersion: number; // Revocation version
 }

@@ -1,4 +1,7 @@
 import express, {Request} from "express";
+import {rateLimit, ipKeyGenerator} from 'express-rate-limit';
+import jwt from "jsonwebtoken";
+
 import * as authController from "../controllers/authController";
 import {validateRequest} from "../middleware/validateRequest";
 import {
@@ -7,7 +10,8 @@ import {
     signupSchema,
 } from "../validation/authSchemas";
 import * as auth from "../middleware/authMiddleware";
-import {rateLimit, ipKeyGenerator} from 'express-rate-limit';
+import {env} from "../config/env";
+import {TokenPayload} from "../utils/jwt";
 
 const loginLimiter = rateLimit({
     max: 5,
@@ -45,6 +49,21 @@ const refreshLimiter = rateLimit({
     max: 100,
     windowMs: 60 * 60 * 1000,
     skipSuccessfulRequests: true,
+    keyGenerator: (req: Request) => {
+        try {
+            const token = req.cookies?.refreshToken;
+            const payload = jwt.verify(token, env.JWT_REFRESH_SECRET, {
+                algorithms: ['HS256'],
+            }) as TokenPayload;
+            if (!req.ip) {
+                throw new Error('IP is missing');
+            }
+            const ip = ipKeyGenerator(req.ip);
+            return `${payload.userId}:${ip}`;
+        } catch {
+            return ipKeyGenerator(req.ip ?? 'unknown');
+        }
+    },
 });
 
 export const authRouter = express.Router()

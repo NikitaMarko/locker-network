@@ -2,7 +2,6 @@ import {NextFunction, Request, Response} from "express";
 
 import {HttpError} from '../errorHandler/HttpError';
 import {authService} from '../services/AuthServiceImplPostgres';
-import { TokenPayload } from "../utils/jwt";
 
 export const register = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -22,16 +21,12 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
 
 export const me = async (req: Request, res: Response, next: NextFunction) => {
     try{
-    const {userId} = req.user as TokenPayload;
+    const {userId} = req.user;
     const currentUser = await authService.me(userId);
     return res.status(200).json({
         status: 'success',
         data: {
-            userId: currentUser.userId,
-            name: currentUser.name,
-            email: currentUser.email,
-            role: currentUser.role,
-            createdAt: currentUser.createdAt,
+            ...currentUser
         },
     })
     } catch (e) {

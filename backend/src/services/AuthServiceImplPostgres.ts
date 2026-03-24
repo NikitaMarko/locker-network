@@ -1,14 +1,16 @@
-import {Response, Request} from "express";
-
-import {HttpError} from "../errorHandler/HttpError";
-import * as tokenService from "../utils/jwt"
-import {prismaService} from "./prismaService";
+import {Request, Response} from "express";
 import {hash, verify} from "argon2";
-import {env} from "../config/env";
 import jwt from "jsonwebtoken";
-import { logAudit } from '../utils/audit';
-import {TokenPayload} from "../utils/jwt";
-import {SignupDto, LoginDto} from "./dto/applDto";
+
+import * as tokenService from "../utils/jwt"
+import {hashToken, TokenPayload} from "../utils/jwt"
+import {env} from "../config/env";
+import {HttpError} from "../errorHandler/HttpError";
+import {logAudit} from '../utils/audit';
+
+import {prismaService} from "./prismaService";
+import {LoginDto, SignupDto} from "./dto/applDto";
+
 export class AuthServiceImplPostgres {
    
     async auth(res: Response, user: TokenPayload) {
@@ -123,6 +125,7 @@ export class AuthServiceImplPostgres {
             select: {
                 userId: true,
                 email: true,
+                phone: true,
                 name: true,
                 role: true,
                 createdAt: true,
@@ -130,7 +133,7 @@ export class AuthServiceImplPostgres {
         });
 
         if (!currentUser) {
-            throw new HttpError(401, 'User not found');
+            throw new HttpError(404, 'User not found');
         }
 
         return currentUser;
@@ -141,8 +144,9 @@ export class AuthServiceImplPostgres {
         let payload: TokenPayload;
 
         try {
-            payload = jwt.verify(refreshToken,
-                env.JWT_REFRESH_SECRET) as TokenPayload;
+            payload = jwt.verify(refreshToken, env.JWT_REFRESH_SECRET, {
+                algorithms: ['HS256'],
+            }) as TokenPayload;
         } catch {
             tokenService.clearCookies(res);
 
@@ -162,9 +166,10 @@ export class AuthServiceImplPostgres {
         if (!user || !user.refreshToken) {
             throw new HttpError(401, "User not found");
         }
-        const isValid = await verify(user.refreshToken, refreshToken );
 
-        if (!isValid) {
+        const hashedIncoming = hashToken(refreshToken);
+
+        if (hashedIncoming !== user.refreshToken) {
             throw new HttpError(401,'Invalid refresh token');
         }
 
@@ -186,7 +191,7 @@ export class AuthServiceImplPostgres {
         };
 
         const { accessToken, refreshToken: newRefreshToken } = await tokenService.generateTokens(newPayload);
-        const hashed = await hash(newRefreshToken);
+        const hashed = hashToken(newRefreshToken);
 
         const result = await prismaService.user.updateMany({
             where: {
