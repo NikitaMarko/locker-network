@@ -1,11 +1,19 @@
-import { LambdaRequest, LambdaResponse } from '../types/contracts';
+import { HealthCheckResponse, HealthCheckBody } from '../types/contracts';
 
-export const handler = async (event: LambdaRequest): Promise<LambdaResponse> => {
-  console.log('Invoked by:', event.requestedBy);
-  console.log('Action:', event.action);
+const startTime = Date.now();
+
+export const handler = async (): Promise<HealthCheckResponse> => {
+  const body: HealthCheckBody = {
+    status: 'ok',
+    uptime: Math.floor((Date.now() - startTime) / 1000),
+    services: {
+      lambda: { status: 'ok' },
+    },
+  };
 
   return {
-    message: 'Ok',
-    timestamp: new Date().toISOString(),
+    statusCode: 200,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
   };
 };
