@@ -1,6 +1,7 @@
 import { Request } from 'express';
+
 import { prismaService } from '../services/prismaService';
-import { logger } from '../Logger/winston';
+import {auditLogger} from '../Logger/winston';
 
 type AuditAction =
     | 'USER_LOGIN'
@@ -46,6 +47,6 @@ export const logAudit = async ({
             },
         });
     } catch (err) {
-        logger.error('Failed to write audit log', { action, actorId, err });
+        auditLogger.error('Failed to write audit log', { action, actorId, err });
     }
 };
