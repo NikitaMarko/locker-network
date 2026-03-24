@@ -1,12 +1,11 @@
 import {NextFunction, Request, RequestHandler, Response} from "express";
 import jwt from "jsonwebtoken";
+import {Role} from "@prisma/client"
 
 import {env} from "../config/env";
 import {HttpError} from "../errorHandler/HttpError";
 import {logger} from "../Logger/winston";
-import {prismaService} from "../services/prismaService";
 import {TokenPayload} from "../utils/jwt";
-import {Role} from "../prisma"
 
 export const protect: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
 

@@ -2,9 +2,9 @@ import { createHash } from 'crypto';
 
 import {CookieOptions, Response} from 'express';
 import jwt, {JwtPayload, SignOptions} from 'jsonwebtoken';
+import {Role} from '@prisma/client';
 
 import {env} from '../config/env';
-import {Role} from '../prisma';
 import {prismaService} from '../services/prismaService';
 
 export interface TokenPayload extends JwtPayload {

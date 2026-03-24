@@ -1,4 +1,5 @@
 import { env } from '../config/env';
+
 import { prismaService } from './prismaService';
 
 export const getHealthStatus = async () => {

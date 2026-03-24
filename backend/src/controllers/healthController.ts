@@ -1,4 +1,5 @@
 import {Request, Response, NextFunction} from 'express';
+
 import * as healthService from '../services/HealthService';
 
 export const healthStatus = async (req: Request, res: Response, next: NextFunction) => {

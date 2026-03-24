@@ -35,6 +35,9 @@ npm install
 cp .env.example .env
 # Edit .env — replace JWT secrets with strong random values (see Environment Setup)
 
+# Generate Prisma client
+npx prisma generate  
+
 # Run migrations
 npx prisma migrate dev
 
@@ -51,18 +54,18 @@ Swagger docs: `http://localhost:3555/docs` (development only)
 
 | Component | Technology | Version |
 |-----------|-----------|---------|
-| **Runtime** | Node.js | 22+ |
-| **Language** | TypeScript | 5.9+ |
-| **Framework** | Express.js | 5.2+ |
-| **ORM** | Prisma | 5.22+ |
-| **Database** | PostgreSQL | 12+ |
-| **Auth** | JWT (access + refresh token rotation) | HS256 |
-| **Password Hash** | Argon2 | 0.44+ |
-| **Logging** | Winston | 3.19+ |
-| **Rate Limiting** | express-rate-limit | 8.3+ |
-| **Validation** | Zod | 4.3+ |
-| **Security** | Helmet, HPP, CORS | latest |
-| **API Docs** | Swagger UI (OpenAPI 3.0) | latest |
+| **Runtime** | Node.js | 22+     |
+| **Language** | TypeScript | 5.9+    |
+| **Framework** | Express.js | 5.2+    |
+| **ORM** | Prisma | 5.22+   |
+| **Database** | PostgreSQL | 12+     |
+| **Auth** | JWT (access + refresh token rotation) | HS256   |
+| **Password Hash** | Argon2 | 0.44+   |
+| **Logging** | Winston | 3.19+   |
+| **Rate Limiting** | express-rate-limit | 8.3+    |
+| **Validation** | Zod | 4.3+    |
+| **Security** | Helmet, HPP, CORS | latest  |
+| **API Docs** | Swagger UI (OpenAPI 3.0) | latest  |
 
 ---
 
@@ -199,7 +202,7 @@ docker-compose down -v
 docker build -t locker-backend:latest .
 
 docker run -p 3555:3555 \
-  -e DATABASE_URL="postgresql://user:pass@host:5432/db" \
+  -e DATABASE_URL="postgresql://user:pass@host:5433/locker" \
   -e JWT_ACCESS_SECRET="your-32-char-secret" \
   -e JWT_REFRESH_SECRET="your-32-char-secret" \
   locker-backend:latest
@@ -228,7 +231,7 @@ npx prisma studio
 
 Schema: `prisma/schema.prisma`
 Migrations: `prisma/migrations/`
-Generated client: `src/prisma/`
+Generated client: `@prisma/client`
 
 ---
 
@@ -305,16 +308,15 @@ http://localhost:3555/api/v1
    → Authorization: Bearer <accessToken>
 
 3. TOKEN EXPIRED (401)
-   POST /auth/refresh  (refreshToken sent automatically via cookie)
+   POST /auth/refresh
    ← new accessToken in JSON body
-   ← new refreshToken in httpOnly cookie (token rotation)
-   tokenVersion is incremented — all previous tokens revoked
+   ← new refreshToken in httpOnly cookie (refresh token rotation)
+   old refresh token is invalidated
 
-4. LOGOUT
-   POST /auth/logout
-   → refreshToken deleted from DB
+4. LOGOUT / REVOKE
+   → refresh token removed from DB
    → tokenVersion incremented
-   → cookie cleared
+   → all previously issued tokens become invalid for refresh flow
 ```
 
 ### Token payload
@@ -322,6 +324,7 @@ http://localhost:3555/api/v1
 ```typescript
 interface TokenPayload {
   userId: string;       // User UUID
+  jti?: string;         // Unique token ID
   role: Role;           // USER | OPERATOR | ADMIN
   tokenVersion: number; // Revocation version
 }
@@ -374,7 +377,7 @@ curl -X POST http://localhost:3555/api/v1/auth/logout \
 - **Access token**: short-lived (15m), transmitted via `Authorization` header only
 - **Refresh token**: long-lived (7d), stored in `httpOnly; Secure; SameSite` cookie — inaccessible to JavaScript
 - **Token rotation**: every `/refresh` issues a new refresh token and invalidates the old one
-- **Token revocation**: `tokenVersion` field — incrementing it invalidates all issued tokens immediately
+- **Token revocation**: incrementing `tokenVersion` prevents further refresh and forces re-authentication after the current access token expires.
 
 ### HTTP security headers (Helmet)
 
@@ -496,8 +499,6 @@ backend/
 │   │   └── authSchemas.ts              # Zod schemas for auth endpoints
 │   ├── Logger/
 │   │   └── winston.ts                  # Winston logger configuration
-│   ├── prisma/
-│   │   └── index.js                    # Generated Prisma client
 │   └── types/
 │       └── express.d.ts                # Express Request type extensions
 ├── prisma/

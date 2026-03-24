@@ -1,25 +1,28 @@
 
+import { randomUUID } from 'crypto';
+
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express, {Application, NextFunction, Request, Response} from 'express'
-
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import hpp from 'hpp';
 import morgan from "morgan";
 import qs from 'qs';
 import swaggerUi from "swagger-ui-express"
-import {baseUrl, PORT} from "./config/appConfig";
+
 import {env} from "./config/env";
 import {errorHandler} from "./errorHandler/errorHandler";
 import {logger} from "./Logger/winston";
 import {authRouter} from "./routes/authRoutes";
 import {healthRouter} from "./routes/healthRoutes";
-import { randomUUID } from 'crypto';
 import { HttpError } from './errorHandler/HttpError';
 import {lockersRoutes} from "./routes/lockersRoutes";
 
+    const PORT = env.PORT;
+    const baseUrl = `http://localhost:${PORT}`;
 export const createApp = () => {
+
 
     const app: Application = express();
     app.set('trust proxy', 1);

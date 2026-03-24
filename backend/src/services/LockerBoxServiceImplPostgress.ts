@@ -1,6 +1,8 @@
 import {Response, Request} from "express";
-import {prismaService} from "./prismaService";
+
 import {HttpError} from "../errorHandler/HttpError";
+
+import {prismaService} from "./prismaService";
 
 
 
