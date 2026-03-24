@@ -1,0 +1,145 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Locker Network Lambda Functions
+
+# ─── Global settings for all functions ───
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Timeout: 30
+    MemorySize: 256
+    Environment:
+      Variables:
+        DATABASE_URL: !Ref DatabaseUrl
+        NODE_ENV: !Ref Environment
+
+# ─── Parameters ───
+Parameters:
+  DatabaseUrl:
+    Type: String
+    Description: PostgreSQL connection string
+    NoEcho: true
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+
+# ─── Lambda Functions ───
+Resources:
+
+  # ── Health Check ──
+  HealthCheckFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub locker-${Environment}-health-check
+      Handler: dist/functions/healthCheck.handler
+      CodeUri: .
+      Description: Returns Ok + timestamp
+
+  # ── Booking ──
+  CreateBookingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub locker-${Environment}-create-booking
+      Handler: dist/functions/booking/createBooking.handler
+      CodeUri: .
+      Description: Create booking, reserve locker box, write audit log
+
+  CancelBookingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub locker-${Environment}-cancel-booking
+      Handler: dist/functions/booking/cancelBooking.handler
+      CodeUri: .
+      Description: Cancel booking, release locker box
+
+  ExtendBookingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub locker-${Environment}-extend-booking
+      Handler: dist/functions/booking/extendBooking.handler
+      CodeUri: .
+      Description: Extend booking end time
+
+  UpdateBookingStatusFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub locker-${Environment}-update-booking-status
+      Handler: dist/functions/booking/updateBookingStatus.handler
+      CodeUri: .
+      Description: Change booking status (admin/operator)
+
+  # ── Cron ──
+  ExpireBookingsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub locker-${Environment}-expire-bookings
+      Handler: dist/functions/cron/expireBookings.handler
+      CodeUri: .
+      Description: Find and expire overdue bookings
+      Events:
+        ScheduleEvent:
+          Type: Schedule
+          Properties:
+            Schedule: rate(5 minutes)
+            Enabled: true
+
+  # ── Notification (triggered by SQS) ──
+  SendNotificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub locker-${Environment}-send-notification
+      Handler: dist/functions/notification/sendNotification.handler
+      CodeUri: .
+      Description: Send email/SMS notifications
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt NotificationQueue.Arn
+            BatchSize: 10
+
+  # ── Audit Log (triggered by SQS) ──
+  WriteAuditLogFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub locker-${Environment}-write-audit-log
+      Handler: dist/functions/audit/writeAuditLog.handler
+      CodeUri: .
+      Description: Write audit log entry to DB
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt AuditLogQueue.Arn
+            BatchSize: 10
+
+# ─── SQS Queues ───
+  NotificationQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub locker-${Environment}-notification-queue
+      VisibilityTimeout: 60
+      MessageRetentionPeriod: 86400  # 24 hours
+
+  AuditLogQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub locker-${Environment}-audit-log-queue
+      VisibilityTimeout: 60
+      MessageRetentionPeriod: 86400
+
+# ─── Outputs ───
+Outputs:
+  HealthCheckArn:
+    Description: Health Check Lambda ARN
+    Value: !GetAtt HealthCheckFunction.Arn
+  NotificationQueueUrl:
+    Description: SQS URL for notifications
+    Value: !Ref NotificationQueue
+  AuditLogQueueUrl:
+    Description: SQS URL for audit logs
+    Value: !Ref AuditLogQueue
