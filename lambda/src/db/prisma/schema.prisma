@@ -1,11 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/prisma"
 }
 
 datasource db {
@@ -70,7 +64,7 @@ model User {
   phone             String?   @unique
   role              Role      @default(USER)
   refreshToken      String?
-  tokenVersion      Int
+  tokenVersion      Int       @default(0)
   passwordChangedAt DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
@@ -80,18 +74,19 @@ model User {
 }
 
 model LockerStation {
-  stationId String  @id @default(uuid())
-  location  String // default "Tel Aviv"
+  stationId String        @id @default(uuid())
+  city      String // default "Tel Aviv"
   address   String? // "Dizengoff 10"
-
-  status StationStatus @default(ACTIVE)
+  latitude  String
+  longitude String
+  status    StationStatus @default(ACTIVE)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   lockers LockerBox[]
 
-  @@index([location])
+  @@index([city])
 }
 
 model LockerBox {
@@ -100,6 +95,7 @@ model LockerBox {
 
   code   String       @unique // "A-01"
   size   LockerSize
+  price  Decimal      @db.Decimal(10, 2)
   status LockerStatus @default(AVAILABLE)
 
   createdAt DateTime @default(now())
@@ -111,7 +107,7 @@ model LockerBox {
   bookings Booking[]
   AuditLog AuditLog[]
 
-  @@unique([stationId])
+  @@unique([stationId, code])
   @@index([stationId])
   @@index([status])
 }

@@ -9,13 +9,13 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "dependencies": {
-    "@prisma/client": "^7.5.0",
-    "prisma": "^7.5.0",
-    "typescript": "^5.9.3"
-  },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.161",
-    "@types/node": "^25.5.0"
+    "@types/node": "^25.5.0",
+    "prisma": "^5.22.0",
+    "typescript": "^6.0.2"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0"
   }
 }
