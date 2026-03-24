@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/useAuth';
 
-export function LoginPage() {
+export function LoginPageTest() {
     const navigate = useNavigate();
     const { login } = useAuth();
 
@@ -26,49 +26,112 @@ export function LoginPage() {
         }
     }
 
-
     return (
-        <div style={{ maxWidth: 400, margin: '60px auto' }}>
-            <h1>Вход</h1>
+        <div style={wrapperStyle}>
+            <div style={cardStyle}>
+                <h1 style={titleStyle}>Login</h1>
 
-            <div style={{
-                marginTop: '15px',
-                padding: '10px 15px',
-                background: '#f5f5f5',
-                borderRadius: '8px',
-                fontSize: '14px',
-                color: '#444',
-                border: '1px solid #ddd'
-            }}>
-                <p style={{ margin: 0 }}><strong>Тестовый пользователь:</strong></p>
-                <p style={{ margin: 0 }}>Email: <strong>demo@example.com</strong></p>
-                <p style={{ margin: 0 }}>Пароль: <strong>123456</strong></p>
+                {/* TEST USER */}
+                <div style={infoStyle}>
+                    <p><strong>Тестовый пользователь:</strong></p>
+                    <p>Email: <strong>demo@example.com</strong></p>
+                    <p>Password: <strong>123456</strong></p>
+                </div>
+
+                <form onSubmit={handleSubmit} style={formStyle}>
+                    <input
+                        type="email"
+                        placeholder="Email"
+                        value={email}
+                        onChange={e => setEmail(e.target.value)}
+                        required
+                        style={inputStyle}
+                    />
+
+                    <input
+                        type="password"
+                        placeholder="Password"
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        required
+                        style={inputStyle}
+                    />
+
+                    {error && (
+                        <div style={errorStyle}>
+                            {error}
+                        </div>
+                    )}
+
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        style={buttonStyle}
+                    >
+                        {loading ? 'Logging in...' : 'Login'}
+                    </button>
+                </form>
             </div>
-
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <input
-                    type="email"
-                    placeholder="Email"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    required
-                />
-
-                <input
-                    type="password"
-                    placeholder="Пароль"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    required
-                />
-
-                {error && <div style={{ color: 'red' }}>{error}</div>}
-
-                <button type="submit" disabled={loading}>
-                    {loading ? 'Вход...' : 'Войти'}
-                </button>
-            </form>
         </div>
-
     );
 }
+
+/* ===== styles ===== */
+
+const wrapperStyle = {
+    height: "100vh",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f5f6fa",
+};
+
+const cardStyle = {
+    width: "100%",
+    maxWidth: "400px",
+    padding: "30px",
+    borderRadius: "12px",
+    backgroundColor: "white",
+    boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
+};
+
+const titleStyle = {
+    textAlign: "center" as const,
+    marginBottom: "20px",
+};
+
+const infoStyle = {
+    marginBottom: "20px",
+    padding: "10px 15px",
+    background: "#f1f3f5",
+    borderRadius: "8px",
+    fontSize: "14px",
+};
+
+const formStyle = {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "12px",
+};
+
+const inputStyle = {
+    padding: "12px",
+    borderRadius: "8px",
+    border: "1px solid #ddd",
+    fontSize: "14px",
+};
+
+const buttonStyle = {
+    padding: "12px",
+    borderRadius: "8px",
+    border: "none",
+    backgroundColor: "#4CAF50",
+    color: "white",
+    fontWeight: "bold",
+    cursor: "pointer",
+};
+
+const errorStyle = {
+    color: "#e53935",
+    fontSize: "14px",
+};
