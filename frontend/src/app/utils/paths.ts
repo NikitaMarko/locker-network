@@ -1,4 +1,4 @@
-export enum Paths {
+gitgexport enum Paths {
     HOME='/',
     USER='user',
     OPERATOR='operator',
