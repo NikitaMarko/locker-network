@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/useAuth';
 import { useState } from 'react';
 import bg from '/smart-locker-project.jpeg';
-import {Paths} from "../../../app/utils/paths.ts";
+import { Paths } from "../../../app/utils/paths.ts";
 
 export function HomePageTest() {
     const { user } = useAuth();
@@ -10,19 +10,37 @@ export function HomePageTest() {
     const [health, setHealth] = useState<any>(null);
     const [loading, setLoading] = useState(false);
 
+    const HEALTH_URL = 'http://localhost:3555/health';
+
+    const normalizeStatus = (status: string) => {
+        if (status === 'ok') return 'UP';
+        if (status === 'error') return 'DOWN';
+        return status;
+    };
+
     const handleHealthCheck = async () => {
         try {
             setLoading(true);
 
-            const res = await fetch('http://localhost:3555/health');
+            const res = await fetch(HEALTH_URL);
+
+            if (!res.ok) {
+                throw new Error(`HTTP error: ${res.status}`);
+            }
+
             const data = await res.json();
 
-            setHealth(data);
-        } catch (err) {
-            console.error(err);
+            setHealth({
+                ...data,
+                status: normalizeStatus(data.status),
+            });
+
+        } catch (err: any) {
+            console.error('Health check failed:', err);
+
             setHealth({
                 status: 'DOWN',
-                message: 'Server unreachable'
+                message: err?.message || 'Server unreachable'
             });
         } finally {
             setLoading(false);
@@ -36,7 +54,7 @@ export function HomePageTest() {
             case 'UP':
                 return 'lightgreen';
             case 'DOWN':
-                return 'red';
+                return '#e53935';
             default:
                 return 'orange';
         }
@@ -89,12 +107,13 @@ export function HomePageTest() {
             }}>
                 Smart Locker System
             </h1>
-            <h3
-                style={{
+
+            <h3 style={{
                 fontSize: "38px",
                 marginBottom: "25px",
                 color: "#ffffff",
-                letterSpacing: "1px"}}>
+                letterSpacing: "1px"
+            }}>
                 Smart Storage. Zero Hassle.
             </h3>
 
@@ -159,8 +178,13 @@ export function HomePageTest() {
                             Status: {health.status}
                         </p>
 
-                        {health.time && <p>Time: {health.time}</p>}
                         {health.uptime && <p>Uptime: {health.uptime}s</p>}
+
+                        {health.services?.lambda && (
+                            <p>
+                                Lambda: {health.services.lambda.status}
+                            </p>
+                        )}
 
                         {health.services?.database && (
                             <p>
