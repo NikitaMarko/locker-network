@@ -15,7 +15,6 @@ export function Info() {
                     A digital platform for booking and managing smart lockers across locations.
                 </p>
 
-                {/* MAIN CARDS */}
                 <div style={gridStyle}>
 
                     <div
@@ -54,7 +53,7 @@ export function Info() {
                         onMouseEnter={() => setHovered(3)}
                         onMouseLeave={() => setHovered(null)}
                     >
-                        <h3 style={{color:"#4CAF50"}}>How it works</h3>
+                        <h3 style={cardGreenText}>How it works</h3>
                         <ul style={listStyle}>
                             <li>Create account</li>
                             <li>Select locker</li>
@@ -68,6 +67,10 @@ export function Info() {
         </div>
     );
 }
+
+const cardGreenText = {
+    color:"#4CAF50"
+};
 const wrapperStyle = {
     height: "100vh",
     display: "flex",

@@ -11,7 +11,6 @@ export function Location() {
 
                 <div style={layoutStyle}>
 
-                    {/* LIST */}
                     <div style={listStyle}>
                         {locations.map((loc) => (
                             <div
