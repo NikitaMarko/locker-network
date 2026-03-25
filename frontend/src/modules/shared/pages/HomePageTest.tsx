@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/useAuth';
 import { useState } from 'react';
-import bg from '../../../../public/smart-locker-project.jpeg';
+import bg from '/smart-locker-project.jpeg';
 import {Paths} from "../../../app/utils/paths.ts";
 
 export function HomePageTest() {
