@@ -16,6 +16,9 @@ import { ProtectedRoute } from '../modules/shared/components/ProtectedRoute';
 import { RoleGuard } from '../modules/shared/components/RoleGuard';
 import { ROLES } from '../config/roles';
 import Navbar from "./Navbar.tsx";
+import {Info} from "../components/Info.tsx";
+import {Pricing} from "../components/Price.tsx";
+import {Location} from "../components/Location.tsx";
 
 export function AppRoutes() {
     return (
@@ -28,6 +31,9 @@ export function AppRoutes() {
 
                 {/* Публичные */}
                 <Route path="/login" element={<LoginPageTest />} />
+                <Route path="/info" element={<Info />} />
+                <Route path="/price" element={<Pricing />} />
+                <Route path="/location" element={<Location />} />
                 <Route path="/register" element={<RegisterPage />} />
 
                 <Route path="/403" element={<ForbiddenPage />} />

@@ -57,7 +57,7 @@ export function HomePage() {
                 </Link>
             )}
 
-            {/* 🔥 HEALTH BUTTON */}
+            {/*  HEALTH BUTTON */}
             <button onClick={handleHealthCheck}>
                 Sync Health Check
             </button>

@@ -10,7 +10,7 @@ const Navbar = () => {
         <nav className="navbar">
             <div className="navbar-left">
                 <Link to={Paths.HOME}>Home</Link>
-                <Link to={Paths.LOCKERS}>Lockers</Link>
+                {/*<Link to={Paths.LOCKERS}>Lockers</Link>*/}
                 <Link to={Paths.LOCATION}>Locations</Link>
                 <Link to={Paths.PRICE}>Pricing</Link>
                 <Link to={Paths.INFO}>Info</Link>

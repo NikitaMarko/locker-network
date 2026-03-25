@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/useAuth';
 import { useState } from 'react';
 import bg from '../../../../public/smart-locker-project.jpeg';
+import {Paths} from "../../../app/utils/paths.ts";
 
 export function HomePageTest() {
     const { user } = useAuth();
@@ -131,7 +132,7 @@ export function HomePageTest() {
                             Go to dashboard
                         </Link>
                     ) : (
-                        <Link to="/login" style={buttonStyle}>
+                        <Link to={Paths.LOGIN} style={buttonStyle}>
                             Get started
                         </Link>
                     )}

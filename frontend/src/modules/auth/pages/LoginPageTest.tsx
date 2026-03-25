@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import {Link, useNavigate} from 'react-router-dom';
 import { useAuth } from '../../../app/providers/useAuth';
+import {Paths} from "../../../app/utils/paths.ts";
 
 export function LoginPageTest() {
     const navigate = useNavigate();
@@ -71,12 +72,28 @@ export function LoginPageTest() {
                         {loading ? 'Logging in...' : 'Login'}
                     </button>
                 </form>
+                <div style={footerTextStyle}>Don&apos;t have an account?</div> <Link to={Paths.REGISTER} style={linkStyle}> Sign up </Link>
             </div>
         </div>
     );
 }
 
 /* ===== styles ===== */
+
+const footerTextStyle = {
+    marginTop: "15px",
+    textAlign: "center" as const,
+    fontSize: "14px",
+};
+
+const linkStyle = {
+    display: "block",
+    textAlign: "center" as const,
+    marginTop: "5px",
+    color: "#4CAF50",
+    textDecoration: "none",
+    fontWeight: "bold",
+};
 
 const wrapperStyle = {
     height: "100vh",
@@ -97,7 +114,7 @@ const cardStyle = {
 
 const titleStyle = {
     textAlign: "center" as const,
-    marginBottom: "20px",
+    marginBottom: "50px",
 };
 
 const infoStyle = {
