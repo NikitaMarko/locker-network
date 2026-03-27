@@ -1,5 +1,4 @@
-
-import { useEffect, useState } from "react";
+import { useEffect, useState} from "react";
 import type { ReactNode } from "react";
 import type { User } from "../../modules/shared/types/user";
 import { AuthContext } from "./AuthContext";
@@ -20,7 +19,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const token = localStorage.getItem("access_token");
 
         if (!token) {
-            setLoading(false);
+            // делаем вызов асинхронным
+            setTimeout(() => setLoading(false), 0);
             return;
         }
 

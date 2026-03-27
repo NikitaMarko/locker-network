@@ -1,7 +1,6 @@
-// src/modules/shared/layout/Sidebar.tsx
 import { NavLink } from 'react-router-dom';
-import { useAuth } from '../../../app/providers/AuthProvider';
 import { menuByRole } from './menu';
+import {useAuth} from "../../../app/providers/useAuth.ts";
 
 export function Sidebar() {
     const { user } = useAuth();

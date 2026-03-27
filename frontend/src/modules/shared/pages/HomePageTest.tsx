@@ -10,7 +10,8 @@ export function HomePageTest() {
     const [health, setHealth] = useState<any>(null);
     const [loading, setLoading] = useState(false);
 
-    const HEALTH_URL = 'http://localhost:3555/health';
+    // const HEALTH_URL = 'http://localhost:3555/health';
+    const HEALTH_URL = 'http://locker-lb-823207158.eu-north-1.elb.amazonaws.com/health';
 
     const normalizeStatus = (status: string) => {
         if (status === 'ok') return 'UP';

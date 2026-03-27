@@ -1,4 +1,5 @@
-import { useAuth } from '../../../app/providers/AuthProvider';
+import {useAuth} from "../../../app/providers/useAuth.ts";
+
 
 export function Header() {
     const { user, logout } = useAuth();

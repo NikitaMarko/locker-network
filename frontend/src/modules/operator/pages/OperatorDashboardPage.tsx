@@ -1,16 +1,26 @@
-import { useOperatorLockers } from '../hooks/useOperatorLockers';
-import { LockerControlTable } from '../components/LockerControlTable';
+import {LockerControlTable} from "../components/LockerControlTable.tsx";
+import {useOperatorLockers} from "../hooks/useOperatorLockers.ts";
 
 export function OperatorDashboardPage() {
-    const { data, isLoading, error } = useOperatorLockers();
+    const {
+        lockers,
+        isLoading,
+        openLocker,
+        closeLocker,
+        releaseLocker,
+    } = useOperatorLockers();
 
     if (isLoading) return <div>Загрузка...</div>;
-    if (error) return <div>Ошибка загрузки ячеек</div>;
 
     return (
         <div>
             <h1>Управление ячейками</h1>
-            <LockerControlTable lockers={data} />
+            <LockerControlTable
+                lockers={lockers}
+                openLocker={openLocker}
+                closeLocker={closeLocker}
+                releaseLocker={releaseLocker}
+            />
         </div>
     );
 }

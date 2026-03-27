@@ -1,20 +1,25 @@
-import type { Locker } from "../../shared/types/locker";
 import { useState } from "react";
-import { useOperatorLockers } from "../hooks/useOperatorLockers";
 
-export function LockerControlTable() {
-    const {
-        lockers,
-        isLoading,
-        openLocker,
-        closeLocker,
-        releaseLocker,
-    } = useOperatorLockers();
+type Locker = {
+    id: string;
+    number: number;
+    status: "FREE" | "BUSY" | "ERROR";
+    userId?: string;
+};
 
+export function LockerControlTable({
+                                       lockers,
+                                       openLocker,
+                                       closeLocker,
+                                       releaseLocker,
+                                   }: {
+    lockers: Locker[];
+    openLocker: (id: string) => void;
+    closeLocker: (id: string) => void;
+    releaseLocker: (id: string) => void;
+}) {
     const [filter, setFilter] = useState("all");
     const [search, setSearch] = useState("");
-
-    if (isLoading) return <div>Загрузка...</div>;
 
     const filtered = lockers
         .filter((locker) => {
@@ -38,20 +43,20 @@ export function LockerControlTable() {
 
     return (
         <div>
-            <h2>Управление ячейками</h2>
+            <h2>Locker Management</h2>
 
-            {/* Фильтры */}
+            {/* Filters */}
             <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
-                <button onClick={() => setFilter("all")}>Все</button>
-                <button onClick={() => setFilter("free")}>Свободные</button>
-                <button onClick={() => setFilter("busy")}>Занятые</button>
-                <button onClick={() => setFilter("error")}>С ошибками</button>
+                <button onClick={() => setFilter("all")}>All</button>
+                <button onClick={() => setFilter("free")}>Free</button>
+                <button onClick={() => setFilter("busy")}>Busy</button>
+                <button onClick={() => setFilter("error")}>Error</button>
             </div>
 
-            {/* Поиск */}
+            {/* Search */}
             <input
                 type="text"
-                placeholder="Поиск по номеру..."
+                placeholder="Search by number..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 style={{ marginBottom: 20, padding: 8, width: 200 }}
@@ -61,10 +66,10 @@ export function LockerControlTable() {
                 <thead>
                 <tr>
                     <th style={cell}>ID</th>
-                    <th style={cell}>Номер</th>
-                    <th style={cell}>Статус</th>
-                    <th style={cell}>Пользователь</th>
-                    <th style={cell}>Действия</th>
+                    <th style={cell}>Number</th>
+                    <th style={cell}>Status</th>
+                    <th style={cell}>User</th>
+                    <th style={cell}>Actions</th>
                 </tr>
                 </thead>
 
@@ -79,16 +84,16 @@ export function LockerControlTable() {
                         <td style={cell}>
                             <div style={{ display: "flex", gap: 8 }}>
                                 <button onClick={() => openLocker(locker.id)}>
-                                    Открыть
+                                    Open
                                 </button>
 
                                 <button onClick={() => closeLocker(locker.id)}>
-                                    Закрыть
+                                    Close
                                 </button>
 
                                 {locker.status === "BUSY" && (
                                     <button onClick={() => releaseLocker(locker.id)}>
-                                        Освободить
+                                        Release
                                     </button>
                                 )}
                             </div>

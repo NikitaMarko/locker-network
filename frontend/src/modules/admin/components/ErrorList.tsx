@@ -5,8 +5,8 @@ export function ErrorList({ errors }) {
     const queryClient = useQueryClient();
 
     const resolveMutation = useMutation({
-        mutationFn: (id) => resolveError(id),
-        onSuccess: () => queryClient.invalidateQueries(['errors']),
+        mutationFn: (id:string) => resolveError(id),
+        onSuccess: () => queryClient.invalidateQueries({queryKey:['errors']}),
     });
 
     return (
@@ -14,10 +14,10 @@ export function ErrorList({ errors }) {
     <thead>
         <tr>
             <th style={cell}>ID</th>
-        <th style={cell}>Ячейка</th>
-        <th style={cell}>Описание</th>
-        <th style={cell}>Дата</th>
-        <th style={cell}>Действия</th>
+        <th style={cell}>Cell</th>
+        <th style={cell}>Definition</th>
+        <th style={cell}>Date</th>
+        <th style={cell}>Action</th>
         </tr>
         </thead>
 

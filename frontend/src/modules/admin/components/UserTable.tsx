@@ -6,27 +6,39 @@ import {
     deleteUser
 } from '../../../api/usersApi';
 
-export function UserTable({ users }) {
+type User = {
+    id: string;
+    email: string;
+    role: string;
+    blocked: boolean;
+};
+
+export function UserTable({ users }: { users: User[] }) {
     const queryClient = useQueryClient();
 
     const roleMutation = useMutation({
-        mutationFn: ({ id, role }) => updateUserRole(id, role),
-        onSuccess: () => queryClient.invalidateQueries(['users']),
+        mutationFn: (data: { id: string; role: string }) =>
+            updateUserRole(data.id, data.role),
+        onSuccess: () =>
+            queryClient.invalidateQueries({ queryKey: ['users'] }),
     });
 
     const blockMutation = useMutation({
-        mutationFn: (id) => blockUser(id),
-        onSuccess: () => queryClient.invalidateQueries(['users']),
+        mutationFn: (id: string) => blockUser(id),
+        onSuccess: () =>
+            queryClient.invalidateQueries({ queryKey: ['users'] }),
     });
 
     const unblockMutation = useMutation({
-        mutationFn: (id) => unblockUser(id),
-        onSuccess: () => queryClient.invalidateQueries(['users']),
+        mutationFn: (id: string) => unblockUser(id),
+        onSuccess: () =>
+            queryClient.invalidateQueries({ queryKey: ['users'] }),
     });
 
     const deleteMutation = useMutation({
-        mutationFn: (id) => deleteUser(id),
-        onSuccess: () => queryClient.invalidateQueries(['users']),
+        mutationFn: (id: string) => deleteUser(id),
+        onSuccess: () =>
+            queryClient.invalidateQueries({ queryKey: ['users'] }),
     });
 
     return (
@@ -42,20 +54,24 @@ export function UserTable({ users }) {
             </thead>
 
             <tbody>
-            {users.map(user => (
+            {users.map((user) => (
                 <tr key={user.id}>
                     <td style={cell}>{user.id}</td>
                     <td style={cell}>{user.email}</td>
                     <td style={cell}>{user.role}</td>
-                    <td style={cell}>{user.blocked ? 'Заблокирован' : 'Активен'}</td>
+                    <td style={cell}>
+                        {user.blocked ? 'Заблокирован' : 'Активен'}
+                    </td>
 
                     <td style={cell}>
                         <div style={{ display: 'flex', gap: 8 }}>
-                            {/* Смена роли */}
                             <select
                                 value={user.role}
                                 onChange={(e) =>
-                                    roleMutation.mutate({ id: user.id, role: e.target.value })
+                                    roleMutation.mutate({
+                                        id: user.id,
+                                        role: e.target.value,
+                                    })
                                 }
                             >
                                 <option value="USER">USER</option>
@@ -63,21 +79,29 @@ export function UserTable({ users }) {
                                 <option value="ADMIN">ADMIN</option>
                             </select>
 
-                            {/* Блокировка / разблокировка */}
                             {user.blocked ? (
-                                <button onClick={() => unblockMutation.mutate(user.id)}>
+                                <button
+                                    onClick={() =>
+                                        unblockMutation.mutate(user.id)
+                                    }
+                                >
                                     Разблокировать
                                 </button>
                             ) : (
-                                <button onClick={() => blockMutation.mutate(user.id)}>
+                                <button
+                                    onClick={() =>
+                                        blockMutation.mutate(user.id)
+                                    }
+                                >
                                     Заблокировать
                                 </button>
                             )}
 
-                            {/* Удаление */}
                             <button
                                 style={{ background: 'red', color: 'white' }}
-                                onClick={() => deleteMutation.mutate(user.id)}
+                                onClick={() =>
+                                    deleteMutation.mutate(user.id)
+                                }
                             >
                                 Удалить
                             </button>
