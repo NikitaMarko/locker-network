@@ -17,6 +17,7 @@ const envSchema = z.object({
 
     FRONTEND_URL: z.string().url().optional(),
     SERVER_URL: z.string().url().optional(),
+    CLOUDFRONT_URL: z.string().url().optional(),
     LOG_LEVEL: z.string().default("info"),
     USE_LAMBDA_HEALTH: z.string().default("false"),
     LAMBDA_HEALTH_URL: z.string().url().optional().or(z.literal("").transform(() => undefined)),

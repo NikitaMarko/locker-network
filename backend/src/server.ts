@@ -20,7 +20,9 @@ import { HttpError } from './errorHandler/HttpError';
 import {lockersRoutes} from "./routes/lockersRoutes";
 
     const PORT = env.PORT;
-    const baseUrl = `http://localhost:${PORT}`;
+    //const baseUrl = `http://localhost:${PORT}`;
+    const baseUrl = env.SERVER_URL || `http://localhost:${PORT}`;
+
 export const createApp = () => {
 
 
@@ -67,7 +69,8 @@ export const createApp = () => {
         cors({
             origin: [
                 env.FRONTEND_URL,
-                env.SERVER_URL
+                env.SERVER_URL,
+                env.CLOUDFRONT_URL
             ].filter(Boolean) as string[],
             methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
             allowedHeaders: ["Content-Type", "Authorization", "Accept"],
@@ -99,6 +102,7 @@ export const createApp = () => {
         res.setHeader('x-correlation-id', correlationId);
         next();
     });
+
 
     //===============Router================
     const API_PREFIX = '/api/v1';
