@@ -12,7 +12,9 @@ export const signupSchema = z.object({
         name: z.string().min(2),
         email: z.string().email(),
         password: passwordSchema,
-        phone: z.string().min(10).max(15).optional(),
+        phone: z.string()
+            .regex(/^\+?[1-9]\d{7,14}$/, 'Invalid phone number')
+            .optional(),
     }),
 });
 
@@ -33,6 +35,5 @@ export const updatePasswordSchema = z.object({
     body: z.object({
         passwordCurrent: z.string().min(1),
         newPassword: passwordSchema,
-        newPasswordConfirm: passwordSchema,
     }),
 });
