@@ -1,6 +1,7 @@
 import {Request, Response} from "express";
 import {hash, verify} from "argon2";
 import jwt from "jsonwebtoken";
+import { Prisma } from "@prisma/client";
 
 import * as tokenService from "../utils/jwt"
 import {hashToken, TokenPayload} from "../utils/jwt"
@@ -10,6 +11,16 @@ import {logAudit} from '../utils/audit';
 
 import {prismaService} from "./prismaService";
 import {LoginDto, SignupDto} from "./dto/applDto";
+
+
+function isPrismaUniqueConstraintError(error: unknown): error is Prisma.PrismaClientKnownRequestError {
+    return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+}
+
+function extractConstraintField(error: Prisma.PrismaClientKnownRequestError): string {
+    const fields = error.meta?.target as string[] | undefined;
+    return fields?.[0] ?? 'Field';
+}
 
 export class AuthServiceImplPostgres {
    
@@ -26,27 +37,29 @@ export class AuthServiceImplPostgres {
 
     async register(res: Response, req: Request, dto: SignupDto) {
         const {name, email, password, phone} = dto;
-        const isExists = await prismaService.user.findUnique({
-            where: {
-                email,
+        let user;
+
+        try {
+            user = await prismaService.user.create({
+                data: {
+                    name,
+                    email,
+                    password: await hash(password),
+                    phone,
+                },
+                select: {
+                    userId: true,
+                    role: true,
+                    tokenVersion: true,
+                },
+            });
+        } catch (error) {
+            if (isPrismaUniqueConstraintError(error)) {
+                const field = extractConstraintField(error); // 'email' or 'phone'
+                throw new HttpError(400, `${field} already in use`);
             }
-        })
-        if (isExists) {
-            throw new HttpError(400, `User already exists`);
+            throw error;
         }
-        const user = await prismaService.user.create({
-            data: {
-                name,
-                email,
-                password: await hash(password),
-                phone,
-            },
-            select: {
-                userId: true,
-                role: true,
-                tokenVersion: true,
-            },
-        });
         await logAudit({
             req,
             action: 'USER_REGISTER',
