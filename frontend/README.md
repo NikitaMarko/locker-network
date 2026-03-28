@@ -57,6 +57,8 @@ npm run dev
 
 App runs at: `http://localhost:5173`
 
+App runs in AWS Amplify at: `https://main.d3o4dsb0dyvne1.amplifyapp.com/`
+
 ## 🌍 Environment Configuration
 **Environment setup** — create `.env` in root:
 
@@ -101,31 +103,38 @@ frontend/
 │  ├─ app/
 │  │  ├─ App.tsx
 │  │  ├─ routes.tsx
+│  │  ├─ Navbar.tsx
+│  │  ├─ navlink.css
+│  │  ├─ utils/
+|  |  |  ├─ paths.ts
 │  │  ├─ providers/
 │  │  │  ├─ AuthProvider.tsx
+|  |  |  ├─ AuthProviderTest.tsx
 │  │  │  ├─ QueryProvider.tsx
+|  |  |  ├─ useAuth.ts
+|  |  |  ├─ authContext.ts
 │  │  │  └─ ThemeProvider.tsx
-│  │  └─ store/              # если используем Redux
+│  │  └─ store/              
 │  │     ├─ index.ts
-│  │     └─ slices/
+│  │     └─ useAuth.ts
 │  ├─ config/
 │  │  ├─ env.ts              # BASE_API_URL, WS_URL и т.п.
 │  │  └─ roles.ts            # USER / OPERATOR / ADMIN
 │  ├─ api/
-│  │  ├─ httpClient.ts       # axios instance / fetch wrapper
+│  │  ├─ httpClient.ts
+│  │  ├─ httpClient2.ts
+│  │  ├─ httpClientTest.ts
+│  │  ├─ adminApi.ts
+│  │  ├─ usersApi.ts
 │  │  ├─ authApi.ts
 │  │  ├─ lockersApi.ts
-│  │  ├─ sessionsApi.ts
 │  │  └─ errorsApi.ts
 │  ├─ modules/
 │  │  ├─ auth/
 │  │  │  ├─ pages/
 │  │  │  │  ├─ LoginPage.tsx
+│  │  │  │  ├─ LoginPageTest.tsx
 │  │  │  │  └─ RegisterPage.tsx
-│  │  │  ├─ components/
-│  │  │  │  └─ AuthForm.tsx
-│  │  │  └─ hooks/
-│  │  │     └─ useAuth.ts
 │  │  ├─ user/
 │  │  │  ├─ pages/
 │  │  │  │  ├─ UserDashboardPage.tsx
@@ -151,30 +160,43 @@ frontend/
 │  │  │  │  ├─ ErrorList.tsx
 │  │  │  │  └─ UserTable.tsx
 │  │  │  └─ hooks/
+│  │  │  │  ├─ useUsers.ts
+│  │  │  │  ├─ useAdminDashboard.ts
 │  │  │     └─ useErrors.ts
 │  │  ├─ shared/
 │  │  │  ├─ components/
-│  │  │  │  ├─ Layout.tsx
+│  │  │  │  ├─ Header.tsx
 │  │  │  │  ├─ ProtectedRoute.tsx
-│  │  │  │  ├─ RoleGuard.tsx
-│  │  │  │  ├─ Loader.tsx
-│  │  │  │  └─ Notification.tsx
-│  │  │  ├─ hooks/
-│  │  │  │  ├─ usePolling.ts
-│  │  │  │  └─ useWebSocket.ts
+│  │  │  │  └─ RoleGuard.tsx
+│  │  │  ├─ layout/
+│  │  │  │  ├─ Layout.tsx
+│  │  │  │  ├─ menu.ts
+│  │  │  │  └─ Sidebar.tsx
+│  │  │  ├─ pages/
+│  │  │  │  ├─ ForbiddenPage.tsx
+│  │  │  │  ├─ HomePage.tsx
+│  │  │  │  ├─ HomePage2.tsx
+│  │  │  │  ├─ HomePageTest.tsx
+│  │  │  │  └─ RedirectByRole.tsx
 │  │  │  └─ types/
 │  │  │     ├─ locker.ts
 │  │  │     ├─ user.ts
-│  │  │     └─ error.ts
-│  ├─ utils/
-│  │  ├─ jwt.ts
-│  │  ├─ date.ts
-│  │  └─ formatters.ts
-│  ├─ index.tsx
-│  └─ styles/
-│     └─ global.css
+│  │  │     └─ admin.ts
+│  ├─ components/
+│  │  ├─ Info.tsx
+│  │  ├─ Location.tsx
+│  │  └─ Price.tsx
+│  ├─ index.css
+│  ├─ App.css
+│  └─ main.tsx
 ├─ .env
 ├─ package.json
+├─ package-lock.json
+├─ tsconfig.json
+├─ tsconfig.app.json
+├─ tsconfig.node.json
+├─ vite.config.ts
+├─ index.html
 └─ README.md
 ```
 
