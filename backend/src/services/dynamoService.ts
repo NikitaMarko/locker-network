@@ -1,4 +1,4 @@
-import {GetCommand, PutCommand} from "@aws-sdk/lib-dynamodb";
+import {GetCommand, PutCommand, UpdateCommand} from "@aws-sdk/lib-dynamodb";
 
 import {dynamoDocClient} from "../utils/awsClient";
 
@@ -20,4 +20,14 @@ export async function getOperation(operationId: string) {
         Key: {operationId}
     }));
     return result.Item;
+}
+
+export async function updateOperationStatus(operationId:string, status:string) {
+    await dynamoDocClient.send(new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { operationId },
+        UpdateExpression: "set #s = :s",
+        ExpressionAttributeNames: { "#s": "status" },
+        ExpressionAttributeValues: { ":s": status }
+    }));
 }
