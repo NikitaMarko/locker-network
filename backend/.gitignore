@@ -39,8 +39,7 @@ build/                  # Alternative build directory
 *.sqlite                # SQLite files
 *.sqlite-shm            # SQLite shared memory
 *.sqlite-wal            # SQLite write-ahead log
-/src/prisma/            # Generated Prisma client (except index.d.ts)
-!src/prisma/index.d.ts  # Keep TypeScript definitions
+prisma/migrations/     # Prisma migration files (if not committed)
 
 # ============================================================================
 # LOGS & RUNTIME
