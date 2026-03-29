@@ -5,7 +5,7 @@ import {operationsService} from "../services/OperationService";
 
 export const createOperation = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        return await operationsService.createOperation(req,res);
+        return await operationsService.createOper(req,res);
     } catch (e) {
         next(e);
     }

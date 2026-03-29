@@ -17,6 +17,8 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1019.0",
+    "@aws-sdk/lib-dynamodb": "^3.1019.0",
     "@prisma/client": "^5.22.0",
     "argon2": "^0.44.0",
     "compression": "^1.8.1",

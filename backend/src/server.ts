@@ -18,7 +18,7 @@ import {authRouter} from "./routes/authRoutes";
 import {healthRouter} from "./routes/healthRoutes";
 import { HttpError } from './errorHandler/HttpError';
 import {lockersRoutes} from "./routes/lockersRoutes";
-import {operationsRoutes} from "./routes/operationsRoutes";
+import {operationsRouter} from "./routes/operationsRoutes";
 
     const PORT = env.PORT;
     //const baseUrl = `http://localhost:${PORT}`;
@@ -109,9 +109,10 @@ export const createApp = () => {
     const API_PREFIX = '/api/v1';
     app.get('/', (_, res) => res.send('API is running'));
     app.use(`${API_PREFIX}/auth`, authRouter)
+    app.use(`/operations`, operationsRouter)
     app.use(`/health`, healthRouter)
     app.use(`${API_PREFIX}/lockers`, lockersRoutes)
-    app.use(`/operations`, operationsRoutes)
+
 
 
 

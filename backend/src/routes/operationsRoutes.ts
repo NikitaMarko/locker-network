@@ -3,7 +3,7 @@ import express from "express";
 import {createOperation, getOperationStatus} from "../controllers/operationsController";
 
 
-export const operationsRoutes = express.Router();
+export const operationsRouter = express.Router();
 
-operationsRoutes.post('/health', createOperation);
-operationsRoutes.get('/', getOperationStatus)
+operationsRouter.post('/health', createOperation);
+operationsRouter.get('/:id', getOperationStatus)
