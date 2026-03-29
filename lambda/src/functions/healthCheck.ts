@@ -1,4 +1,4 @@
-import { HealthCheckResponse, HealthCheckBody } from '../types/contracts';
+import { HealthCheckResponse, HealthCheckBody } from '../types/contracts/HealthCheckContracts';
 
 const startTime = Date.now();
 

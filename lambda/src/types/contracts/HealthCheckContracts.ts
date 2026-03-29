@@ -6,7 +6,7 @@ export interface HealthCheckRequest {
 export interface HealthCheckResponse {
   statusCode: number;
   headers: { 'Content-Type': string };
-  body: string;  // JSON-строка, потому что API Gateway так требует
+  body: string;  
 }
 
 export interface HealthCheckBody {
