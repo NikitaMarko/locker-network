@@ -57,7 +57,7 @@ npm run dev
 
 App runs at: `http://localhost:5173`
 
-App runs in AWS Amplify at: `https://main.d3o4dsb0dyvne1.amplifyapp.com/`
+App runs in AWS Amplify at: `https://main.d3vb1066jloxjy.amplifyapp.com/`
 
 ## 🌍 Environment Configuration
 **Environment setup** — create `.env` in root:
