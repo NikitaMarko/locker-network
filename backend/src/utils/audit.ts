@@ -9,7 +9,11 @@ type AuditAction =
     | 'USER_LOGOUT'
     | 'USER_REGISTER'
     | 'TOKEN_REFRESH'
-    | 'TOKEN_REVOKED';
+    | 'TOKEN_REVOKED'
+    | 'OPERATION_CREATE'
+    | 'OPERATION_INFO'
+    | 'OPERATION_INFO_FAILED'
+    | 'HEALTH_CHECK';
 
 interface AuditParams {
     req: Request;
