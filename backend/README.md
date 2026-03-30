@@ -461,9 +461,15 @@ Response `503 Service Unavailable` (degraded):
 
 ```ts 
 type Operation = {
-operationId: string;
-timestamp: string; // ISO date
-status: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILE";
+    operationId: string,
+    timestamp: string,
+    status: OperationStatus,
+}
+enum OperationStatus {
+    PENDING = "PENDING",
+    PROCESSING = "PROCESSING",
+    SUCCESS = "SUCCESS",
+    FAILED = "FAILED",
 }
 ```
 ### Endpoints:
@@ -480,6 +486,14 @@ Response `200 OK`:
         "operationId": "305fa517-25a4-41ca-b0c9-f41c331a9a8b",
         "status": "PENDING"
     }
+}
+```
+
+Response `500 Internal Server Error`:
+```json
+{
+  "status": "error",
+  "message": "Failed to create operation"
 }
 ```
 
@@ -502,6 +516,14 @@ Response `404 Not Found`:
 {
     "status": "error",
     "message": "Operation not found"
+}
+```
+
+Response `500 Internal Server Error`:
+```json
+{
+  "status": "error",
+  "message": "Failed to getInfo operation"
 }
 ```
 
