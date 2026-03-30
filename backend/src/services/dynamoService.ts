@@ -1,11 +1,12 @@
 import {GetCommand, PutCommand, UpdateCommand} from "@aws-sdk/lib-dynamodb";
 
 import {dynamoDocClient} from "../utils/awsClient";
+import {env} from "../config/env";
 
 import {Operation} from "./dto/operationDto";
 
 
-const TABLE_NAME = process.env.DYNAMO_TABLE_NAME || "operations";
+const TABLE_NAME = env.DYNAMO_TABLE_NAME || "operations";
 
 export async function createOperation(operation: Operation) {
     await dynamoDocClient.send(new PutCommand({

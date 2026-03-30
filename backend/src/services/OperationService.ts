@@ -4,7 +4,7 @@ import {v4 as uuidv4} from "uuid";
 import {HttpError} from "../errorHandler/HttpError";
 import {logAudit} from "../utils/audit";
 
-import {Operation} from "./dto/operationDto";
+import {ActionType, Operation, OperationStatus} from "./dto/operationDto";
 import {createOperation, getOperation, updateOperationStatus} from "./dynamoService";
 
 
@@ -15,23 +15,23 @@ export class OperationService {
         const operation: Operation = {
             operationId,
             timestamp: new Date().toISOString(),
-            status: "PENDING"
+            status: OperationStatus.PENDING
         }
         await createOperation(operation);
         //ToDo Send command to sqs!!! and delete mock sqs!
         //========= mock sqs ===============
         setTimeout(async () => {
-            await updateOperationStatus(operationId, 'PROCESSING');
+            await updateOperationStatus(operationId, OperationStatus.PROCESSING);
 
             setTimeout(async () => {
-                await updateOperationStatus(operationId, 'SUCCESS');
+                await updateOperationStatus(operationId, OperationStatus.SUCCESS);
             }, 10000);
 
         }, 10000);
         // =======================================
         await logAudit({
             req,
-            action: 'OPERATION_CREATE',
+            action: ActionType.OPERATION_CREATE,
             actorId: undefined,
             entityId: operationId,
             entityType: 'Operation'
@@ -41,7 +41,7 @@ export class OperationService {
             success: true,
             data: {
                 operationId: operationId,
-                status: "PENDING"
+                status: OperationStatus.PENDING
             }
         })
     }
@@ -51,7 +51,7 @@ export class OperationService {
         if (!operation) {
             await logAudit({
                 req,
-                action: 'OPERATION_INFO_FAILED',
+                action: ActionType.OPERATION_INFO_FAILED,
                 actorId: undefined,
                 entityId: req.params.id as string,
                 entityType: 'Operation',
@@ -61,7 +61,7 @@ export class OperationService {
         }
         await logAudit({
             req,
-            action: 'OPERATION_INFO',
+            action: ActionType.OPERATION_INFO,
             actorId: undefined,
             entityId: operation.operationId,
             entityType: 'Operation'

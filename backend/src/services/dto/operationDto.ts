@@ -1,5 +1,24 @@
 export type Operation = {
     operationId: string,
     timestamp: string,
-    status: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILE",
+    status: OperationStatus,
+}
+
+export enum OperationStatus {
+    PENDING = "PENDING",
+    PROCESSING = "PROCESSING",
+    SUCCESS = "SUCCESS",
+    FAILED = "FAILED",
+}
+
+export enum ActionType {
+    HEALTH_CHECK = "HEALTH_CHECK",
+    OPERATION_CREATE = "OPERATION_CREATE",
+    OPERATION_INFO = "OPERATION_INFO",
+    OPERATION_INFO_FAILED = "OPERATION_INFO_FAILED",
+    USER_LOGIN = "USER_LOGIN",
+    USER_LOGIN_FAILED = "USER_LOGIN_FAILED",
+    USER_LOGOUT = "USER_LOGOUT",
+    TOKEN_REVOKED = "TOKEN_REVOKED",
+    USER_REGISTER = "USER_REGISTER",
 }

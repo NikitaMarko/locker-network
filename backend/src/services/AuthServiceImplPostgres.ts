@@ -11,6 +11,7 @@ import {logAudit} from '../utils/audit';
 
 import {prismaService} from "./prismaService";
 import {LoginDto, SignupDto} from "./dto/applDto";
+import {ActionType} from "./dto/operationDto";
 
 
 function isPrismaUniqueConstraintError(error: unknown): error is Prisma.PrismaClientKnownRequestError {
@@ -62,7 +63,7 @@ export class AuthServiceImplPostgres {
         }
         await logAudit({
             req,
-            action: 'USER_REGISTER',
+            action: ActionType.USER_REGISTER,
             actorId: user.userId,
             entityId: user.userId,
         });
@@ -88,7 +89,7 @@ export class AuthServiceImplPostgres {
         if (!user) {
             await logAudit({
                 req,
-                action: 'USER_LOGIN_FAILED',
+                action: ActionType.USER_LOGIN_FAILED,
                 entityId: email,
                 entityType: 'User',
                 details: { email, reason: 'User not found' },
@@ -101,7 +102,7 @@ export class AuthServiceImplPostgres {
         if (!isValidPassword) {
             await logAudit({
                 req,
-                action: 'USER_LOGIN_FAILED',
+                action: ActionType.USER_LOGIN_FAILED,
                 actorId: user.userId,
                 entityId: user.userId,
                 details: { email, reason: 'Wrong password' },
@@ -111,7 +112,7 @@ export class AuthServiceImplPostgres {
 
         await logAudit({
             req,
-            action: 'USER_LOGIN',
+            action: ActionType.USER_LOGIN,
             actorId: user.userId,
             entityId: user.userId,
         });
@@ -125,7 +126,7 @@ export class AuthServiceImplPostgres {
         tokenService.clearCookies(res);
         await logAudit({
             req,
-            action: 'USER_LOGOUT',
+            action: ActionType.USER_LOGOUT,
             actorId: userId,
             entityId: userId,
         });
@@ -189,7 +190,7 @@ export class AuthServiceImplPostgres {
         if (payload.tokenVersion !== user.tokenVersion) {
             await logAudit({
                 req,
-                action: 'TOKEN_REVOKED',
+                action: ActionType.TOKEN_REVOKED,
                 actorId: user.userId,
                 entityId: user.userId,
                 details: { reason: 'Token version mismatch' },
