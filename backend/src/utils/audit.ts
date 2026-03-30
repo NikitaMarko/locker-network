@@ -13,7 +13,8 @@ type AuditAction =
     | 'OPERATION_CREATE'
     | 'OPERATION_INFO'
     | 'OPERATION_INFO_FAILED'
-    | 'HEALTH_CHECK';
+    | 'HEALTH_CHECK'
+    | 'OPERATION_CREATE_FAILED';
 
 interface AuditParams {
     req: Request;

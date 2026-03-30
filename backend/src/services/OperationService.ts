@@ -17,8 +17,29 @@ export class OperationService {
             timestamp: new Date().toISOString(),
             status: OperationStatus.PENDING
         }
-        await createOperation(operation);
+        try{
+            await createOperation(operation);
+        }catch(e){
+            await logAudit({
+                req,
+                action: ActionType.OPERATION_CREATE_FAILED,
+                actorId: undefined,
+                entityId: operationId,
+                entityType: 'Operation',
+                details: {reason: 'DynamoDB error'}
+            });
+            throw new HttpError(500, "Failed to create operation");
+        }
+
         //ToDo Send command to sqs!!! and delete mock sqs!
+        /*
+        try{
+
+        }catch(e){
+        await updateOperationStatus(operationId, OperationStatus.FAILED);
+        throw new HttpError(500, "Failed to send command sqs");
+        }
+         */
         //========= mock sqs ===============
         setTimeout(async () => {
             await updateOperationStatus(operationId, OperationStatus.PROCESSING);
@@ -47,7 +68,21 @@ export class OperationService {
     }
 
     async getOperationStatus(req: Request, res: Response) {
-        const operation = await getOperation(req.params.id as string);
+        let operation;
+        try{
+            operation = await getOperation(req.params.id as string);
+        }catch(e){
+            await logAudit({
+                req,
+                action: ActionType.OPERATION_INFO_FAILED,
+                actorId: undefined,
+                entityId: req.params.id as string,
+                entityType: 'Operation',
+                details: {reason: 'DynamoDB error'},
+            });
+            throw new HttpError(500, "Failed to getInfo operation");
+        }
+
         if (!operation) {
             await logAudit({
                 req,

@@ -3,7 +3,7 @@ import {GetCommand, PutCommand, UpdateCommand} from "@aws-sdk/lib-dynamodb";
 import {dynamoDocClient} from "../utils/awsClient";
 import {env} from "../config/env";
 
-import {Operation} from "./dto/operationDto";
+import {Operation, OperationStatus} from "./dto/operationDto";
 
 
 const TABLE_NAME = env.DYNAMO_TABLE_NAME || "operations";
@@ -23,7 +23,7 @@ export async function getOperation(operationId: string) {
     return result.Item;
 }
 
-export async function updateOperationStatus(operationId:string, status:string) {
+export async function updateOperationStatus(operationId:string, status:OperationStatus) {
     await dynamoDocClient.send(new UpdateCommand({
         TableName: TABLE_NAME,
         Key: { operationId },
