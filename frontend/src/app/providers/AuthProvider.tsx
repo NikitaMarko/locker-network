@@ -58,6 +58,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
 
     // ---------------------------------------------------------
+    // регистрация - google
+    // ---------------------------------------------------------
+
+    const googleLogin = async (idToken:string): Promise<User> => {
+        // отправляем токен как jwt на сервер
+        const res = await  http.post("/auth/google", idToken, {
+            headers: {"Content-Type": "application/json",},
+            data: JSON.stringify({ token: idToken }),
+        });
+
+        localStorage.setItem("access_token", res.data.accessToken);
+        setUser(res.data.user);
+
+        return res.data.user;
+    }
+
+
+    // ---------------------------------------------------------
     // Logout
     // ---------------------------------------------------------
     const logout = () => {
@@ -67,7 +85,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
 
     return (
-        <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+        <AuthContext.Provider value={{ user, loading, login, register, logout ,googleLogin}}>
             {children}
         </AuthContext.Provider>
     );
