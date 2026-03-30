@@ -132,7 +132,6 @@ frontend/
 │  ├─ modules/
 │  │  ├─ auth/
 │  │  │  ├─ pages/
-│  │  │  │  ├─ LoginPage.tsx
 │  │  │  │  ├─ LoginPageTest.tsx
 │  │  │  │  └─ RegisterPage.tsx
 │  │  ├─ user/
@@ -175,8 +174,6 @@ frontend/
 │  │  │  ├─ pages/
 │  │  │  │  ├─ ForbiddenPage.tsx
 │  │  │  │  ├─ HomePage.tsx
-│  │  │  │  ├─ HomePage2.tsx
-│  │  │  │  ├─ HomePageTest.tsx
 │  │  │  │  └─ RedirectByRole.tsx
 │  │  │  └─ types/
 │  │  │     ├─ locker.ts
