@@ -7,6 +7,7 @@ export type AuthContextValue = {
     login: (email: string, password: string) => Promise<User>;
     register: (email: string, password: string, name: string) => Promise<User>; // ← добавили
     logout: () => void;
+    googleLogin : (idToken:string)=> Promise<User> ;
 };
 
 
