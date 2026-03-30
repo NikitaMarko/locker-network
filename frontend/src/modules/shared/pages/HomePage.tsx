@@ -14,8 +14,15 @@ const COLOR_STATUS:Record<string, string> = {
     PENDING: 'orange',
     FAILED: 'red',
     SUCCESS: 'lightgreen',
-    IN_PROGRESS: '#29b6f6'
+    IN_PROGRESS: '#29b6f6',
+    TIMEOUT:    '#ff7043'
 }
+const mapToOperation = (data:any): AsyncOperation =>({
+    operationId:data.operationId,
+        operationStatus:data.status,
+        timestamp:data.timestamp,
+        errorMessage:data.errorMessage
+});
 
 export function HomePage() {
 
@@ -94,10 +101,10 @@ export function HomePage() {
             if(!initData.success) {
                 throw new Error('Failed to start health check');
             }
-            const {operationId, operationStatus} = initData.data;
-            setAsyncOperation({operationId, operationStatus});
+            const op = mapToOperation(initData.data);
+            setAsyncOperation(op);
             setAsyncLoading(false);
-            pollStatus(operationId, 1);
+            pollStatus(op.operationId, 1);
 
         }catch(err:any){
             setAsyncOperation({operationId: '', operationStatus:'FAILED', errorMessage:err?.message});
@@ -120,7 +127,7 @@ export function HomePage() {
                 throw new Error("Operation not found");
             }
             const result = await res.json();
-            const op:AsyncOperation = result.data;
+            const op = mapToOperation(result.data);
             setAsyncOperation(op);
             if (op.operationStatus === 'SUCCESS' || op.operationStatus === 'FAILED') {
                 isPollingRef.current = false;
