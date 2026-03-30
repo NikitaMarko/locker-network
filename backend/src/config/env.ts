@@ -16,6 +16,7 @@ const envSchema = z.object({
     JWT_REFRESH_TOKEN_TTL: z.coerce.number().default(7),
 
     FRONTEND_URL: z.string().url().optional(),
+    FRONTEND_LOCAL_URL: z.string().url().optional(),
     SERVER_URL: z.string().url().optional(),
     CLOUDFRONT_URL: z.string().url().optional(),
     DYNAMO_TABLE_NAME: z.string().optional(),

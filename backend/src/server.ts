@@ -69,6 +69,7 @@ export const createApp = () => {
     app.use(
         cors({
             origin: [
+                env.FRONTEND_LOCAL_URL,
                 env.FRONTEND_URL,
                 env.SERVER_URL,
                 env.CLOUDFRONT_URL

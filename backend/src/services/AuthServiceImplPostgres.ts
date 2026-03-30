@@ -224,7 +224,7 @@ export class AuthServiceImplPostgres {
         tokenService.cookieToken(newRefreshToken, res, expires);
         await logAudit({
             req,
-            action: 'TOKEN_REFRESH',
+            action: ActionType.TOKEN_REFRESH,
             actorId: user.userId,
             entityId: user.userId,
         });
