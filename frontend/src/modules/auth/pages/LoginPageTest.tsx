@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {Link, useNavigate} from 'react-router-dom';
 import { useAuth } from '../../../app/providers/useAuth';
 import {Paths} from "../../../app/utils/paths.ts";
+import GoogleLoginTest from "../../../components/GoogleLoginTest.tsx";
 
 export function LoginPageTest() {
     const navigate = useNavigate();
@@ -72,7 +73,9 @@ export function LoginPageTest() {
                         {loading ? 'Logging in...' : 'Login'}
                     </button>
                 </form>
-                <div style={footerTextStyle}>Don&apos;t have an account?</div> <Link to={Paths.REGISTER} style={linkStyle}> Sign up </Link>
+                <div style={footerTextStyle}>Don&apos;t have an account?</div>
+                <GoogleLoginTest/>
+                <Link to={Paths.REGISTER} style={linkStyle}> Sign up </Link>
             </div>
         </div>
     );
@@ -84,6 +87,8 @@ const footerTextStyle = {
     marginTop: "15px",
     textAlign: "center" as const,
     fontSize: "14px",
+    marginBottom:"5px",
+
 };
 
 const linkStyle = {
@@ -146,6 +151,8 @@ const buttonStyle = {
     color: "white",
     fontWeight: "bold",
     cursor: "pointer",
+    marginBottom:"20px",
+
 };
 
 const errorStyle = {
