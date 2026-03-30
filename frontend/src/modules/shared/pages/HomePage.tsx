@@ -4,12 +4,28 @@ import {useRef, useState} from 'react';
 import bg from '/smart-locker-project.jpeg';
 import { Paths } from "../../../app/utils/paths.ts";
 
+interface AsyncOperation{
+    operationId: string;
+    operationStatus: string;
+    timestamp?: string;
+    errorMessage?: string;
+}
+const COLOR_STATUS:Record<string, string> = {
+    PENDING: 'orange',
+    FAILED: 'red',
+    SUCCESS: 'lightgreen',
+    IN_PROGRESS: '#29b6f6'
+}
+
 export function HomePage() {
+
     const { user } = useAuth();
     const [health, setHealth] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const [asyncLoading, setAsyncLoading] = useState(false);
     const [count, setCount] = useState(0);
+    const[asyncOperation, setAsyncOperation] = useState<AsyncOperation|null>(null);
+    const [activeMode, setActiveMode] = useState<'sync' | 'async' | null>(null);
     const isPollingRef = useRef<boolean>(false);
 
     // const HEALTH_URL = 'http://localhost:3555/health';
@@ -30,6 +46,8 @@ export function HomePage() {
     //=============Sync work
 
     const handleHealthCheck = async () => {
+        setActiveMode('sync');
+        setAsyncOperation(null);
         try {
             setLoading(true);
 
@@ -62,9 +80,11 @@ export function HomePage() {
 
     const handleAsyncHealthCheck = async () => {
         if(isPollingRef.current) return;
+        setActiveMode('async');
+        setHealth(null);
         try{
             setAsyncLoading(true);
-            setHealth(null);
+            setAsyncOperation(null);
             setCount(0);
             isPollingRef.current = true;
 
@@ -74,12 +94,13 @@ export function HomePage() {
             if(!initData.success) {
                 throw new Error('Failed to start health check');
             }
-            const operationId = initData.data.operationId;
+            const {operationId, operationStatus} = initData.data;
+            setAsyncOperation({operationId, operationStatus});
+            setAsyncLoading(false);
             pollStatus(operationId, 1);
 
         }catch(err:any){
-            console.error('Init failed:', err);
-            setHealth({status: 'DOWN', message: err?.message});
+            setAsyncOperation({operationId: '', operationStatus:'FAILED', errorMessage:err?.message});
             setAsyncLoading(false);
             isPollingRef.current = false;
         }
@@ -89,8 +110,7 @@ export function HomePage() {
         if(!isPollingRef.current) return;
         setCount(attempt);
         if(attempt > MAX_ATTEMPTS){
-            setHealth({status: 'DOWN', message: 'the waiting time has expired'})
-            setAsyncLoading(false);
+            setAsyncOperation(prev=>prev ? {...prev,operationStatus:'TIMEOUT'}:null);
             isPollingRef.current = false;
             return;
         }
@@ -100,23 +120,17 @@ export function HomePage() {
                 throw new Error("Operation not found");
             }
             const result = await res.json();
-            const status = result.data.operationStatus;
-            if (status === 'SUCCESS' || status === 'FAILED') {
-
-                setHealth({
-                    status: status === 'SUCCESS' ? 'UP' : 'DOWN',
-                    message: result.data.errorMessage || (status === 'SUCCESS' ? 'System is healthy' : 'Check failed')
-                });
-                setAsyncLoading(false);
+            const op:AsyncOperation = result.data;
+            setAsyncOperation(op);
+            if (op.operationStatus === 'SUCCESS' || op.operationStatus === 'FAILED') {
                 isPollingRef.current = false;
-            } else {
+                } else {
 
                 setTimeout(() => pollStatus(operId, attempt + 1), POLLING_INTERVAL);
             }
 
         } catch (err: any) {
-            setHealth({ status: 'DOWN', message: err.message });
-            setAsyncLoading(false);
+           setAsyncOperation(prev=>prev ? {...prev, operationStatus:'FAILED', errorMessage:err.message}:null);
             isPollingRef.current = false;
         }
     };
@@ -145,6 +159,11 @@ export function HomePage() {
         textDecoration: "none",
         whiteSpace: "nowrap",
     };
+
+    const isPolling = isPollingRef.current;
+    const isFailed = asyncOperation?.operationStatus === 'FAILED';
+    const isTimeout = asyncOperation?.operationStatus === 'TIMEOUT';
+
 
     return (
         <div
@@ -232,18 +251,17 @@ export function HomePage() {
                 <div style={{ display: "flex", gap: "15px", justifyContent: "center" }}>
                     <button
                         onClick={handleAsyncHealthCheck}
-                        style={buttonStyle}
-                        disabled={asyncLoading}
+                        style={{ ...buttonStyle, backgroundColor: asyncLoading || isPolling ? '#555' : '#4CAF50', cursor: asyncLoading || isPolling ? 'not-allowed' : 'pointer' }}
+                        disabled={asyncLoading || isPolling}
                     >
                         {asyncLoading
-                            ? `Checking (Try ${count}/${MAX_ATTEMPTS})...`
-                            : 'Start Async Health Check'}
+                            ? 'IN_PROGRESS' : isPolling ? `Polling(${count}/${MAX_ATTEMPTS})...` : 'Async Health Check'}
                     </button>
                 </div>
 
 
                 {/* HEALTH */}
-                {health && !loading && !asyncLoading &&(
+                {activeMode === "sync" && health && !loading && (
                     <div style={{
                         marginTop: "15px",
                         padding: "15px",
@@ -275,6 +293,51 @@ export function HomePage() {
                         {health.message && <p>{health.message}</p>}
                     </div>
                 )}
+                {activeMode === 'async' && asyncOperation && (
+                    <div style={{ marginTop: "12px", padding: "15px", borderRadius: "10px", background: "rgba(255,255,255,0.12)", backdropFilter: "blur(4px)", justifyContent: "center" }}>
+                        {/*<p style={{ fontWeight: 'bold', marginBottom: '6px' }}> Async Operation</p>*/}
+
+                        {asyncOperation.operationId && (
+                            <p style={{ fontSize: '11px', opacity: 0.6, marginBottom: '6px' }}>
+                                operationId: {asyncOperation.operationId}
+                            </p>
+                        )}
+
+                        <p style={{
+                            color: COLOR_STATUS[asyncOperation.operationStatus] ?? 'orange',
+                            fontWeight: 'bold',
+                            fontSize: '18px',
+                        }}>
+                            operationStatus: {asyncOperation.operationStatus}
+                        </p>
+
+                        {asyncOperation.timestamp && (
+                            <p style={{ fontSize: '15px', opacity: 0.7, marginTop: '4px' }}>
+                                timestamp: {asyncOperation.timestamp}
+                            </p>
+                        )}
+
+                        {asyncOperation.errorMessage && (
+                            <p style={{ color: '#e53935', fontSize: '15px', marginTop: '4px' }}>
+                                error: {asyncOperation.errorMessage}
+                            </p>
+                        )}
+                        {(isFailed || isTimeout) && (
+                            <p style={{
+                                fontSize: '15px',
+                                opacity: 0.75,
+                                marginTop: '8px',
+                                borderTop: '1px solid rgba(255,255,255,0.15)',
+                                paddingTop: '8px',
+                            }}>
+                                {isTimeout
+                                ? 'Time expired - no response received'
+                                : 'Something went wrong - please try again'}
+                            </p>
+                        )}
+                    </div>
+                )}
+
 
             </div>
         </div>
