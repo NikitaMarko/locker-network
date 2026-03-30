@@ -1,4 +1,4 @@
-import { HomePageTest } from '../modules/shared/pages/HomePageTest';
+import { HomePage } from '../modules/shared/pages/HomePage.tsx';
 import { RedirectByRole } from '../modules/shared/pages/RedirectByRole';
 
 import { Routes, Route } from 'react-router-dom';
@@ -26,7 +26,7 @@ export function AppRoutes() {
             <Navbar />
 
             <Routes>
-                <Route path="/" element={<HomePageTest />} />
+                <Route path="/" element={<HomePage />} />
                 <Route path="/redirect-by-role" element={<RedirectByRole />} />
 
                 {/* Публичные */}

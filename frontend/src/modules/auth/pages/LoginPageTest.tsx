@@ -33,13 +33,6 @@ export function LoginPageTest() {
             <div style={cardStyle}>
                 <h1 style={titleStyle}>Login</h1>
 
-                {/* TEST USER */}
-                <div style={infoStyle}>
-                    <p><strong>Тестовый пользователь:</strong></p>
-                    <p>Email: <strong>demo@example.com</strong></p>
-                    <p>Password: <strong>123456</strong></p>
-                </div>
-
                 <form onSubmit={handleSubmit} style={formStyle}>
                     <input
                         type="email"
@@ -120,14 +113,6 @@ const cardStyle = {
 const titleStyle = {
     textAlign: "center" as const,
     marginBottom: "50px",
-};
-
-const infoStyle = {
-    marginBottom: "20px",
-    padding: "10px 15px",
-    background: "#f1f3f5",
-    borderRadius: "8px",
-    fontSize: "14px",
 };
 
 const formStyle = {
