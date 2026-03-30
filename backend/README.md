@@ -455,6 +455,56 @@ Response `503 Service Unavailable` (degraded):
 }
 ```
 
+## 🏥 Health Check Async
+
+### Data Models:
+
+```ts 
+type Operation = {
+operationId: string;
+timestamp: string; // ISO date
+status: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILE";
+}
+```
+### Endpoints:
+
+#### POST /operations/health
+
+- Request Body: not required
+
+Response `200 OK`:
+```json
+{
+    "success": true,
+    "data": {
+        "operationId": "305fa517-25a4-41ca-b0c9-f41c331a9a8b",
+        "status": "PENDING"
+    }
+}
+```
+
+#### GET /operations/:id
+
+Response `200 OK`:
+```json
+{
+    "success": true,
+    "data": {
+        "operationId": "305fa517-25a4-41ca-b0c9-f41c331a9a8b",
+        "status":  "PROCESSING",
+        "timestamp": "2026-03-29T18:24:40.076Z"
+    }
+}
+```
+
+Response `404 Not Found`:
+```json
+{
+    "status": "error",
+    "message": "Operation not found"
+}
+```
+
 ### Two modes
 
 | `USE_LAMBDA_HEALTH` | Behaviour |
