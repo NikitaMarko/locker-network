@@ -31,8 +31,8 @@ export function HomePage() {
     // const HEALTH_URL = 'http://localhost:3555/health';
     // const HEALTH_URL = 'http://locker-lb-823207158.eu-north-1.elb.amazonaws.com/health';
     const HEALTH_URL = 'https://d31p0ponhhqgks.cloudfront.net/health';
-    const ASYNC_STATUS_HEALTH_POST_URL = 'https://d31p0ponhhqgks.cloudfront.net/operation/health';
-    const ASYNC_STATUS_HEALTH_GET_URL = (id:string)=>`https://d31p0ponhhqgks.cloudfront.net/operation/${id}`;
+    const ASYNC_STATUS_HEALTH_POST_URL = 'https://d31p0ponhhqgks.cloudfront.net/operations/health';
+    const ASYNC_STATUS_HEALTH_GET_URL = (id:string)=>`https://d31p0ponhhqgks.cloudfront.net/operations/${id}`;
 
     const MAX_ATTEMPTS = 12;
     const POLLING_INTERVAL = 5000;
