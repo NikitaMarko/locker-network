@@ -1,5 +1,5 @@
 
-import { randomUUID } from 'crypto';
+import {randomUUID} from 'crypto';
 
 import cookieParser from "cookie-parser";
 import cors from "cors";
@@ -16,11 +16,11 @@ import {errorHandler} from "./errorHandler/errorHandler";
 import {logger} from "./Logger/winston";
 import {authRouter} from "./routes/authRoutes";
 import {healthRouter} from "./routes/healthRoutes";
-import { HttpError } from './errorHandler/HttpError';
+import {HttpError} from './errorHandler/HttpError';
 import {lockersRoutes} from "./routes/lockersRoutes";
 import {operationsRouter} from "./routes/operationsRoutes";
 
-    const PORT = env.PORT;
+const PORT = env.PORT;
     //const baseUrl = `http://localhost:${PORT}`;
     const baseUrl = env.SERVER_URL || `http://localhost:${PORT}`;
 
@@ -127,7 +127,7 @@ export const createApp = () => {
     return app;
 };
 
-export const launchServer = () => {
+export const launchServer = async () => {
     const app = createApp();
 
     const server = app.listen(PORT, () => {

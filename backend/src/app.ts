@@ -1,7 +1,9 @@
+import { Server } from "http";
+
 import { logger } from "./Logger/winston";
 import { launchServer } from "./server";
-import { Server } from "http";
 import {prismaService} from "./services/prismaService";
+import {assertAwsCredentialsConfigured} from "./utils/awsClient";
 
 let server: Server;
 let isShuttingDown = false;
@@ -18,9 +20,12 @@ logger.info('Starting server initialization...');
         await prismaService.connectDB();
         logger.info('PostgreSQL connected successfully');
 
-        server = launchServer();
+        await assertAwsCredentialsConfigured();
+        logger.info('AWS credentials resolved successfully');
+
+        server = await launchServer();
     } catch (err) {
-        logger.error('PostgreSQL connection error', err);
+        logger.error('Server initialization failed', err);
         process.exit(1);
     }
 })();

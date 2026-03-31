@@ -24,15 +24,10 @@ export class OperationService {
             status: OperationStatus.PENDING,
             type: OperationType.HEALTH_CHECK
         }
-        console.log(operationId)
         try{
             await createOperation(operation);
         }catch(e){
-                // console.error(e); // ← ВОТ ЭТО ДОБАВЬ
-                // res.status(500).json({
-                //     status: "error",
-                //     message: e.message
-                // });
+            const errorMessage = e instanceof Error ? e.message : "DynamoDB error";
 
             await logAudit({
                 req,
@@ -40,9 +35,9 @@ export class OperationService {
                 actorId: undefined,
                 entityId: operationId,
                 entityType: 'Operation',
-                details: {reason: 'DynamoDB error'}
+                details: {reason: errorMessage}
             });
-            throw new HttpError(500, "Failed to create operation");
+            throw new HttpError(500, errorMessage);
         }
 
         try{
@@ -104,15 +99,17 @@ export class OperationService {
         try{
             operation = await getOperation(req.params.id as string);
         }catch(e){
+            const errorMessage = e instanceof Error ? e.message : "DynamoDB error";
+
             await logAudit({
                 req,
                 action: ActionType.OPERATION_INFO_FAILED,
                 actorId: undefined,
                 entityId: req.params.id as string,
                 entityType: 'Operation',
-                details: {reason: 'DynamoDB error'},
+                details: {reason: errorMessage},
             });
-            throw new HttpError(500, "Failed to getInfo operation");
+            throw new HttpError(500, errorMessage);
         }
 
         if (!operation) {
