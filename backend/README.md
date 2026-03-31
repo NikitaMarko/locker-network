@@ -105,14 +105,15 @@ cp .env.example .env
 NODE_ENV=development                    # development | production | test
 PORT=3555
 SERVER_URL=http://localhost:3555
+CLOUDFRONT_URL=https://your-cloudfront-domain
 
 # Database
 # Note: 5433 = host port mapped to Docker container's 5432
-DATABASE_URL="postgresql://root:root@localhost:5433/locker"
+DATABASE_URL="postgresql://root:root@localhost:5433/locker_db"
 POSTGRES_USER=root
 POSTGRES_PASSWORD=root
 POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
+POSTGRES_PORT=5433
 
 # JWT — generate secrets with:
 # node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
@@ -125,13 +126,18 @@ JWT_REFRESH_TOKEN_TTL=7                 # Refresh token TTL in days
 
 # Frontend CORS origin
 FRONTEND_URL=http://localhost:5173
+FRONTEND_LOCAL_URL=http://localhost:5173
 
 # Logging
 LOG_LEVEL=info                          # debug | info | warn | error
 
 # Lambda health check
-USE_LAMBDA_HEALTH=false                 # true = call AWS Lambda, false = check DB directly
+USE_LAMBDA_HEALTH=true                  # true = call AWS Lambda first, fallback to DB check on error
 LAMBDA_HEALTH_URL=                      # Required when USE_LAMBDA_HEALTH=true
+
+# Async operations
+DYNAMO_TABLE_NAME=operations
+SQS_URL=
 ```
 
 ### ⚠️ Security requirements
@@ -270,15 +276,15 @@ http://localhost:3555/api/v1
 | `PATCH` | `/api/v1/users/:id` | Update profile | Bearer |
 | `DELETE` | `/api/v1/users/:id` | Delete account | Bearer |
 
-#### Lockers (coming soon)
+#### Lockers (in progress)
 | Method | Path | Description | Auth |
 |--------|------|-------------|------|
-| `GET` | `/api/v1/lockers/stations` | List stations | Bearer |
-| `GET` | `/api/v1/lockers/stations/:id` | Get station | Bearer |
-| `POST` | `/api/v1/lockers/stations` | Create station | Admin/Operator |
-| `GET` | `/api/v1/lockers/boxes` | List locker boxes | Bearer |
-| `GET` | `/api/v1/lockers/boxes/:id` | Get box details | Bearer |
-| `POST` | `/api/v1/lockers/boxes` | Create locker box | Admin/Operator |
+| `GET` | `/api/v1/lockers/` | List locker boxes | not enforced yet |
+| `POST` | `/api/v1/lockers/boxes` | Create locker box | not enforced yet |
+| `GET` | `/api/v1/lockers/stations` | List stations | not enforced yet |
+| `POST` | `/api/v1/lockers/stations` | Create station | not enforced yet |
+
+`Lockers` endpoints are still under active development. Auth/role checks and additional read endpoints are planned, but are not wired in the current router yet.
 
 #### Bookings (coming soon)
 | Method | Path | Description | Auth |
@@ -324,7 +330,6 @@ http://localhost:3555/api/v1
 ```typescript
 interface TokenPayload {
   userId: string;       // User UUID
-  jti?: string;         // Unique token ID
   role: Role;           // USER | OPERATOR | ADMIN
   tokenVersion: number; // Revocation version
 }
@@ -375,7 +380,8 @@ curl -X POST http://localhost:3555/api/v1/auth/logout \
 ### Token security
 
 - **Access token**: short-lived (15m), transmitted via `Authorization` header only
-- **Refresh token**: long-lived (7d), stored in `httpOnly; Secure; SameSite` cookie — inaccessible to JavaScript
+- **Refresh token**: long-lived (7d), stored in an `httpOnly` cookie — inaccessible to JavaScript
+- **Cookie flags**: in production the cookie is `Secure` + `SameSite=None`; in local development it is `SameSite=Lax` and not `Secure`
 - **Token rotation**: every `/refresh` issues a new refresh token and invalidates the old one
 - **Token revocation**: incrementing `tokenVersion` prevents further refresh and forces re-authentication after the current access token expires.
 
@@ -455,6 +461,8 @@ Response `503 Service Unavailable` (degraded):
 }
 ```
 
+If `USE_LAMBDA_HEALTH=true` and the Lambda request fails or times out, the backend now falls back to the local DB check and returns `source: "mock-fallback"`.
+
 ## 🏥 Health Check Async
 
 ### Data Models:
@@ -532,7 +540,7 @@ Response `500 Internal Server Error`:
 | `USE_LAMBDA_HEALTH` | Behaviour |
 |---------------------|-----------|
 | `false` (default) | Node.js queries PostgreSQL directly |
-| `true` + valid `LAMBDA_HEALTH_URL` | Delegates to AWS Lambda, falls back to mock on timeout |
+| `true` + valid `LAMBDA_HEALTH_URL` | Calls AWS Lambda first, then falls back to local DB health check on timeout/error |
 
 ---
 
@@ -544,20 +552,29 @@ backend/
 │   ├── app.ts                          # Entry point, graceful shutdown
 │   ├── server.ts                       # Express setup, middleware, routes
 │   ├── config/
-│   │   ├── env.ts                      # Zod environment validation
-│   │   └── appConfig.ts                # Port, base URL
+│   │   └── env.ts                      # Zod environment validation
 │   ├── controllers/
 │   │   ├── authController.ts           # Auth route handlers
-│   │   └── healthController.ts         # Health route handler
+│   │   ├── healthController.ts         # Health route handler
+│   │   ├── lockerBoxController.ts      # Locker box handlers
+│   │   ├── lockerStationController.ts  # Locker station handlers
+│   │   └── operationsController.ts     # Async operation handlers
 │   ├── services/
 │   │   ├── AuthServiceImplPostgres.ts  # Auth business logic
 │   │   ├── HealthService.ts            # Health check (mock + lambda)
+│   │   ├── LockerBoxServiceImplPostgress.ts
+│   │   ├── LockerStationServiceImplPostgress.ts
+│   │   ├── OperationService.ts         # Async operation status flow
+│   │   ├── dynamoService.ts            # DynamoDB access
 │   │   ├── prismaService.ts            # Prisma client wrapper
+│   │   ├── sqsService.ts               # SQS dispatch
 │   │   └── dto/
 │   │       └── applDto.ts              # SignupDto, LoginDto
 │   ├── routes/
 │   │   ├── authRoutes.ts               # /api/v1/auth/*
-│   │   └── healthRoutes.ts             # /health
+│   │   ├── healthRoutes.ts             # /health
+│   │   ├── lockersRoutes.ts            # /api/v1/lockers/*
+│   │   └── operationsRoutes.ts         # /operations/*
 │   ├── middleware/
 │   │   ├── authMiddleware.ts           # JWT protect middleware
 │   │   └── validateRequest.ts          # Zod request validation
@@ -565,18 +582,21 @@ backend/
 │   │   ├── errorHandler.ts             # Global Express error handler
 │   │   └── HttpError.ts                # Custom HTTP error class
 │   ├── utils/
+│   │   ├── audit.ts                    # Audit log writer
+│   │   ├── awsClient.ts                # AWS SDK clients
 │   │   ├── jwt.ts                      # Token sign, verify, cookie helpers
-│   │   └── audit.ts                    # Audit log writer
+│   │   └── sqsClient.ts                # Shared SQS client
 │   ├── validation/
 │   │   └── authSchemas.ts              # Zod schemas for auth endpoints
 │   ├── Logger/
 │   │   └── winston.ts                  # Winston logger configuration
+│   ├── lib/
+│   │   └── prisma.ts                   # Prisma library helpers
 │   └── types/
 │       └── express.d.ts                # Express Request type extensions
 ├── prisma/
 │   ├── schema.prisma                   # DB schema
-│   ├── migrations/                     # Migration history
-│   └── seed.ts                         # Seed data (optional)
+│   └── migrations/                     # Migration history
 ├── docs/
 │   └── openapi.json                    # OpenAPI 3.0 spec
 ├── .env.example                        # Environment template

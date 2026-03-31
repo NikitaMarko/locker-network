@@ -22,8 +22,7 @@ services:
       - postgres
     env_file:
       - .env
-    environment:
-      - .env
+
 
 volumes:
   postgres_data:

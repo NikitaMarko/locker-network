@@ -6,7 +6,11 @@ export const getHealthStatus = async () => {
     const useLambda = env.USE_LAMBDA_HEALTH === 'true' && env.LAMBDA_HEALTH_URL;
 
     if (useLambda) {
-        return callLambda();
+        try {
+            return await callLambda();
+        } catch {
+            return getMock('mock-fallback');
+        }
     }
     return getMock();
 };
@@ -27,17 +31,32 @@ const callLambda = async () => {
     };
 };
 
-const getMock = async () => {
+const getMock = async (source: 'mock' | 'mock-fallback' = 'mock') => {
     const start = Date.now();
-    await prismaService.$queryRaw`SELECT 1`;
 
-    return {
-        status: 'ok' as const,
-        time: new Date().toISOString(),
-        source: 'mock' as const,
-        uptime: Math.floor(process.uptime()),
-        services: {
-            database: { status: 'ok', latencyMs: Date.now() - start },
-        },
-    };
+    try {
+        await prismaService.$queryRaw`SELECT 1`;
+
+        return {
+            status: 'ok' as const,
+            time: new Date().toISOString(),
+            source,
+            uptime: Math.floor(process.uptime()),
+            services: {
+                database: { status: 'ok', latencyMs: Date.now() - start },
+            },
+        };
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Database unreachable';
+
+        return {
+            status: 'degraded' as const,
+            time: new Date().toISOString(),
+            source,
+            uptime: Math.floor(process.uptime()),
+            services: {
+                database: { status: 'error', error: message },
+            },
+        };
+    }
 };
