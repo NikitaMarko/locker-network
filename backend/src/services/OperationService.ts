@@ -31,15 +31,27 @@ export class OperationService {
             throw new HttpError(500, "Failed to create operation");
         }
 
-        //ToDo Send command to sqs!!! and delete mock sqs!
-        /*
         try{
-
+            //ToDo Send command to sqs!!! and delete mock sqs!
         }catch(e){
-        await updateOperationStatus(operationId, OperationStatus.FAILED);
-        throw new HttpError(500, "Failed to send command sqs");
+        await updateOperationStatus(operationId, OperationStatus.FAILED, "Failed to send command sqs");
+            await logAudit({
+                req,
+                action: ActionType.OPERATION_CREATE_FAILED,
+                actorId: undefined,
+                entityId: operationId,
+                entityType: 'Operation',
+                details: {reason: 'Sqs error'}
+            });
+            return res.status(200).json({
+                success: true,
+                data: {
+                    operationId: operationId,
+                    status: OperationStatus.FAILED,
+                    errorMessage: "Failed to send command sqs"
+                }
+            })
         }
-         */
         //========= mock sqs ===============
         setTimeout(async () => {
             await updateOperationStatus(operationId, OperationStatus.PROCESSING);

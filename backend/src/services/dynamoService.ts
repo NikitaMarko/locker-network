@@ -23,12 +23,17 @@ export async function getOperation(operationId: string) {
     return result.Item;
 }
 
-export async function updateOperationStatus(operationId:string, status:OperationStatus) {
+export async function updateOperationStatus(operationId:string, status:OperationStatus, errorMessage?: string) {
     await dynamoDocClient.send(new UpdateCommand({
         TableName: TABLE_NAME,
         Key: { operationId },
-        UpdateExpression: "set #s = :s",
+        UpdateExpression: errorMessage
+            ? 'SET #s = :status, errorMessage = :err'
+            : 'SET #s = :status',
         ExpressionAttributeNames: { "#s": "status" },
-        ExpressionAttributeValues: { ":s": status }
+        ExpressionAttributeValues: {
+            ':status': status,
+            ...(errorMessage && { ':err': errorMessage }),
+        },
     }));
 }
