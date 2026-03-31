@@ -1,17 +1,22 @@
 import {GetCommand, PutCommand, UpdateCommand} from "@aws-sdk/lib-dynamodb";
 
 import {dynamoDocClient} from "../utils/awsClient";
-import {env} from "../config/env";
+// import {env} from "../config/env";
 
 import {Operation, OperationStatus} from "./dto/operationDto";
 
 
-const TABLE_NAME = env.DYNAMO_TABLE_NAME || "operations";
+const TABLE_NAME = "locker-dev-operations-dynamodb";
 
 export async function createOperation(operation: Operation) {
     await dynamoDocClient.send(new PutCommand({
         TableName: TABLE_NAME,
-        Item: operation
+        Item: {
+            operationId: operation.operationId,
+            type: operation.type,
+            status: "PENDING",
+            timestamp: new Date().toISOString(),
+        }
     }));
 }
 

@@ -1,7 +1,9 @@
 export type Operation = {
     operationId: string,
     timestamp: string,
+    type: OperationType,
     status: OperationStatus,
+    errorMessage?: string,
 }
 
 export enum OperationStatus {
@@ -9,6 +11,10 @@ export enum OperationStatus {
     PROCESSING = "PROCESSING",
     SUCCESS = "SUCCESS",
     FAILED = "FAILED",
+}
+
+export enum OperationType {
+    HEALTH_CHECK = "HEALTH_CHECK",
 }
 
 export enum ActionType {

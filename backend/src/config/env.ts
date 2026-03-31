@@ -18,6 +18,7 @@ const envSchema = z.object({
     FRONTEND_URL: z.string().url().optional(),
     FRONTEND_LOCAL_URL: z.string().url().optional(),
     SERVER_URL: z.string().url().optional(),
+    SQS_URL: z.string().url().optional(),
     CLOUDFRONT_URL: z.string().url().optional(),
     DYNAMO_TABLE_NAME: z.string().optional(),
     LOG_LEVEL: z.string().default("info"),

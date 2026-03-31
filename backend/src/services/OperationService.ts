@@ -4,8 +4,14 @@ import {v4 as uuidv4} from "uuid";
 import {HttpError} from "../errorHandler/HttpError";
 import {logAudit} from "../utils/audit";
 
-import {ActionType, Operation, OperationStatus} from "./dto/operationDto";
+import {
+    ActionType,
+    Operation,
+    OperationStatus,
+    OperationType
+} from "./dto/operationDto";
 import {createOperation, getOperation, updateOperationStatus} from "./dynamoService";
+import {sendOperationToQueue} from "./sqsService";
 
 
 export class OperationService {
@@ -15,11 +21,19 @@ export class OperationService {
         const operation: Operation = {
             operationId,
             timestamp: new Date().toISOString(),
-            status: OperationStatus.PENDING
+            status: OperationStatus.PENDING,
+            type: OperationType.HEALTH_CHECK
         }
+        console.log(operationId)
         try{
             await createOperation(operation);
         }catch(e){
+                // console.error(e); // ← ВОТ ЭТО ДОБАВЬ
+                // res.status(500).json({
+                //     status: "error",
+                //     message: e.message
+                // });
+
             await logAudit({
                 req,
                 action: ActionType.OPERATION_CREATE_FAILED,
@@ -32,7 +46,13 @@ export class OperationService {
         }
 
         try{
-            //ToDo Send command to sqs!!! and delete mock sqs!
+            await sendOperationToQueue({
+                operationId,
+                type: operation.type,
+                payload: {
+                    timestamp: operation.timestamp,
+                }
+            });
         }catch(e){
         await updateOperationStatus(operationId, OperationStatus.FAILED, "Failed to send command sqs");
             await logAudit({
@@ -43,8 +63,8 @@ export class OperationService {
                 entityType: 'Operation',
                 details: {reason: 'Sqs error'}
             });
-            return res.status(200).json({
-                success: true,
+            return res.status(500).json({
+                success: false,
                 data: {
                     operationId: operationId,
                     status: OperationStatus.FAILED,
@@ -52,23 +72,23 @@ export class OperationService {
                 }
             })
         }
-        //========= mock sqs ===============
-        setTimeout(async () => {
-            await updateOperationStatus(operationId, OperationStatus.PROCESSING);
-
-            setTimeout(async () => {
-                await updateOperationStatus(operationId, OperationStatus.SUCCESS);
-            }, 10000);
-
-        }, 10000);
-        // =======================================
-        await logAudit({
-            req,
-            action: ActionType.OPERATION_CREATE,
-            actorId: undefined,
-            entityId: operationId,
-            entityType: 'Operation'
-        });
+        // //========= mock sqs ===============
+        // setTimeout(async () => {
+        //     await updateOperationStatus(operationId, OperationStatus.PROCESSING);
+        //
+        //     setTimeout(async () => {
+        //         await updateOperationStatus(operationId, OperationStatus.SUCCESS);
+        //     }, 10000);
+        //
+        // }, 10000);
+        // // =======================================
+        // await logAudit({
+        //     req,
+        //     action: ActionType.OPERATION_CREATE,
+        //     actorId: undefined,
+        //     entityId: operationId,
+        //     entityType: 'Operation'
+        // });
 
         return res.status(200).json({
             success: true,
