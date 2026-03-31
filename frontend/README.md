@@ -13,6 +13,8 @@
 - [API Layer](#-api-layer)
 - [Authentication](#-authentication)
 - [API Integration](#-api-integration)
+- [Sync Health Check](#-sync-health-check)
+- [Async Health Check](#-async-health-check)
 - [User Features](#-user-features)
 - [Operator Features](#-operator-features)
 - [Administrator Features](#-administrator-features)
@@ -57,7 +59,7 @@ npm run dev
 
 App runs at: `http://localhost:5173`
 
-App runs in AWS Amplify at: `https://main.d3o4dsb0dyvne1.amplifyapp.com/`
+App runs in AWS Amplify at: `https://main.d3vb1066jloxjy.amplifyapp.com/`
 
 ## 🌍 Environment Configuration
 **Environment setup** — create `.env` in root:
@@ -271,6 +273,79 @@ const api = axios.create({
   withCredentials: true,
 });
 ```
+### 🔹 Sync Health Check
+
+- **Endpoint:**
+```ts
+  GET /health
+```
+
+- **Behavior:**
+    - Executes request synchronously
+    - Returns final result in a single response
+    - Used via `handleHealthCheck`
+
+- **Flow:**
+```
+  fetch(HEALTH_URL)
+  await response.json()
+  Normalize status:
+    ok    → UP
+    error → DOWN
+```
+
+- **Response (mapped on frontend):**
+```ts
+  {
+    "status": "UP | DOWN",
+    "uptime": number,
+    "services": {
+      "lambda": { "status": "ok" },
+      "database": {
+        "status": "ok",
+        "latencyMs": number
+      }
+    },
+    "message": "string (optional)"
+  }
+```
+
+---
+
+### 🔹 Async Health Check
+
+- **Endpoints:**
+```ts
+  POST /operations/health      // initiate
+  GET  /operations/:id         // poll status
+```
+
+- **Behavior:**
+    - Initiates async health check, returns `operationId` and initial `status: PENDING`
+    - Polls every **5 seconds**, up to **12 attempts** (60s max)
+    - Polling stops when status is `SUCCESS` or `FAILED`
+    - Used via `handleAsyncHealthCheck`
+
+- **Status flow:**
+```
+  PENDING → PROCESSING → SUCCESS
+                       → FAILED
+```
+
+- **Response shape (both POST and GET):**
+```ts
+  {
+    "success": true,
+    "data": {
+      "operationId": "uuid",
+      "status": "PENDING | PROCESSING | SUCCESS | FAILED",
+      "timestamp": "ISO string",
+      "errorMessage": "string (optional)"
+    }
+  }
+```
+
+> **Note:** BE returns field `status` (not `operationStatus`). Mapped to `operationStatus` internally on the frontend.
 
 ### Lockers
 
