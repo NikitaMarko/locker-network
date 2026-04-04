@@ -1,0 +1,101 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Locker Network Lambda Functions
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Timeout: 30
+    MemorySize: 256
+    Environment:
+      Variables:
+        DATABASE_URL: !Ref DatabaseUrl
+        NODE_ENV: !Ref Environment
+
+Parameters:
+  DatabaseUrl:
+    Type: String
+    Description: PostgreSQL connection string
+    NoEcho: true
+    Default: "placeholder"
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+
+Resources:
+  HealthCheckFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: nodejs20.x
+    Properties:
+      FunctionName: !Sub locker-${Environment}-health-check
+      Handler: dist/functions/healthCheck.handler
+      CodeUri: .
+      Description: Returns status and uptime
+      Events:
+        HttpGet:
+          Type: Api
+          Properties:
+            Path: /health
+            Method: get
+    # ── SQS Queue ──
+  OperationsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub locker-${Environment}-operations-queue
+      VisibilityTimeout: 60
+      MessageRetentionPeriod: 86400
+
+  # ── DynamoDB Table ──
+  OperationsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub locker-${Environment}-operations-dynamodb
+      AttributeDefinitions:
+        - AttributeName: operationId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: operationId
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  # ── Command Handler Lambda (triggered by SQS) ──
+  CommandHandlerFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: nodejs20.x
+    Properties:
+      FunctionName: !Sub locker-${Environment}-command-handler
+      Handler: dist/functions/operations/commandHandler.handler
+      CodeUri: .
+      Description: Reads commands from SQS and routes to services
+      Environment:
+        Variables:
+          OPERATIONS_TABLE: !Ref OperationsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref OperationsTable
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt OperationsQueue.Arn
+            BatchSize: 1
+
+Outputs:
+  HealthCheckApi:
+    Description: Health Check endpoint URL
+    Value: !Sub https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/health
+  OperationsQueueUrl:
+    Description: SQS URL for operations
+    Value: !Ref OperationsQueue
+  OperationsQueueArn:
+    Description: SQS ARN for operations
+    Value: !GetAtt OperationsQueue.Arn
+  OperationsTableName:
+    Description: DynamoDB table name
+    Value: !Ref OperationsTable

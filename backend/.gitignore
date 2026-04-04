@@ -1,0 +1,71 @@
+# ============================================================================
+# ENVIRONMENT & SECRETS
+# ============================================================================
+.env                    # Actual environment (NEVER commit)
+.env.local              # Local overrides
+.env.*.local            # Per-environment overrides
+.env.production         # Production secrets
+
+# ============================================================================
+# NODE & DEPENDENCIES
+# ============================================================================
+node_modules/           # Installed packages
+npm-debug.log*          # NPM debug logs
+yarn-debug.log*         # Yarn debug logs
+pnpm-debug.log*         # PNPM debug logs
+.pnpm-store/
+
+# ============================================================================
+# BUILD OUTPUT
+# ============================================================================
+dist/                   # Compiled JavaScript
+build/                  # Alternative build directory
+*.tsbuildinfo           # TypeScript build info
+
+# ============================================================================
+# IDE & EDITOR
+# ============================================================================
+.vscode/                # VSCode settings
+.idea/                  # JetBrains IDE
+*.swp                   # Vim temporary
+*.swo                   # Vim temporary
+*~                      # Backup files
+.DS_Store               # macOS
+
+# ============================================================================
+# DATABASE & PRISMA
+# ============================================================================
+*.db                    # SQLite database (if used)
+*.sqlite                # SQLite files
+*.sqlite-shm            # SQLite shared memory
+*.sqlite-wal            # SQLite write-ahead log
+prisma/migrations/     # Prisma migration files (if not committed)
+
+# ============================================================================
+# LOGS & RUNTIME
+# ============================================================================
+logs/                   # Log files directory
+*.log                   # Log files
+coverage/               # Test coverage reports
+
+# ============================================================================
+# TEMPORARY & OS FILES
+# ============================================================================
+.tmp/                   # Temporary files
+temp/                   # Temporary directory
+uploads/                # User uploads
+*.tmp                   # Temporary files
+.cache/                 # Cache directory
+
+# ============================================================================
+# TEST ARTIFACTS
+# ============================================================================
+.nyc_output/            # Coverage output
+*.lcov                  # Coverage reports
+
+# ============================================================================
+# DOCKER
+# ============================================================================
+.dockerignore           # Docker ignore patterns
+docker-compose.override.yml  # Local docker overrides
+/logs/

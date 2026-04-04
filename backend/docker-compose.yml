@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: postgres-db
+    restart: always
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: locker
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build: .
+    container_name: locker-backend
+    restart: always
+    ports:
+      - "3555:3555"
+    depends_on:
+      - postgres
+    env_file:
+      - .env
+
+
+volumes:
+  postgres_data:

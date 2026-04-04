@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Smart Locker Network System — Frontend
 
 > 📌 This document describes frontend architecture, API integration, and system behavior.
@@ -455,7 +454,3 @@ export const logger = {
 - API versioned (/api/v1)
 - Frontend follows backend contract
 - Async operations depend on backend
-=======
-# locker-network-repository
-Monorepositiry for project
->>>>>>> dbdabe115db1e4206588923c671492e1a17c646c
