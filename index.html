@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>finafront</title>
+
+    <!-- Важно: чтобы Chrome передавал origin при http → https -->
+    <meta name="referrer" content="no-referrer-when-downgrade">
+
+    <!-- Google Identity Services -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+    <!-- Показываем реальный client_id, который Vite подставляет -->
+    <script type="module">
+      console.log("INDEX HTML CLIENT_ID =", import.meta.env.VITE_GOOGLE_CLIENT_ID);
+    </script>
+    <!-- End Google Identity Services -->
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
