@@ -1,10 +1,6 @@
 import { http } from "./httpClient";
 import type { User } from "../modules/shared/types/user";
 
-// -------------------------
-// Типы ответов backend
-// -------------------------
-
 export interface LoginResponse {
     accessToken: string;
     refreshToken?: string;
@@ -29,7 +25,16 @@ export async function loginApi(email: string, password: string): Promise<LoginRe
 }
 
 // -------------------------
-// Обновление токена
+// Google Login
+// -------------------------
+
+export async function googleLoginApi(idToken: string): Promise<LoginResponse> {
+    const res = await http.post<LoginResponse>("/auth/google", { token: idToken });
+    return res.data;
+}
+
+// -------------------------
+// Refresh
 // -------------------------
 
 export async function refreshTokenRequest(): Promise<string> {
@@ -38,7 +43,7 @@ export async function refreshTokenRequest(): Promise<string> {
 }
 
 // -------------------------
-// Регистрация
+// Register
 // -------------------------
 
 export async function registerApi(
@@ -58,7 +63,7 @@ export async function registerApi(
 }
 
 // -------------------------
-// Получение текущего пользователя
+// Me
 // -------------------------
 
 export async function meApi(): Promise<User | null> {
@@ -71,7 +76,7 @@ export async function meApi(): Promise<User | null> {
 }
 
 // -------------------------
-// Выход
+// Logout
 // -------------------------
 
 export async function logoutApi(): Promise<void> {

@@ -1,69 +1,81 @@
-import {useContext, useEffect} from "react";
-import {AuthContext} from "../app/providers/AuthContext.ts";
-
+import { useEffect, useContext, useCallback, useState } from "react";
+import { AuthContext } from "../app/providers/AuthContext.ts";
+import { GOOGLE_CLIENT_ID } from "../config/env";
 
 type GoogleCredentialResponse = {
     credential: string;
-    select_by?: string;
 };
 
-type GoogleWindow= {
-    accounts: {
-        id: {
-            initialize: (config: {
-                client_id: string;
-                callback: (response: GoogleCredentialResponse) => void;
-            }) => void;
-            renderButton: (
-                parent: HTMLElement | null,
-                options: {
-                    theme?: string;
-                    size?: string;
-                }
-            ) => void;
-        };
-    };
-};
-
-
-// расширяем тип window и не было ошибок при компиляции
 declare global {
     interface Window {
-        google?:GoogleWindow
+        google?: any;
     }
 }
 
-
 const GoogleLoginTest = () => {
+    const { googleLogin } = useContext(AuthContext);
+    const [sdkLoaded, setSdkLoaded] = useState(false);
 
-    const {googleLogin} = useContext(AuthContext)
+    const handleCredentialResponse = useCallback(
+        async (response: GoogleCredentialResponse) => {
+            console.log("GOOGLE CALLBACK FIRED:", response);
 
-    const handleCredentialResponse = async (responseGoogle: GoogleCredentialResponse) => {
-        // {
-        //   googleId: string,
-        //   email: string,
-        //   name: string,
-        //   avatar: string,
-        // }
-        const idToken = responseGoogle.credential;
-        await googleLogin(idToken);
+            if (!response?.credential) {
+                console.log("NO CREDENTIAL");
+                return;
+            }
 
-    };
+            try {
+                console.log("SENDING TOKEN TO BACKEND...");
+                await googleLogin(response.credential);
+
+                console.log("LOGIN SUCCESS → REDIRECT");
+                window.location.href = "/redirect-by-role";
+
+            } catch (e) {
+                console.error("GOOGLE LOGIN ERROR:", e);
+            }
+        },
+        [googleLogin]
+    );
 
     useEffect(() => {
-        if (!window.google) return;
+        if (window.google) {
+            setSdkLoaded(true);
+            return;
+        }
+
+        const script = document.createElement("script");
+        script.src = "https://accounts.google.com/gsi/client";
+        script.async = true;
+        script.onload = () => {
+            console.log("Google SDK loaded");
+            setSdkLoaded(true);
+        };
+
+        document.body.appendChild(script);
+    }, []);
+
+    useEffect(() => {
+        if (!sdkLoaded || !window.google) return;
+
+        console.log("GOOGLE INIT");
+
+        const el = document.getElementById("googleButton");
+        if (!el) return;
 
         window.google.accounts.id.initialize({
-            // id из акк
-            client_id: " ",
+            client_id: GOOGLE_CLIENT_ID,
             callback: handleCredentialResponse,
+            ux_mode: "popup"
         });
 
-        window.google.accounts.id.renderButton(
-            document.getElementById("googleButton"),
-            { theme: "outline", size: "large" }
-        );
-    }, []);
+        window.google.accounts.id.renderButton(el, {
+            theme: "outline",
+            size: "large"
+        });
+
+    }, [sdkLoaded, handleCredentialResponse]);
 
     return <div id="googleButton"></div>;
 };

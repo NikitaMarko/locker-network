@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import {Link, useNavigate} from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/useAuth';
-import {Paths} from "../../../app/utils/paths.ts";
+import { Paths } from "../../../app/utils/paths.ts";
 import GoogleLoginTest from "../../../components/GoogleLoginTest.tsx";
 
 export function LoginPageTest() {
@@ -52,23 +52,19 @@ export function LoginPageTest() {
                         style={inputStyle}
                     />
 
-                    {error && (
-                        <div style={errorStyle}>
-                            {error}
-                        </div>
-                    )}
+                    {error && <div style={errorStyle}>{error}</div>}
 
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        style={buttonStyle}
-                    >
+                    <button type="submit" disabled={loading} style={buttonStyle}>
                         {loading ? 'Logging in...' : 'Login'}
                     </button>
                 </form>
-                <div style={footerTextStyle}>Don&apos;t have an account?</div>
-                <GoogleLoginTest/>
-                <Link to={Paths.REGISTER} style={linkStyle}> Sign up </Link>
+
+                <div style={footerTextStyle}>Or login with</div>
+
+                <GoogleLoginTest />
+
+                <div style={footerTextStyle}>Don't have an account?</div>
+                <Link to={Paths.REGISTER} style={linkStyle}>Sign up</Link>
             </div>
         </div>
     );
