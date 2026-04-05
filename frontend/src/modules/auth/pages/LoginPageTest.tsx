@@ -21,12 +21,19 @@ export function LoginPageTest() {
         try {
             await login(email, password);
             navigate('/redirect-by-role');
-        } catch {
-            setError('Неверный email или пароль');
+        } catch (error){
+
+            if(error.name === "BLOCK_TIME"){
+                setError(error.message);
+            }else{
+                setError('Wrong email or password . ');
+            }
+
         } finally {
             setLoading(false);
         }
     }
+
 
     return (
         <div style={wrapperStyle}>

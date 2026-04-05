@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/useAuth';
 import { Paths } from "./../../../app/utils/paths.ts";
+import GoogleLoginTest from "../../../components/GoogleLoginTest.tsx";
 
 export function RegisterPage() {
     const navigate = useNavigate();
@@ -85,6 +86,8 @@ export function RegisterPage() {
                 <div style={footerTextStyle}>
                     Already have an account?
                 </div>
+
+                <GoogleLoginTest />
 
                 <Link to={Paths.LOGIN} style={linkStyle}>
                     Login

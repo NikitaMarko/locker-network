@@ -5,6 +5,7 @@ import { AuthContext } from "./AuthContext";
 import { http } from "../../api/httpClient";
 import { googleLoginApi } from "../../api/authApi";
 import { USE_MOCK } from "../../config/env";
+import {BLOCK_TIME, MAX_ATTEMPTS} from "../utils/constans.ts";
 
 interface AuthProviderProps {
     children: ReactNode;
@@ -13,6 +14,9 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
+
+    const[attempts,setAttempts] = useState(0)
+    const [block,setBlock] = useState<number |null>(null);
 
     // ---------------------------------------------------------
     // Проверяем токен и загружаем пользователя
@@ -55,12 +59,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // login
     // ---------------------------------------------------------
     const login = async (email: string, password: string): Promise<User> => {
-        const res = await http.post("/auth/login", { email, password });
 
-        localStorage.setItem("access_token", res.data.accessToken);
-        setUser(res.data.user);
+        if (block && Date.now() < block) {
+            const mins = Math.ceil((block - Date.now()) / 60000);
+            const error = new Error(`Too many attempts. Wait ${mins} minutes.`);
+            error.name = "BLOCK_TIME";
+            throw error;
+        }
 
-        return res.data.user;
+        try {
+            const res = await http.post("/auth/login", { email, password });
+            setAttempts(0);
+            setBlock(null);
+            localStorage.setItem("access_token", res.data.accessToken);
+            setUser(res.data.user);
+            return res.data.user;
+        } catch (err) {
+            const newAttempts = attempts + 1;
+            setAttempts(newAttempts);
+
+            if (newAttempts >= MAX_ATTEMPTS) {
+                setBlock(Date.now() + BLOCK_TIME);
+            }
+
+            throw err;
+        }
     };
 
     // ---------------------------------------------------------
