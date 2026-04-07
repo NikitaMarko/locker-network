@@ -15,7 +15,7 @@ export class LockerBoxServiceImplPostgres {
     }
 
     async createBox (req: Request, res: Response) {
-        const {stationId, code, size, price} = req.body;
+        const {stationId, code, size} = req.body;
 
         const stationExists = await prismaService.lockerStation.findUnique({
             where: { stationId },
@@ -36,7 +36,6 @@ export class LockerBoxServiceImplPostgres {
                 stationId,
                 code,
                 size,
-                price
             },
             select:{
                 lockerBoxId: true,
