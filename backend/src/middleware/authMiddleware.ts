@@ -18,7 +18,7 @@ export const protect: RequestHandler = async (req: Request, res: Response, next:
         const currentUser = {
             userId: decoded.userId,
             role: decoded.role,
-            tokenVersion: decoded.tokenVersion,
+            sessionId: decoded.sessionId,
         }
 
         req.user = currentUser;

@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
+import {timingSafeEqual} from "node:crypto";
 
-import {CookieOptions, Response} from 'express';
+import {CookieOptions, Response, Request} from 'express';
 import jwt, {JwtPayload, SignOptions} from 'jsonwebtoken';
 import {Role} from '@prisma/client';
 
@@ -10,7 +11,7 @@ import {prismaService} from '../services/prismaService';
 export interface TokenPayload extends JwtPayload {
     userId: string;
     role: Role;
-    tokenVersion: number;
+    sessionId: string;
 }
 
 export const signToken = (payload: TokenPayload) =>
@@ -26,21 +27,39 @@ export const signRefreshToken = (payload: TokenPayload) =>
 export const hashToken = (token: string) =>
     createHash('sha256').update(token).digest('hex');
 
-export const saveToken = async (userId: string, refreshToken: string) => {
-    await prismaService.user.update({
-        where: {userId},
-        data: {
-            refreshToken: hashToken(refreshToken),
-        },
-    });
+export const timingSafeTokenCompare = (a: string, b: string): boolean => {
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+    if (bufA.length !== bufB.length) return false;
+    return timingSafeEqual(bufA, bufB);
 };
 
-export const removeToken = async (userId: string) => {
-    await prismaService.user.update({
-        where: {userId},
+export const saveToken = async (userId: string, refreshToken: string, req: Request,
+): Promise<string> => {
+    const expiresAt = new Date(
+        Date.now() + 1000 * 60 * 60 * 24 * env.JWT_REFRESH_TOKEN_TTL,
+    );
+    const session = await prismaService.refreshSession.create({
         data: {
-            refreshToken: null,
-            tokenVersion: {increment: 1}
+            userId,
+            tokenHash: hashToken(refreshToken),
+            ipAddress: req.ip ?? null,
+            deviceInfo: req.headers['user-agent'] ?? null,
+            expiresAt,
+        },
+    });
+    return session.id;
+};
+
+export const refreshSession = async (sessionId: string, userId: string) => {
+    await prismaService.refreshSession.updateMany({
+        where: {
+            id: sessionId,
+            userId: userId,
+            revokedAt: null,
+        },
+        data: {
+            revokedAt: new Date(),
         },
     });
 };

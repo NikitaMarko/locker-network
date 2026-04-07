@@ -57,59 +57,96 @@ enum ErrorSeverity {
 }
 
 model User {
-  userId            String    @id @default(uuid())
-  name              String
-  email             String    @unique
-  password          String
-  phone             String?   @unique
-  role              Role      @default(USER)
-  refreshToken      String?
-  tokenVersion      Int       @default(0)
+  userId   String  @id @default(uuid())
+  name     String
+  email    String  @unique
+  password String
+  phone    String? @unique
+  role     Role    @default(USER)
+
   passwordChangedAt DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
 
   bookings  Booking[]
-  auditLogs AuditLog[] @relation("AuditActor")
+  sessions  RefreshSession[]
+  auditLogs AuditLog[]       @relation("AuditActor")
+}
+
+model RefreshSession {
+  id String @id @default(uuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  tokenHash String
+
+  ipAddress  String?
+  deviceInfo String?
+
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model LockerStation {
   stationId String        @id @default(uuid())
   city      String // default "Tel Aviv"
   address   String? // "Dizengoff 10"
-  latitude  String
-  longitude String
+  latitude  Float
+  longitude Float
   status    StationStatus @default(ACTIVE)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  lockers LockerBox[]
+  lockers  LockerBox[]
+  bookings Booking[]
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
 
   @@index([city])
 }
 
 model LockerBox {
   lockerBoxId String @id @default(uuid())
-  stationId   String
 
-  code   String       @unique // "A-01"
-  size   LockerSize
-  price  Decimal      @db.Decimal(10, 2)
-  status LockerStatus @default(AVAILABLE)
+  stationId String
+  station   LockerStation @relation(fields: [stationId], references: [stationId], onDelete: Cascade)
+
+  code String     @unique // "A-01"
+  size LockerSize
+
+  status  LockerStatus @default(AVAILABLE)
+  version Int          @default(0)
+
+  lastStatusChangedAt DateTime @default(now())
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  station LockerStation @relation(fields: [stationId], references: [stationId], onDelete: Cascade)
-  device  LockerDevice?
+  device LockerDevice?
 
-  bookings Booking[]
+  statusHistory LockerStatusHistory[]
+
   auditLog AuditLog[]
+  bookings Booking[]  @relation("LockerBookings")
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
 
   @@unique([stationId, code])
   @@index([stationId])
   @@index([status])
+  @@index([stationId, status])
 }
 
 enum DeviceOnlineStatus {
@@ -130,7 +167,8 @@ enum LockStatus {
 model LockerDevice {
   deviceId String @id @default(uuid())
 
-  lockerBoxId String @unique
+  lockerBoxId String    @unique
+  lockerBox   LockerBox @relation(fields: [lockerBoxId], references: [lockerBoxId], onDelete: Cascade)
 
   onlineStatus DeviceOnlineStatus @default(ONLINE)
   doorStatus   DoorStatus         @default(CLOSED)
@@ -141,14 +179,19 @@ model LockerDevice {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  lockerBox LockerBox @relation(fields: [lockerBoxId], references: [lockerBoxId], onDelete: Cascade)
 }
 
 model Booking {
-  bookingId   String @id @default(uuid())
-  userId      String
+  bookingId String @id @unique @default(uuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [userId], onDelete: Restrict)
+
   lockerBoxId String
+  lockerBox   LockerBox @relation("LockerBookings", fields: [lockerBoxId], references: [lockerBoxId])
+
+  stationId String
+  station   LockerStation @relation(fields: [stationId], references: [stationId], onDelete: Restrict)
 
   status BookingStatus @default(PENDING)
 
@@ -158,17 +201,58 @@ model Booking {
 
   totalPrice Decimal? @db.Decimal(10, 2)
 
-  correlationId String
-  requestId     String? @unique
+  idempotencyKey String? @unique
+
+  payment Payment?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  lockerBox LockerBox @relation(fields: [lockerBoxId], references: [lockerBoxId], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [userId], onDelete: Cascade)
-
   @@index([lockerBoxId])
   @@index([userId])
+  @@index([stationId])
+  @@index([status])
+}
+
+model LockerStatusHistory {
+  id String @id @default(uuid())
+
+  lockerBoxId String
+  lockerBox   LockerBox @relation(fields: [lockerBoxId], references: [lockerBoxId], onDelete: Restrict)
+
+  fromStatus LockerStatus?
+  toStatus   LockerStatus
+
+  reason String
+  source String
+
+  bookingId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([lockerBoxId, createdAt])
+}
+
+model Payment {
+  paymentId String @id @default(uuid())
+
+  bookingId String  @unique
+  booking   Booking @relation(fields: [bookingId], references: [bookingId], onDelete: Restrict)
+
+  status PaymentStatus
+
+  provider          String?
+  providerPaymentId String?
+
+  amount   Decimal
+  currency String
+
+  paidAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([bookingId])
 }
 
 model AuditLog {
