@@ -149,6 +149,21 @@ model LockerBox {
   @@index([stationId, status])
 }
 
+model Pricing {
+  priceId String @id @default(uuid())
+
+  city String
+  size LockerSize
+
+  pricePerHour Decimal @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([city, size])
+  @@index([city])
+}
+
 enum DeviceOnlineStatus {
   ONLINE
   OFFLINE
