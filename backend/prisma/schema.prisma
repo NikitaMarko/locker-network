@@ -96,9 +96,25 @@ model RefreshSession {
   @@index([userId])
 }
 
+model City {
+  cityId String @id @default(uuid())
+
+  code String @unique // TLV
+  name String // Tel Aviv
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stations LockerStation[]
+  Pricing  Pricing[]
+}
+
 model LockerStation {
   stationId String        @id @default(uuid())
-  city      String // default "Tel Aviv"
+  cityId    String
+  city      City          @relation(fields: [cityId], references: [cityId])
   address   String? // "Dizengoff 10"
   latitude  Float
   longitude Float
@@ -113,7 +129,7 @@ model LockerStation {
   isDeleted Boolean   @default(false)
   deletedAt DateTime?
 
-  @@index([city])
+  @@index([cityId])
 }
 
 model LockerBox {
@@ -152,16 +168,17 @@ model LockerBox {
 model Pricing {
   priceId String @id @default(uuid())
 
-  city String
-  size LockerSize
+  cityId String
+  city   City       @relation(fields: [cityId], references: [cityId])
+  size   LockerSize
 
   pricePerHour Decimal @db.Decimal(10, 2)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([city, size])
-  @@index([city])
+  @@unique([cityId, size])
+  @@index([cityId])
 }
 
 enum DeviceOnlineStatus {
