@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/useAuth';
 import { Paths } from "../../../app/utils/paths.ts";
 import GoogleLoginTest from "../../../components/GoogleLoginTest.tsx";
+import axios from "axios";
 
 export function LoginPageTest() {
     const navigate = useNavigate();
@@ -21,14 +22,19 @@ export function LoginPageTest() {
         try {
             await login(email, password);
             navigate('/redirect-by-role');
-        } catch (error){
+        } catch (error: unknown) {
 
-            if(error.name === "BLOCK_TIME"){
+            if (error instanceof Error && error.name === "BLOCK_TIME") {
                 setError(error.message);
-            }else{
-                setError('Wrong email or password . ');
+                return;
             }
 
+            if (axios.isAxiosError(error)) {
+                setError(error.response?.data?.message || "Wrong email or password");
+                return;
+            }
+
+            setError("Unexpected error");
         } finally {
             setLoading(false);
         }

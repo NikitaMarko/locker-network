@@ -1,31 +1,47 @@
 // src/api/httpClient.ts
 
 import axios from "axios";
+import { BASE_API_URL, USE_MOCK } from "../config/env";
 
+// ---------------------------------------------------------
+// AXIOS INSTANCE
+// ---------------------------------------------------------
 export const http = axios.create({
-    baseURL: "http://localhost:8080", // 👉 сюда поставьте URL backend
+    baseURL: BASE_API_URL || "http://localhost:8080",
     withCredentials: false,
 });
 
 // ---------------------------------------------------------
-// 🔹 Добавляем access_token в каждый запрос
+// 🔹 REQUEST: добавляем токен
 // ---------------------------------------------------------
 http.interceptors.request.use((config) => {
     const token = localStorage.getItem("access_token");
+
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }
+
     return config;
 });
 
 // ---------------------------------------------------------
-// 🔹 Обработка ошибок (например, 401)
+// 🔹 RESPONSE: обработка ошибок
 // ---------------------------------------------------------
 http.interceptors.response.use(
     (response) => response,
+
     async (error) => {
+
+        // ✅ MOCK режим — НЕ ломаем приложение
+        if (USE_MOCK) {
+            console.warn("MOCK MODE → skip HTTP error handling");
+            return Promise.reject(error);
+        }
+
+        // -------------------------------------------------
+        // ❗ Backend доступен → нормальная обработка
+        // -------------------------------------------------
         if (error.response?.status === 401) {
-            // Токен недействителен → выходим из системы
             localStorage.removeItem("access_token");
             window.location.href = "/login";
         }

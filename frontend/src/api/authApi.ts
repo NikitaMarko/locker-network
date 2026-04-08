@@ -1,84 +1,49 @@
+import type { Role } from "../config/roles";
 import { http } from "./httpClient";
-import type { User } from "../modules/shared/types/user";
 
-export interface LoginResponse {
-    accessToken: string;
-    refreshToken?: string;
-    user: User;
+export interface AuthResponse {
+    accessToken?: string;
+    user: {
+        userId: string;
+        email: string;
+        name: string;
+        role: Role;
+        phone?: string;
+    };
 }
 
-export interface MeResponse {
-    user: User;
-}
-
-export interface RegisterResponse {
-    user: User;
-}
-
-// -------------------------
-// Авторизация
-// -------------------------
-
-export async function loginApi(email: string, password: string): Promise<LoginResponse> {
-    const res = await http.post<LoginResponse>("/auth/login", { email, password });
-    return res.data;
-}
-
-// -------------------------
-// Google Login
-// -------------------------
-
-export async function googleLoginApi(idToken: string): Promise<LoginResponse> {
-    const res = await http.post<LoginResponse>("/auth/google", { token: idToken });
-    return res.data;
-}
-
-// -------------------------
-// Refresh
-// -------------------------
-
-export async function refreshTokenRequest(): Promise<string> {
-    const res = await http.post<{ accessToken: string }>("/auth/refresh");
-    return res.data.accessToken;
-}
-
-// -------------------------
-// Register
-// -------------------------
-
-export async function registerApi(
-    email: string,
-    password: string,
-    name: string,
-    phone?: string
-): Promise<RegisterResponse> {
-    const res = await http.post<RegisterResponse>("/auth/register", {
+// ---------------------------------------------------------
+// LOGIN
+// ---------------------------------------------------------
+export const loginApi = async (email: string, password: string) => {
+    const res = await http.post<AuthResponse>("/auth/login", {
         email,
         password,
-        name,
-        phone,
     });
 
     return res.data;
-}
+};
 
-// -------------------------
-// Me
-// -------------------------
+// ---------------------------------------------------------
+// REGISTER
+// ---------------------------------------------------------
+export const registerApi = async (data: {
+    email: string;
+    password: string;
+    name: string;
+    phone?: string;
+}) => {
+    const res = await http.post<AuthResponse>("/auth/register", data);
+    return res.data;
+};
 
-export async function meApi(): Promise<User | null> {
-    try {
-        const res = await http.get<MeResponse>("/auth/me");
-        return res.data.user;
-    } catch {
-        return null;
-    }
-}
+// ---------------------------------------------------------
+// GOOGLE LOGIN
+// ---------------------------------------------------------
+export const googleLoginApi = async (idToken: string) => {
+    const res = await http.post<AuthResponse>("/auth/google", {
+        idToken,
+    });
 
-// -------------------------
-// Logout
-// -------------------------
-
-export async function logoutApi(): Promise<void> {
-    await http.post("/auth/logout").catch(() => {});
-}
+    return res.data;
+};

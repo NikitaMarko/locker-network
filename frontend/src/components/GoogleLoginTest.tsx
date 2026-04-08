@@ -1,4 +1,5 @@
-import { useEffect, useContext, useCallback, useState } from "react";
+import { useEffect, useContext, useCallback, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../app/providers/AuthContext.ts";
 import { GOOGLE_CLIENT_ID } from "../config/env";
 
@@ -14,31 +15,35 @@ declare global {
 
 const GoogleLoginTest = () => {
     const { googleLogin } = useContext(AuthContext);
+    const navigate = useNavigate();
+
     const [sdkLoaded, setSdkLoaded] = useState(false);
+    const initialized = useRef(false);
 
     const handleCredentialResponse = useCallback(
         async (response: GoogleCredentialResponse) => {
             console.log("GOOGLE CALLBACK FIRED:", response);
 
-            if (!response?.credential) {
-                console.log("NO CREDENTIAL");
-                return;
-            }
+            if (!response?.credential) return;
 
             try {
-                console.log("SENDING TOKEN TO BACKEND...");
                 await googleLogin(response.credential);
 
                 console.log("LOGIN SUCCESS → REDIRECT");
-                window.location.href = "/redirect-by-role";
+
+                // ✅ ВАЖНО: даём React обновить state
+                setTimeout(() => {
+                    navigate("/redirect-by-role");
+                }, 0);
 
             } catch (e) {
                 console.error("GOOGLE LOGIN ERROR:", e);
             }
         },
-        [googleLogin]
+        [googleLogin, navigate]
     );
 
+    // загрузка SDK
     useEffect(() => {
         if (window.google) {
             setSdkLoaded(true);
@@ -48,6 +53,7 @@ const GoogleLoginTest = () => {
         const script = document.createElement("script");
         script.src = "https://accounts.google.com/gsi/client";
         script.async = true;
+
         script.onload = () => {
             console.log("Google SDK loaded");
             setSdkLoaded(true);
@@ -56,8 +62,12 @@ const GoogleLoginTest = () => {
         document.body.appendChild(script);
     }, []);
 
+    // init ТОЛЬКО 1 раз
     useEffect(() => {
         if (!sdkLoaded || !window.google) return;
+        if (initialized.current) return;
+
+        initialized.current = true;
 
         console.log("GOOGLE INIT");
 
@@ -67,12 +77,12 @@ const GoogleLoginTest = () => {
         window.google.accounts.id.initialize({
             client_id: GOOGLE_CLIENT_ID,
             callback: handleCredentialResponse,
-            ux_mode: "popup"
+            ux_mode: "popup",
         });
 
         window.google.accounts.id.renderButton(el, {
             theme: "outline",
-            size: "large"
+            size: "large",
         });
 
     }, [sdkLoaded, handleCredentialResponse]);

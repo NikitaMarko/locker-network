@@ -11,22 +11,53 @@ export function RegisterPage() {
     const [email, setEmail] = useState('');
     const [name, setName] = useState('');
     const [password, setPassword] = useState('');
+
     const [error, setError] = useState('');
+    const [validationError, setValidationError] = useState('');
     const [loading, setLoading] = useState(false);
+
+    // ✅ ВАЛИДАЦИЯ
+    function validate() {
+        if (name.trim().length < 2) {
+            return "Name must be at least 2 characters";
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return "Invalid email format";
+        }
+
+        if (password.length < 6) {
+            return "Password must be at least 6 characters";
+        }
+
+        return "";
+    }
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
+
         setError('');
+        setValidationError('');
+
+        const validation = validate();
+
+        // ❗ НЕ ОТПРАВЛЯЕМ ЗАПРОС
+        if (validation) {
+            setValidationError(validation);
+            return;
+        }
+
         setLoading(true);
 
         try {
-            const user = await register(email, password, name);
+            await register(email, password, name);
 
-            if (user.role === 'USER') navigate('/user/dashboard');
-            if (user.role === 'OPERATOR') navigate('/operator/dashboard');
-            if (user.role === 'ADMIN') navigate('/admin/dashboard');
-        } catch {
-            setError('Registration failed');
+            // ✅ ПО ЗАДАНИЮ → LOGIN PAGE
+            navigate('/login');
+
+        } catch (e: any) {
+            setError(e?.response?.data?.message || 'Registration failed');
         } finally {
             setLoading(false);
         }
@@ -43,7 +74,6 @@ export function RegisterPage() {
                         placeholder="Name"
                         value={name}
                         onChange={e => setName(e.target.value)}
-                        required
                         disabled={loading}
                         style={inputStyle}
                     />
@@ -53,7 +83,6 @@ export function RegisterPage() {
                         placeholder="Email"
                         value={email}
                         onChange={e => setEmail(e.target.value)}
-                        required
                         disabled={loading}
                         style={inputStyle}
                     />
@@ -63,15 +92,18 @@ export function RegisterPage() {
                         placeholder="Password"
                         value={password}
                         onChange={e => setPassword(e.target.value)}
-                        required
                         disabled={loading}
                         style={inputStyle}
                     />
 
+                    {/* ✅ ВАЛИДАЦИЯ */}
+                    {validationError && (
+                        <div style={errorStyle}>{validationError}</div>
+                    )}
+
+                    {/* ✅ ОШИБКА СЕРВЕРА */}
                     {error && (
-                        <div style={errorStyle}>
-                            {error}
-                        </div>
+                        <div style={errorStyle}>{error}</div>
                     )}
 
                     <button

@@ -7,16 +7,21 @@ export function RedirectByRole() {
 
     if (loading) return <div>Загрузка...</div>;
 
-    if (!user) return <Navigate to="/login" replace />;
-
-    switch (user.role) {
-        case ROLES.USER:
-            return <Navigate to="/user/dashboard" replace />;
-        case ROLES.OPERATOR:
-            return <Navigate to="/operator" replace />;
-        case ROLES.ADMIN:
-            return <Navigate to="/admin" replace />;
-        default:
-            return <Navigate to="/403" replace />;
+    if (!user) {
+        return <Navigate to="/login" replace />;
     }
+
+    if (user.role === ROLES.USER) {
+        return <Navigate to="/user/dashboard" replace />;
+    }
+
+    if (user.role === ROLES.OPERATOR) {
+        return <Navigate to="/operator" replace />;
+    }
+
+    if (user.role === ROLES.ADMIN) {
+        return <Navigate to="/admin" replace />;
+    }
+
+    return <Navigate to="/403" replace />;
 }
