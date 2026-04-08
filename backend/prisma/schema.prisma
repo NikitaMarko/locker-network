@@ -112,13 +112,14 @@ model City {
 }
 
 model LockerStation {
-  stationId String        @id @default(uuid())
+  stationId String                                 @id @default(uuid())
   cityId    String
-  city      City          @relation(fields: [cityId], references: [cityId])
+  city      City                                   @relation(fields: [cityId], references: [cityId])
   address   String? // "Dizengoff 10"
   latitude  Float
   longitude Float
-  status    StationStatus @default(ACTIVE)
+  location  Unsupported("geography(Point, 4326)")?
+  status    StationStatus                          @default(ACTIVE)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -129,7 +130,7 @@ model LockerStation {
   isDeleted Boolean   @default(false)
   deletedAt DateTime?
 
-  @@index([cityId])
+  @@index([cityId, status, isDeleted])
 }
 
 model LockerBox {
