@@ -1,5 +1,6 @@
 import {Request, Response} from "express";
 
+import {attachPricesToStations} from "../utils/tools";
 import {HttpError} from "../errorHandler/HttpError";
 
 import {prismaService} from "./prismaService";
@@ -10,7 +11,9 @@ export class LockerStationServiceImplPostgres {
     async getAllStation(req: Request, res: Response) {
         const stations = await prismaService.lockerStation.findMany({
             include: {
-                lockers: true,
+                lockers: {
+                    where: { isDeleted: false }
+                },
                 city: {
                     select: {
                         code: true,
@@ -19,12 +22,13 @@ export class LockerStationServiceImplPostgres {
                 }
             }
         });
-        return res.json(stations);
+        const result = await attachPricesToStations(stations);
+        return res.json(result);
     }
 
 
     async createStation(req: Request, res: Response) {
-        const {city, latitude, longitude} = req.body;
+        const {city, latitude, longitude, address} = req.body;
         const cityForStation = await prismaService.city.findUnique({
             where: {code: city}
         });
@@ -37,6 +41,7 @@ export class LockerStationServiceImplPostgres {
                 cityId: cityForStation.cityId,
                 latitude,
                 longitude,
+                address
             },
             select: {
                 stationId: true,
@@ -80,7 +85,7 @@ export class LockerStationServiceImplPostgres {
                 ls."deletedAt",
                 CASE
                     WHEN ${lat}::double precision IS NOT NULL
-                 AND ${lng}::double precision IS NOT NULL
+             AND ${lng}::double precision IS NOT NULL
                 THEN ROUND(
                 ST_Distance(
                 ls."location"::geography,
@@ -95,15 +100,30 @@ export class LockerStationServiceImplPostgres {
                 2
                 )
                 ELSE NULL
-            END AS distance
-        FROM "LockerStation" ls
-        JOIN "City" c ON ls."cityId" = c."cityId"
-        WHERE ls."isDeleted" = false
-          AND (${city ?? null}::text IS NULL OR c."code" = ${city ?? null})
-            AND (
-            ${status ?? null}::"StationStatus" IS NULL
-            OR ls."status" = ${status ?? null}::"StationStatus"
-            )
+            END AS distance,
+        COALESCE(
+            JSON_AGG(
+                JSON_BUILD_OBJECT(
+                    'lockerBoxId', lb."lockerBoxId",
+                    'stationId', lb."stationId",
+                    'code', lb."code",
+                    'size', lb."size",
+                    'status', lb."status",
+                    'createdAt', lb."createdAt",
+                    'updatedAt', lb."updatedAt"
+                )
+            ) FILTER (WHERE lb."lockerBoxId" IS NOT NULL),
+            '[]'
+        ) AS lockers
+    FROM "LockerStation" ls
+    JOIN "City" c ON ls."cityId" = c."cityId"
+    LEFT JOIN "LockerBox" lb
+        ON lb."stationId" = ls."stationId"
+       AND lb."isDeleted" = false
+    WHERE ls."isDeleted" = false
+      AND (${city ?? null}::text IS NULL OR c."code" = ${city ?? null})
+            AND (${status ?? null}::"StationStatus" IS NULL
+            OR ls."status" = ${status ?? null}::"StationStatus")
             AND (
             ${radius}::double precision IS NULL
             OR (
@@ -122,10 +142,12 @@ export class LockerStationServiceImplPostgres {
             )
             )
             )
+            GROUP BY ls."stationId", c."cityId", c."code", c."name"
             ORDER BY distance ASC NULLS LAST;
         `;
 
-        return res.json(stations);
+        const result = await attachPricesToStations(stations as any[]);
+        return res.json(result);
     }
 
     async getOneStation(req: Request, res: Response) {
@@ -135,7 +157,9 @@ export class LockerStationServiceImplPostgres {
                 stationId
             },
             include: {
-                lockers: true,
+                lockers: {
+                    where: { isDeleted: false }
+                },
                 city: {
                     select: {
                         code: true,
@@ -147,7 +171,8 @@ export class LockerStationServiceImplPostgres {
         if (!station) {
             throw new HttpError(404, "Station doesn't exist");
         }
-        return res.json(station);
+        const [result] = await attachPricesToStations([station]);
+        return res.json(result);
     }
 
     async changeStationStatus(req: Request, res: Response) {

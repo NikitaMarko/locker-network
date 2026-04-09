@@ -9,9 +9,38 @@ import {prismaService} from "./prismaService";
 export class LockerBoxServiceImplPostgres {
 
     async getAllBoxes (req: Request, res: Response) {
-        const allBoxes = await prismaService.lockerBox.findMany();
-        return res.json(allBoxes);
+        const lockers = await prismaService.lockerBox.findMany({
+            where: {
+                isDeleted: false,
+                station: {
+                    isDeleted: false,
+                    status: "ACTIVE",
+                },
+            },
+            include: {
+                station: {
+                    include: {
+                        city: true,
+                    },
+                },
+            },
+        });
 
+        const pricing = await prismaService.pricing.findMany();
+
+        const pricingMap = new Map(
+            pricing.map((p) => [`${p.cityId}-${p.size}`, p.pricePerHour])
+        );
+
+        const result = lockers.map((locker) => ({
+            ...locker,
+            pricePerHour:
+                pricingMap.get(
+                    `${locker.station.cityId}-${locker.size}`
+                ) || null,
+        }));
+
+        return res.json(result);
     }
 
     async createBox (req: Request, res: Response) {
@@ -44,7 +73,7 @@ export class LockerBoxServiceImplPostgres {
             }
         });
 
-        return res.status(200).json({massage: "box created"});
+        return res.status(200).json({id: box.lockerBoxId, stationId: stationId});
     }
 
 
