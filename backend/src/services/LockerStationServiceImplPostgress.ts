@@ -11,19 +11,25 @@ export class LockerStationServiceImplPostgres {
     async getAllStation(req: Request, res: Response) {
         const stations = await prismaService.lockerStation.findMany({
             include: {
-                lockers: {
-                    where: { isDeleted: false }
-                },
                 city: {
                     select: {
                         code: true,
                         name: true
                     }
+                },
+                _count: {
+                    select: {
+                        lockers: {
+                            where: {
+                                isDeleted: false,
+                                status: "AVAILABLE",
+                            },
+                        }
+                    }
                 }
             }
         });
-        const result = await attachPricesToStations(stations);
-        return res.json(result);
+        return res.json(stations);
     }
 
 
@@ -85,68 +91,78 @@ export class LockerStationServiceImplPostgres {
                 ls."deletedAt",
                 CASE
                     WHEN ${lat}::double precision IS NOT NULL
-             AND ${lng}::double precision IS NOT NULL
+                    AND ${lng}::double precision IS NOT NULL
                 THEN ROUND(
-                ST_Distance(
-                ls."location"::geography,
-                ST_SetSRID(
-                ST_MakePoint(
-                ${lng}::double precision,
-                ${lat}::double precision
-                ),
-                4326
-                )::geography
+                  ST_Distance(
+                       ls."location"::geography,
+                       ST_SetSRID(
+                             ST_MakePoint(
+                                 ${lng}::double precision,
+                                 ${lat}::double precision
+                             ),
+                             4326
+                  )::geography
                 )::numeric,
                 2
                 )
                 ELSE NULL
             END AS distance,
-        COALESCE(
-            JSON_AGG(
-                JSON_BUILD_OBJECT(
-                    'lockerBoxId', lb."lockerBoxId",
-                    'stationId', lb."stationId",
-                    'code', lb."code",
-                    'size', lb."size",
-                    'status', lb."status",
-                    'createdAt', lb."createdAt",
-                    'updatedAt', lb."updatedAt"
-                )
-            ) FILTER (WHERE lb."lockerBoxId" IS NOT NULL),
-            '[]'
-        ) AS lockers
+        json_build_object(
+            'lockers',
+            COUNT(lb."lockerBoxId") FILTER (
+                WHERE lb."status" = 'AVAILABLE'
+                  AND lb."isDeleted" = false
+            )
+        ) AS "_count"
     FROM "LockerStation" ls
     JOIN "City" c ON ls."cityId" = c."cityId"
     LEFT JOIN "LockerBox" lb
         ON lb."stationId" = ls."stationId"
-       AND lb."isDeleted" = false
+       
     WHERE ls."isDeleted" = false
       AND (${city ?? null}::text IS NULL OR c."code" = ${city ?? null})
             AND (${status ?? null}::"StationStatus" IS NULL
             OR ls."status" = ${status ?? null}::"StationStatus")
-            AND (
-            ${radius}::double precision IS NULL
-            OR (
-            ${lat}::double precision IS NOT NULL
-            AND ${lng}::double precision IS NOT NULL
-            AND ST_DWithin(
-            ls."location"::geography,
-            ST_SetSRID(
-            ST_MakePoint(
-            ${lng}::double precision,
-            ${lat}::double precision
-            ),
-            4326
-            )::geography,
-            ${radius}::double precision
-            )
-            )
+            AND ( 
+                ${radius}::double precision IS NULL  
+                OR (
+                    ${lat}::double precision IS NOT NULL
+                    AND ${lng}::double precision IS NOT NULL
+                    AND ST_DWithin(
+                        ls."location"::geography,
+                        ST_SetSRID(
+                            ST_MakePoint(
+                                ${lng}::double precision,
+                                ${lat}::double precision
+                            ),
+                            4326
+                        )::geography,
+                        ${radius}::double precision
+                    )
+                )
             )
             GROUP BY ls."stationId", c."cityId", c."code", c."name"
             ORDER BY distance ASC NULLS LAST;
         `;
 
-        const result = await attachPricesToStations(stations as any[]);
+        const result = (stations as any[]).map((station) => ({
+            stationId: station.stationId,
+            cityId: station.cityId,
+            address: station.address,
+            latitude: station.latitude,
+            longitude: station.longitude,
+            status: station.status,
+            createdAt: station.createdAt,
+            updatedAt: station.updatedAt,
+            isDeleted: station.isDeleted,
+            deletedAt: station.deletedAt,
+            distance: station.distance,
+            city: {
+                code: station.cityCode,
+                name: station.cityName,
+            },
+            _count: station._count,
+        }));
         return res.json(result);
     }
 

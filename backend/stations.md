@@ -6,119 +6,81 @@
 
 Response `200 OK`:
 ```json
-[  
+[
   {
-    "stationId": "5d433dfc-44ce-4fa5-9422-b816a379be0d",
-    "cityId": "23101b25-e4c2-4592-a27b-21ba05dedda3",
-    "address": null,
-    "latitude": 123.124,
-    "longitude": 123.124,
+    "stationId": "22be00a2-1adf-4d03-931c-2dffa291015a",
+    "cityId": "bf5455e6-3a67-484d-a617-59fc5b9b834c",
+    "address": "Tel Aviv, Dizengoff 10",
+    "latitude": 32.0853,
+    "longitude": 34.7818,
     "status": "ACTIVE",
-    "createdAt": "2026-04-08T23:06:19.717Z",
-    "updatedAt": "2026-04-08T23:06:19.717Z",
+    "createdAt": "2026-04-09T12:49:18.974Z",
+    "updatedAt": "2026-04-09T12:49:18.974Z",
     "isDeleted": false,
     "deletedAt": null,
-    "lockers": [],
     "city": {
       "code": "TLV",
       "name": "Tel Aviv"
+    },
+    "_count": {
+      "lockers": 9
     }
   },
   {
-    "stationId": "00629150-2394-4216-bce0-31d99f149a6f",
-    "cityId": "23101b25-e4c2-4592-a27b-21ba05dedda3",
-    "address": null,
-    "latitude": 34.405045,
-    "longitude": 37.706076,
+    "stationId": "63cdf8d3-ed56-402f-aaa3-4d62d5706da6",
+    "cityId": "bf5455e6-3a67-484d-a617-59fc5b9b834c",
+    "address": "Tel Aviv, Rothschild 20",
+    "latitude": 32.0662,
+    "longitude": 34.7778,
     "status": "ACTIVE",
-    "createdAt": "2026-04-08T23:29:35.171Z",
-    "updatedAt": "2026-04-08T23:57:46.576Z",
-    "isDeleted": true,
-    "deletedAt": "2026-04-08T23:57:46.574Z",
-    "lockers": [],
-    "city": {
-      "code": "TLV",
-      "name": "Tel Aviv"
-    }
-  },
-  {
-    "stationId": "23a843dc-b43b-467b-8902-bd37d7ef7a23",
-    "cityId": "23101b25-e4c2-4592-a27b-21ba05dedda3",
-    "address": null,
-    "latitude": 34.405045,
-    "longitude": 37.706076,
-    "status": "INACTIVE",
-    "createdAt": "2026-04-09T00:22:43.869Z",
-    "updatedAt": "2026-04-09T00:55:50.054Z",
-    "isDeleted": true,
-    "deletedAt": "2026-04-09T00:55:50.052Z",
-    "lockers": [],
-    "city": {
-      "code": "TLV",
-      "name": "Tel Aviv"
-    }
-  },
-  {
-    "stationId": "59cc1902-a082-4b61-8cf1-0d8586579ff4",
-    "cityId": "6594dd53-269a-4ecc-9611-1d352013f973",
-    "address": null,
-    "latitude": 34.405045,
-    "longitude": 37.706076,
-    "status": "ACTIVE",
-    "createdAt": "2026-04-09T07:49:57.919Z",
-    "updatedAt": "2026-04-09T07:49:57.919Z",
+    "createdAt": "2026-04-09T12:49:18.974Z",
+    "updatedAt": "2026-04-09T12:49:18.974Z",
     "isDeleted": false,
     "deletedAt": null,
-    "lockers": [
-      {
-        "lockerBoxId": "0b8d7383-35eb-402f-9b8d-7675ba97912d",
-        "stationId": "59cc1902-a082-4b61-8cf1-0d8586579ff4",
-        "code": "A001",
-        "size": "M",
-        "status": "AVAILABLE",
-        "version": 0,
-        "lastStatusChangedAt": "2026-04-09T08:17:19.212Z",
-        "createdAt": "2026-04-09T08:17:19.212Z",
-        "updatedAt": "2026-04-09T08:17:19.212Z",
-        "isDeleted": false,
-        "deletedAt": null,
-        "pricePerHour": "7.5"
-      },
-      {
-        "lockerBoxId": "68a7af2f-2f99-40b8-8f68-c4878e8ade65",
-        "stationId": "59cc1902-a082-4b61-8cf1-0d8586579ff4",
-        "code": "A003",
-        "size": "L",
-        "status": "AVAILABLE",
-        "version": 0,
-        "lastStatusChangedAt": "2026-04-09T08:17:32.118Z",
-        "createdAt": "2026-04-09T08:17:32.118Z",
-        "updatedAt": "2026-04-09T08:17:32.118Z",
-        "isDeleted": false,
-        "deletedAt": null,
-        "pricePerHour": "10"
-      }
-    ],
     "city": {
-      "code": "HFA",
-      "name": "Haifa"
+      "code": "TLV",
+      "name": "Tel Aviv"
+    },
+    "_count": {
+      "lockers": 9
     }
   },
   {
-    "stationId": "cc642bfa-446c-45a4-9d8e-5695b613e96f",
-    "cityId": "6594dd53-269a-4ecc-9611-1d352013f973",
+    "stationId": "3b969aa1-b57b-4c83-ba9e-c6dd71c508a7",
+    "cityId": "2d5f991d-690c-41ec-bf79-ec2fce4c858e",
     "address": "test",
     "latitude": 34.405045,
     "longitude": 37.706076,
-    "status": "INACTIVE",
-    "createdAt": "2026-04-09T07:48:37.905Z",
-    "updatedAt": "2026-04-09T08:09:32.216Z",
-    "isDeleted": true,
-    "deletedAt": "2026-04-09T08:09:32.215Z",
-    "lockers": [],
+    "status": "ACTIVE",
+    "createdAt": "2026-04-09T12:53:06.839Z",
+    "updatedAt": "2026-04-09T12:53:06.839Z",
+    "isDeleted": false,
+    "deletedAt": null,
     "city": {
       "code": "HFA",
       "name": "Haifa"
+    },
+    "_count": {
+      "lockers": 2
+    }
+  },
+  {
+    "stationId": "e1cdfac0-44b9-4157-a13f-e0e49cacaa9b",
+    "cityId": "2d5f991d-690c-41ec-bf79-ec2fce4c858e",
+    "address": "test",
+    "latitude": 34.405045,
+    "longitude": 37.706076,
+    "status": "ACTIVE",
+    "createdAt": "2026-04-09T12:53:16.600Z",
+    "updatedAt": "2026-04-09T12:53:16.600Z",
+    "isDeleted": false,
+    "deletedAt": null,
+    "city": {
+      "code": "HFA",
+      "name": "Haifa"
+    },
+    "_count": {
+      "lockers": 1
     }
   }
 ]
@@ -140,51 +102,84 @@ Response `200 OK`:
 ```json
 [
   {
-    "stationId": "59cc1902-a082-4b61-8cf1-0d8586579ff4",
-    "cityId": "6594dd53-269a-4ecc-9611-1d352013f973",
-    "cityCode": "HFA",
-    "cityName": "Haifa",
-    "address": null,
+    "stationId": "3b969aa1-b57b-4c83-ba9e-c6dd71c508a7",
+    "cityId": "2d5f991d-690c-41ec-bf79-ec2fce4c858e",
+    "address": "test",
     "latitude": 34.405045,
     "longitude": 37.706076,
     "status": "ACTIVE",
-    "createdAt": "2026-04-09T07:49:57.919Z",
-    "updatedAt": "2026-04-09T07:49:57.919Z",
+    "createdAt": "2026-04-09T12:53:06.839Z",
+    "updatedAt": "2026-04-09T12:53:06.839Z",
     "isDeleted": false,
     "deletedAt": null,
     "distance": "0.09",
-    "lockers": [
-      {
-        "lockerBoxId": "0b8d7383-35eb-402f-9b8d-7675ba97912d",
-        "stationId": "59cc1902-a082-4b61-8cf1-0d8586579ff4",
-        "code": "A001",
-        "size": "M",
-        "status": "AVAILABLE",
-        "createdAt": "2026-04-09T08:17:19.212",
-        "updatedAt": "2026-04-09T08:17:19.212",
-        "pricePerHour": "7.5"
-      },
-      {
-        "lockerBoxId": "1adf60e2-5d7f-4490-9dcc-670b4acbcd2a",
-        "stationId": "59cc1902-a082-4b61-8cf1-0d8586579ff4",
-        "code": "A002",
-        "size": "M",
-        "status": "AVAILABLE",
-        "createdAt": "2026-04-09T08:17:25.117",
-        "updatedAt": "2026-04-09T08:17:25.117",
-        "pricePerHour": "7.5"
-      },
-      {
-        "lockerBoxId": "68a7af2f-2f99-40b8-8f68-c4878e8ade65",
-        "stationId": "59cc1902-a082-4b61-8cf1-0d8586579ff4",
-        "code": "A003",
-        "size": "L",
-        "status": "AVAILABLE",
-        "createdAt": "2026-04-09T08:17:32.118",
-        "updatedAt": "2026-04-09T08:17:32.118",
-        "pricePerHour": "10"
-      }
-    ]
+    "city": {
+      "code": "HFA",
+      "name": "Haifa"
+    },
+    "_count": {
+      "lockers": 2
+    }
+  },
+  {
+    "stationId": "e1cdfac0-44b9-4157-a13f-e0e49cacaa9b",
+    "cityId": "2d5f991d-690c-41ec-bf79-ec2fce4c858e",
+    "address": "test",
+    "latitude": 34.405045,
+    "longitude": 37.706076,
+    "status": "ACTIVE",
+    "createdAt": "2026-04-09T12:53:16.600Z",
+    "updatedAt": "2026-04-09T12:53:16.600Z",
+    "isDeleted": false,
+    "deletedAt": null,
+    "distance": "0.09",
+    "city": {
+      "code": "HFA",
+      "name": "Haifa"
+    },
+    "_count": {
+      "lockers": 1
+    }
+  },
+  {
+    "stationId": "22be00a2-1adf-4d03-931c-2dffa291015a",
+    "cityId": "bf5455e6-3a67-484d-a617-59fc5b9b834c",
+    "address": "Tel Aviv, Dizengoff 10",
+    "latitude": 32.0853,
+    "longitude": 34.7818,
+    "status": "ACTIVE",
+    "createdAt": "2026-04-09T12:49:18.974Z",
+    "updatedAt": "2026-04-09T12:49:18.974Z",
+    "isDeleted": false,
+    "deletedAt": null,
+    "distance": null,
+    "city": {
+      "code": "TLV",
+      "name": "Tel Aviv"
+    },
+    "_count": {
+      "lockers": 9
+    }
+  },
+  {
+    "stationId": "63cdf8d3-ed56-402f-aaa3-4d62d5706da6",
+    "cityId": "bf5455e6-3a67-484d-a617-59fc5b9b834c",
+    "address": "Tel Aviv, Rothschild 20",
+    "latitude": 32.0662,
+    "longitude": 34.7778,
+    "status": "ACTIVE",
+    "createdAt": "2026-04-09T12:49:18.974Z",
+    "updatedAt": "2026-04-09T12:49:18.974Z",
+    "isDeleted": false,
+    "deletedAt": null,
+    "distance": null,
+    "city": {
+      "code": "TLV",
+      "name": "Tel Aviv"
+    },
+    "_count": {
+      "lockers": 9
+    }
   }
 ]
 ```
@@ -195,17 +190,46 @@ Response `200 OK`:
 Response `200 OK`:
 ```json
 {
-  "stationId": "cc642bfa-446c-45a4-9d8e-5695b613e96f",
-  "cityId": "6594dd53-269a-4ecc-9611-1d352013f973",
+  "stationId": "3b969aa1-b57b-4c83-ba9e-c6dd71c508a7",
+  "cityId": "2d5f991d-690c-41ec-bf79-ec2fce4c858e",
   "address": "test",
   "latitude": 34.405045,
   "longitude": 37.706076,
-  "status": "INACTIVE",
-  "createdAt": "2026-04-09T07:48:37.905Z",
-  "updatedAt": "2026-04-09T08:09:32.216Z",
-  "isDeleted": true,
-  "deletedAt": "2026-04-09T08:09:32.215Z",
-  "lockers": [],
+  "status": "ACTIVE",
+  "createdAt": "2026-04-09T12:53:06.839Z",
+  "updatedAt": "2026-04-09T12:53:06.839Z",
+  "isDeleted": false,
+  "deletedAt": null,
+  "lockers": [
+    {
+      "lockerBoxId": "a04cb01d-1dea-4ea0-a08a-efdc7ecb71c4",
+      "stationId": "3b969aa1-b57b-4c83-ba9e-c6dd71c508a7",
+      "code": "A003",
+      "size": "L",
+      "status": "AVAILABLE",
+      "version": 0,
+      "lastStatusChangedAt": "2026-04-09T12:53:29.245Z",
+      "createdAt": "2026-04-09T12:53:29.245Z",
+      "updatedAt": "2026-04-09T12:53:29.245Z",
+      "isDeleted": false,
+      "deletedAt": null,
+      "pricePerHour": "10"
+    },
+    {
+      "lockerBoxId": "3a79899d-5fb7-4348-9f31-f3b26abde5a4",
+      "stationId": "3b969aa1-b57b-4c83-ba9e-c6dd71c508a7",
+      "code": "A004",
+      "size": "L",
+      "status": "AVAILABLE",
+      "version": 0,
+      "lastStatusChangedAt": "2026-04-09T12:53:37.523Z",
+      "createdAt": "2026-04-09T12:53:37.523Z",
+      "updatedAt": "2026-04-09T12:53:37.523Z",
+      "isDeleted": false,
+      "deletedAt": null,
+      "pricePerHour": "10"
+    }
+  ],
   "city": {
     "code": "HFA",
     "name": "Haifa"
