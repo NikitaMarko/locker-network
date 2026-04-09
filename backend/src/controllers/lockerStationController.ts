@@ -18,3 +18,35 @@ export const getAllStation = async (req: Request, res: Response, next: NextFunct
         next(e);
     }
 }
+
+export const getStations = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await stationService.getStations(req,res);
+    } catch (e) {
+        next(e);
+    }
+}
+
+export const getOneStation = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await stationService.getOneStation(req,res);
+    } catch (e) {
+        next(e);
+    }
+}
+
+export const changeStationStatus = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await stationService.changeStationStatus(req,res);
+    } catch (e) {
+        next(e);
+    }
+}
+
+export const deleteStation = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await stationService.deleteStation(req,res);
+    } catch (e) {
+        next(e);
+    }
+}
