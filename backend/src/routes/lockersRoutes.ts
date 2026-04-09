@@ -28,4 +28,4 @@ lockersRoutes.get('/stations',validateRequest(getStationsWithParamsSchema), lock
 lockersRoutes.get('/stations/:id',validateRequest(oneStationSchema), lockerStationController.getOneStation);
 lockersRoutes.post('/stations',validateRequest(createStationSchema), lockerStationController.createStation);
 lockersRoutes.patch('/stations/:id/status',validateRequest(changeStatusStationSchema), lockerStationController.changeStationStatus);
-lockersRoutes.delete('/stations/:id',validateRequest(oneStationSchema), lockerStationController.deleteStation);
+lockersRoutes.patch('/stations/:id',validateRequest(oneStationSchema), lockerStationController.deleteStation);

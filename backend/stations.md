@@ -282,7 +282,7 @@ Response `404 Not Found`:
 }
 ```
 
-#### DELETE /api/v1/lockers/stations/:id
+#### PATCH /api/v1/lockers/stations/:id
 
 Response `200 OK`:
 ```json
