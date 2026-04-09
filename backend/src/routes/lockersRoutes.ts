@@ -9,17 +9,23 @@ import {
     getStationsWithParamsSchema,
     oneStationSchema
 } from "../validation/stationSchemas";
+import {
+    changeStatusLockerSchema,
+    createLockerSchema,
+    getLockersWithParamsSchema,
+    oneLockerSchema
+} from "../validation/lockersSchema";
 
 
 export const lockersRoutes = express.Router();
 
 // boxes routers
 lockersRoutes.get('/', lockerBoxController.getAllBoxes);
-lockersRoutes.get('/boxes', lockerBoxController.getBoxes);
-lockersRoutes.get('/boxes/:id', lockerBoxController.getOneBox);
-lockersRoutes.post('/boxes', lockerBoxController.createBox);
-lockersRoutes.patch('/boxes/:id/status', lockerBoxController.changeBoxStatus);
-lockersRoutes.delete('/boxes/:id', lockerBoxController.deleteBox);
+lockersRoutes.get('/boxes', validateRequest(getLockersWithParamsSchema),lockerBoxController.getBoxes);
+lockersRoutes.get('/boxes/:id',validateRequest(oneLockerSchema), lockerBoxController.getOneBox);
+lockersRoutes.post('/boxes', validateRequest(createLockerSchema),lockerBoxController.createBox);
+lockersRoutes.patch('/boxes/:id/status',validateRequest(changeStatusLockerSchema), lockerBoxController.changeBoxStatus);
+lockersRoutes.patch('/boxes/:id/delete',validateRequest(oneLockerSchema), lockerBoxController.deleteBox);
 
 
 // stations routers
@@ -28,4 +34,4 @@ lockersRoutes.get('/stations',validateRequest(getStationsWithParamsSchema), lock
 lockersRoutes.get('/stations/:id',validateRequest(oneStationSchema), lockerStationController.getOneStation);
 lockersRoutes.post('/stations',validateRequest(createStationSchema), lockerStationController.createStation);
 lockersRoutes.patch('/stations/:id/status',validateRequest(changeStatusStationSchema), lockerStationController.changeStationStatus);
-lockersRoutes.patch('/stations/:id',validateRequest(oneStationSchema), lockerStationController.deleteStation);
+lockersRoutes.patch('/stations/:id/delete',validateRequest(oneStationSchema), lockerStationController.deleteStation);

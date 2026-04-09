@@ -139,7 +139,7 @@ model LockerBox {
   stationId String
   station   LockerStation @relation(fields: [stationId], references: [stationId], onDelete: Cascade)
 
-  code String     @unique // "A-01"
+  code String // "A-01"
   size LockerSize
 
   status  LockerStatus @default(AVAILABLE)

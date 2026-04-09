@@ -10,7 +10,7 @@ export const createStationSchema = z.object({
     body: z.object({
         city: z.string(),
         latitude: z.coerce.number().min(-90).max(90),
-        longitude: z.coerce.number().min(-180).max(190),
+        longitude: z.coerce.number().min(-180).max(180),
         address: z.string().optional(),
     }),
 });

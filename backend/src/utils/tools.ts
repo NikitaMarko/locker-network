@@ -1,4 +1,14 @@
+import {LockerSize, Prisma} from "@prisma/client";
+
 import {prismaService} from "../services/prismaService";
+
+
+
+type PricingItem = {
+    cityId: string;
+    size: LockerSize;
+    pricePerHour: Prisma.Decimal;
+};
 
 export const attachPricesToStations = async (stations: any[]) => {
     if (!stations.length) return stations;
@@ -24,3 +34,28 @@ export const attachPricesToStations = async (stations: any[]) => {
         }))
     }));
 };
+
+export const attachPricesToLockers = async (lockers: any[]) => {
+    if (!lockers.length) return [];
+
+    const pricingMap = new Map<string, Prisma.Decimal>();
+
+    lockers.forEach((locker) => {
+        locker.station.city.Pricing.forEach((p:PricingItem) => {
+            pricingMap.set(`${p.cityId}-${p.size}`, p.pricePerHour);
+        });
+    });
+
+    return lockers.map((locker) => ({
+        ...locker,
+        pricePerHour:
+            pricingMap.get(
+                `${locker.station.cityId}-${locker.size}`
+            ) ?? null,
+        station: {
+            ...locker.station,
+            city: locker.station.city.name
+        },
+    }));
+
+}
