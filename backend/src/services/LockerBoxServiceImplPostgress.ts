@@ -2,14 +2,15 @@ import {Response, Request} from "express";
 
 import {attachPricesToLockers} from "../utils/tools";
 import {HttpError} from "../errorHandler/HttpError";
+import {logAudit} from "../utils/audit";
 
 import {prismaService} from "./prismaService";
-
+import {ActionType} from "./dto/operationDto";
 
 
 export class LockerBoxServiceImplPostgres {
 
-    async getAllBoxes (req: Request, res: Response) {
+    async getAllBoxes(req: Request, res: Response) {
         const lockers = await prismaService.lockerBox.findMany({
             where: {
                 isDeleted: false,
@@ -27,7 +28,7 @@ export class LockerBoxServiceImplPostgres {
                             select: {
                                 code: true,
                                 name: true,
-                                Pricing:true
+                                Pricing: true
                             },
                         },
                     },
@@ -40,13 +41,21 @@ export class LockerBoxServiceImplPostgres {
         return res.json(result);
     }
 
-    async createBox (req: Request, res: Response) {
+    async createBox(req: Request, res: Response) {
         const {stationId, code, size} = req.body;
 
         const stationExists = await prismaService.lockerStation.findUnique({
-            where: { stationId },
+            where: {stationId},
         })
         if (!stationExists) {
+            await logAudit({
+                req,
+                action: ActionType.LOCKER_CREATE_FAILED,
+                actorId: req.user!.id || undefined,
+                entityId: stationId,
+                entityType: 'LockerBox',
+                details: {reason: `Station not found`}
+            });
             throw new HttpError(400, `Station doesn't exists`);
         }
         const boxExists = await prismaService.lockerBox.findUnique({
@@ -58,6 +67,14 @@ export class LockerBoxServiceImplPostgres {
             }
         });
         if (boxExists) {
+            await logAudit({
+                req,
+                action: ActionType.LOCKER_CREATE_FAILED,
+                actorId: req.user!.id || undefined,
+                entityId: stationId,
+                entityType: 'LockerBox',
+                details: {reason: `Locker already exists`}
+            });
             throw new HttpError(400, `Locker already exists`);
         }
         const box = await prismaService.lockerBox.create({
@@ -66,17 +83,25 @@ export class LockerBoxServiceImplPostgres {
                 code,
                 size,
             },
-            select:{
+            select: {
                 lockerBoxId: true,
                 status: true,
                 createdAt: true
             }
         });
 
+        await logAudit({
+            req,
+            action: ActionType.LOCKER_CREATE,
+            actorId: req.user!.id || undefined,
+            entityId: box.lockerBoxId,
+            entityType: 'LockerBox',
+        });
+
         return res.status(200).json({id: box.lockerBoxId, stationId: stationId});
     }
 
-    async getBoxes (req: Request, res: Response) {
+    async getBoxes(req: Request, res: Response) {
         const stationId = req.query.stationId as string | undefined;
         const size = req.query.size as "S" | "M" | "L" | undefined;
         const status = req.query.status as
@@ -90,9 +115,9 @@ export class LockerBoxServiceImplPostgres {
         const lockers = await prismaService.lockerBox.findMany({
             where: {
                 isDeleted: false,
-                ...(stationId && { stationId }),
-                ...(size && { size }),
-                ...(status && { status }),
+                ...(stationId && {stationId}),
+                ...(size && {size}),
+                ...(status && {status}),
                 station: {
                     isDeleted: false,
                     status: "ACTIVE"
@@ -108,19 +133,20 @@ export class LockerBoxServiceImplPostgres {
                             select: {
                                 code: true,
                                 name: true,
-                                Pricing:true
+                                Pricing: true
                             },
                         },
                     },
                 },
-            }});
+            }
+        });
 
         const result = await attachPricesToLockers(lockers);
 
         return res.json(result);
     }
 
-    async getOneBox (req: Request, res: Response) {
+    async getOneBox(req: Request, res: Response) {
         const lockerBoxId = req.params.id as string;
         const locker = await prismaService.lockerBox.findUnique({
             where: {
@@ -136,12 +162,13 @@ export class LockerBoxServiceImplPostgres {
                             select: {
                                 code: true,
                                 name: true,
-                                Pricing:true
+                                Pricing: true
                             },
                         },
                     },
                 },
-            }});
+            }
+        });
         if (!locker) {
             throw new HttpError(404, "Locker doesn't exist");
         }
@@ -149,7 +176,7 @@ export class LockerBoxServiceImplPostgres {
         return res.json(result);
     }
 
-    async changeBoxStatus (req: Request, res: Response) {
+    async changeBoxStatus(req: Request, res: Response) {
 
         const lockerBoxId = req.params.id as string;
         const status = req.body.status;
@@ -162,9 +189,25 @@ export class LockerBoxServiceImplPostgres {
                 data: {status}
             });
 
+            await logAudit({
+                req,
+                action: ActionType.LOCKER_UPDATE_STATUS,
+                actorId: req.user!.id || undefined,
+                entityId: lockerBoxId,
+                entityType: 'LockerBox',
+            });
+
             return res.json(updatedLocker);
 
         } catch (e: any) {
+            await logAudit({
+                req,
+                action: ActionType.LOCKER_UPDATE_STATUS_FAILED,
+                actorId: req.user!.id || undefined,
+                entityId: lockerBoxId,
+                entityType: 'LockerBox',
+                details: {reason: `Failed to update Locker status`}
+            });
             if (e.code === "P2025") {
                 throw new HttpError(404, "Locker not found");
             }
@@ -173,9 +216,10 @@ export class LockerBoxServiceImplPostgres {
         }
     }
 
-    async deleteBox (req: Request, res: Response) {
+    async deleteBox(req: Request, res: Response) {
+        const lockerBoxId = req.params.id as string;
         try {
-            const lockerBoxId = req.params.id as string;
+
 
             const station = await prismaService.lockerBox.update({
                 where: {lockerBoxId},
@@ -185,9 +229,25 @@ export class LockerBoxServiceImplPostgres {
                 }
             });
 
+            await logAudit({
+                req,
+                action: ActionType.LOCKER_DELETE,
+                actorId: req.user!.id || undefined,
+                entityId: lockerBoxId,
+                entityType: 'LockerBox',
+            });
+
             return res.json({message: "Locker deleted", station});
 
         } catch (e: any) {
+            await logAudit({
+                req,
+                action: ActionType.LOCKER_DELETE_FAILED,
+                actorId: req.user!.id || undefined,
+                entityId: lockerBoxId,
+                entityType: 'LockerBox',
+                details: {reason: `Failed to delete Locker`}
+            });
             if (e.code === "P2025") {
                 throw new HttpError(404, "Locker not found");
             }

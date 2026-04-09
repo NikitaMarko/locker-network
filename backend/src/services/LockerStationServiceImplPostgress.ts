@@ -4,6 +4,8 @@ import {attachPricesToStations} from "../utils/tools";
 import {HttpError} from "../errorHandler/HttpError";
 
 import {prismaService} from "./prismaService";
+import {logAudit} from "../utils/audit";
+import {ActionType} from "./dto/operationDto";
 
 
 export class LockerStationServiceImplPostgres {
@@ -40,6 +42,14 @@ export class LockerStationServiceImplPostgres {
         });
 
         if (!cityForStation) {
+            await logAudit({
+                req,
+                action: ActionType.STATION_CREATE_FAILED,
+                actorId: req.user!.id || undefined,
+                entityId: "undefined",
+                entityType: 'LockerStation',
+                details: {reason: `City not found`}
+            });
             throw new HttpError(400, "City not found");
         }
         const station = await prismaService.lockerStation.create({
@@ -59,6 +69,14 @@ export class LockerStationServiceImplPostgres {
             SET location = ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)
             WHERE "stationId" = ${station.stationId}
         `;
+
+        await logAudit({
+            req,
+            action: ActionType.STATION_CREATE,
+            actorId: req.user!.id || undefined,
+            entityId: station.stationId,
+            entityType: 'LockerStation',
+        });
 
         return res.status(200).json({id: station.stationId, city: city});
     }
@@ -203,9 +221,25 @@ export class LockerStationServiceImplPostgres {
                 data: {status}
             });
 
+            await logAudit({
+                req,
+                action: ActionType.STATION_UPDATE_STATUS,
+                actorId: req.user!.id || undefined,
+                entityId: stationId,
+                entityType: 'LockerStation',
+            });
+
             return res.json(updatedStation);
 
         } catch (e: any) {
+            await logAudit({
+                req,
+                action: ActionType.STATION_UPDATE_STATUS_FAILED,
+                actorId: req.user!.id || undefined,
+                entityId: stationId,
+                entityType: 'LockerStation',
+                details: {reason: `Failed to update station status`}
+            });
             if (e.code === "P2025") {
                 throw new HttpError(404, "Station not found");
             }
@@ -215,8 +249,8 @@ export class LockerStationServiceImplPostgres {
     }
 
     async deleteStation(req: Request, res: Response) {
+        const stationId = req.params.id as string;
         try {
-            const stationId = req.params.id as string;
 
             const station = await prismaService.lockerStation.update({
                 where: {stationId},
@@ -226,9 +260,25 @@ export class LockerStationServiceImplPostgres {
                 }
             });
 
+            await logAudit({
+                req,
+                action: ActionType.STATION_DELETE,
+                actorId: req.user!.id || undefined,
+                entityId: stationId,
+                entityType: 'LockerStation',
+            });
+
             return res.json({message: "Station deleted", station});
 
         } catch (e: any) {
+            await logAudit({
+                req,
+                action: ActionType.STATION_DELETE_FAILED,
+                actorId: req.user!.id || undefined,
+                entityId: stationId,
+                entityType: 'LockerStation',
+                details: {reason: `Failed to delete station`}
+            });
             if (e.code === "P2025") {
                 throw new HttpError(404, "Station not found");
             }
