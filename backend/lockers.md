@@ -4,6 +4,8 @@
 
 #### GET /api/v1/lockers/
 
+- Roles:  Operator, Admin
+
 Response `200 OK`:
 ```json
 [
@@ -133,6 +135,8 @@ Response `200 OK`:
 
 #### GET /api/v1/lockers/boxes
 
+- Roles:  All
+
 - Query params: stationId, size, status
 
 For example:
@@ -170,6 +174,8 @@ Response `200 OK`:
 
 #### GET /api/v1/lockers/boxes/:id
 
+- Roles:  Operator, Admin, User
+
 Response `200 OK`:
 ```json
 {
@@ -204,6 +210,8 @@ Response `404 Not Found`:
 
 #### POST /api/v1/lockers/boxes
 
+- Roles:  Operator, Admin
+
 - Request Body:
 ```json
 {
@@ -230,6 +238,8 @@ Response `400 Bad Request`:
 ```
 
 #### PATCH /api/v1/lockers/boxes/:id/status
+
+- Roles:  Operator, Admin
 
 - Request Body:
 ```json
@@ -264,6 +274,8 @@ Response `404 Not Found`:
 ```
 
 #### PATCH /api/v1/lockers/boxes/:id/delete
+
+- Roles:  Operator
 
 Response `200 OK`:
 ```json

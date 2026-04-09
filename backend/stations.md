@@ -4,6 +4,8 @@
 
 #### GET /api/v1/lockers/stations/all
 
+- Roles:  Operator, Admin
+
 Response `200 OK`:
 ```json
 [
@@ -88,6 +90,8 @@ Response `200 OK`:
 
 
 #### GET /api/v1/lockers/stations
+
+- Roles:  All
 
 - Query params: city, lat, lng, radius, status
 
@@ -187,6 +191,8 @@ Response `200 OK`:
 
 #### GET /api/v1/lockers/stations/:id
 
+- Roles:  Operator, Admin, User
+
 Response `200 OK`:
 ```json
 {
@@ -247,6 +253,8 @@ Response `404 Not Found`:
 
 #### POST /api/v1/lockers/stations
 
+- Roles:  Operator, Admin
+
 - Request Body: address optional
 ```json
 {
@@ -274,6 +282,8 @@ Response `400 Bad Request`:
 ```
 
 #### PATCH /api/v1/lockers/stations/:id/status
+
+- Roles:  Operator, Admin
 
 - Request Body:
 ```json
@@ -307,6 +317,8 @@ Response `404 Not Found`:
 ```
 
 #### PATCH /api/v1/lockers/stations/:id/delete
+
+- Roles:  Operator
 
 Response `200 OK`:
 ```json
