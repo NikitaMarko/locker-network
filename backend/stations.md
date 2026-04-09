@@ -247,7 +247,7 @@ Response `404 Not Found`:
 
 #### POST /api/v1/lockers/stations
 
-- Request Body: 
+- Request Body: address optional
 ```json
 {
   "city": "HFA",
