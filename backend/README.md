@@ -11,6 +11,7 @@
 - [Running Locally](#-running-locally)
 - [Docker Deployment](#-docker-deployment)
 - [Database Migrations](#-database-migrations)
+- [Testing](#-testing)
 - [API Documentation](#-api-documentation)
 - [Authentication Flow](#-authentication-flow)
 - [Security](#-security)
@@ -34,6 +35,15 @@ npm install
 # Setup environment
 cp .env.example .env
 # Edit .env — replace JWT secrets with strong random values (see Environment Setup)
+
+# Configure AWS credentials for DynamoDB/SQS access
+# Option A:
+export AWS_ACCESS_KEY_ID=your-access-key
+export AWS_SECRET_ACCESS_KEY=your-secret-key
+export AWS_REGION=eu-west-1
+
+# Option B:
+export AWS_PROFILE=your-profile-name
 
 # Generate Prisma client
 npx prisma generate  
@@ -106,10 +116,11 @@ NODE_ENV=development                    # development | production | test
 PORT=3555
 SERVER_URL=http://localhost:3555
 CLOUDFRONT_URL=https://your-cloudfront-domain
+LOG_LEVEL=info                          # debug | info | warn | error
 
 # Database
 # Note: 5433 = host port mapped to Docker container's 5432
-DATABASE_URL="postgresql://root:root@localhost:5433/locker_db"
+DATABASE_URL="postgresql://root:root@localhost:5433/locker"
 POSTGRES_USER=root
 POSTGRES_PASSWORD=root
 POSTGRES_HOST=localhost
@@ -128,17 +139,37 @@ JWT_REFRESH_TOKEN_TTL=7                 # Refresh token TTL in days
 FRONTEND_URL=http://localhost:5173
 FRONTEND_LOCAL_URL=http://localhost:5173
 
-# Logging
-LOG_LEVEL=info                          # debug | info | warn | error
-
 # Lambda health check
 USE_LAMBDA_HEALTH=true                  # true = call AWS Lambda first, fallback to DB check on error
 LAMBDA_HEALTH_URL=                      # Required when USE_LAMBDA_HEALTH=true
 
-# Async operations
+# AWS / async operations
+AWS_REGION=eu-west-1
+AWS_PROFILE=                            # Optional: local AWS profile name
+DYNAMO_ROLE_ARN=                        # Optional: assume-role ARN for DynamoDB/SQS access
+DYNAMO_ROLE_SESSION_NAME=locker-backend-dynamo
 DYNAMO_TABLE_NAME=operations
 SQS_URL=
 ```
+
+### AWS credentials are required
+
+The backend validates AWS credentials during startup because async operation endpoints use DynamoDB and SQS.
+
+Supported local setup options:
+
+```bash
+# Option A: static credentials
+export AWS_ACCESS_KEY_ID=your-access-key
+export AWS_SECRET_ACCESS_KEY=your-secret-key
+export AWS_REGION=eu-west-1
+
+# Option B: named profile
+export AWS_PROFILE=your-profile-name
+export AWS_REGION=eu-west-1
+```
+
+If your project uses role assumption, also configure `DYNAMO_ROLE_ARN` and, optionally, `DYNAMO_ROLE_SESSION_NAME`.
 
 ### ⚠️ Security requirements
 
@@ -162,11 +193,13 @@ npm run dev
 - Hot reload via `ts-node-dev`
 - Winston logging to console
 - Swagger UI available at `/docs`
+- Startup requires a reachable PostgreSQL instance and valid AWS credentials
 
 Expected output:
 ```
 [INFO] Starting server initialization...
 [INFO] PostgreSQL connected successfully
+[INFO] AWS credentials resolved successfully
 [INFO] App running at http://localhost:3555
 ```
 
@@ -235,9 +268,28 @@ npx prisma generate
 npx prisma studio
 ```
 
+If a schema change requires an index or manual SQL, add it through a Prisma migration instead of applying ad hoc SQL from the README.
+
 Schema: `prisma/schema.prisma`
 Migrations: `prisma/migrations/`
 Generated client: `@prisma/client`
+
+---
+
+## 🧪 Testing
+
+Current status:
+
+- `npm test` is not implemented yet and exits with an error placeholder
+- Jest and Supertest are installed, but the test script still needs to be wired
+- Treat this backend as requiring manual verification until the test command is finalized
+
+Useful verification commands right now:
+
+```bash
+npm run lint
+npm run build
+```
 
 ---
 

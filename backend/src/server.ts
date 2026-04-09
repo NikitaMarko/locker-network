@@ -19,6 +19,7 @@ import {healthRouter} from "./routes/healthRoutes";
 import {HttpError} from './errorHandler/HttpError';
 import {lockersRoutes} from "./routes/lockersRoutes";
 import {operationsRouter} from "./routes/operationsRoutes";
+import { citiesRoutes } from './routes/citiesRoutes';
 
 const PORT = env.PORT;
     //const baseUrl = `http://localhost:${PORT}`;
@@ -113,6 +114,7 @@ export const createApp = () => {
     app.use(`/operations`, operationsRouter)
     app.use(`/health`, healthRouter)
     app.use(`${API_PREFIX}/lockers`, lockersRoutes)
+    app.use(`${API_PREFIX}/cities`, citiesRoutes)
 
 
 

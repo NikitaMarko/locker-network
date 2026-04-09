@@ -1,0 +1,11 @@
+import {NextFunction, Request, Response} from "express";
+
+import {citiesService} from "../services/CitiesServiceImplPostgress";
+
+export const getAllCities = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await citiesService.getAllCities(req,res);
+    } catch (e) {
+        next(e);
+    }
+};
