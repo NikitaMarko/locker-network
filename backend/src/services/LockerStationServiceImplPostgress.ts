@@ -41,11 +41,12 @@ export class LockerStationServiceImplPostgres {
             where: {code: city}
         });
 
+
         if (!cityForStation) {
             await logAudit({
                 req,
                 action: ActionType.STATION_CREATE_FAILED,
-                actorId: req.user!.id || undefined,
+                actorId: req.user!.userId,
                 entityId: "undefined",
                 entityType: 'LockerStation',
                 details: {reason: `City not found`}
@@ -73,7 +74,7 @@ export class LockerStationServiceImplPostgres {
         await logAudit({
             req,
             action: ActionType.STATION_CREATE,
-            actorId: req.user!.id || undefined,
+            actorId: req.user!.userId,
             entityId: station.stationId,
             entityType: 'LockerStation',
         });
@@ -224,7 +225,7 @@ export class LockerStationServiceImplPostgres {
             await logAudit({
                 req,
                 action: ActionType.STATION_UPDATE_STATUS,
-                actorId: req.user!.id || undefined,
+                actorId: req.user!.userId,
                 entityId: stationId,
                 entityType: 'LockerStation',
             });
@@ -235,7 +236,7 @@ export class LockerStationServiceImplPostgres {
             await logAudit({
                 req,
                 action: ActionType.STATION_UPDATE_STATUS_FAILED,
-                actorId: req.user!.id || undefined,
+                actorId: req.user!.userId,
                 entityId: stationId,
                 entityType: 'LockerStation',
                 details: {reason: `Failed to update station status`}
@@ -263,7 +264,7 @@ export class LockerStationServiceImplPostgres {
             await logAudit({
                 req,
                 action: ActionType.STATION_DELETE,
-                actorId: req.user!.id || undefined,
+                actorId: req.user!.userId,
                 entityId: stationId,
                 entityType: 'LockerStation',
             });
@@ -274,7 +275,7 @@ export class LockerStationServiceImplPostgres {
             await logAudit({
                 req,
                 action: ActionType.STATION_DELETE_FAILED,
-                actorId: req.user!.id || undefined,
+                actorId: req.user!.userId,
                 entityId: stationId,
                 entityType: 'LockerStation',
                 details: {reason: `Failed to delete station`}

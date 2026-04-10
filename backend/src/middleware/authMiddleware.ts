@@ -34,7 +34,7 @@ export const authorize = (...roles: Role[]) => {
         if (!req.user) {
             return next(new HttpError(401, 'Not authenticated'));
         }
-
+// ToDo logging and notification
         if (!roles.includes(req.user.role)) {
             return next(new HttpError(403, 'Access denied'));
         }

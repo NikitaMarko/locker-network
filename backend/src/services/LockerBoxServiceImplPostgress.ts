@@ -51,7 +51,7 @@ export class LockerBoxServiceImplPostgres {
             await logAudit({
                 req,
                 action: ActionType.LOCKER_CREATE_FAILED,
-                actorId: req.user!.id || undefined,
+                actorId: req.user!.userId,
                 entityId: stationId,
                 entityType: 'LockerBox',
                 details: {reason: `Station not found`}
@@ -70,7 +70,7 @@ export class LockerBoxServiceImplPostgres {
             await logAudit({
                 req,
                 action: ActionType.LOCKER_CREATE_FAILED,
-                actorId: req.user!.id || undefined,
+                actorId: req.user!.userId,
                 entityId: stationId,
                 entityType: 'LockerBox',
                 details: {reason: `Locker already exists`}
@@ -93,7 +93,7 @@ export class LockerBoxServiceImplPostgres {
         await logAudit({
             req,
             action: ActionType.LOCKER_CREATE,
-            actorId: req.user!.id || undefined,
+            actorId: req.user!.userId,
             entityId: box.lockerBoxId,
             entityType: 'LockerBox',
         });
@@ -192,7 +192,7 @@ export class LockerBoxServiceImplPostgres {
             await logAudit({
                 req,
                 action: ActionType.LOCKER_UPDATE_STATUS,
-                actorId: req.user!.id || undefined,
+                actorId: req.user!.userId,
                 entityId: lockerBoxId,
                 entityType: 'LockerBox',
             });
@@ -203,7 +203,7 @@ export class LockerBoxServiceImplPostgres {
             await logAudit({
                 req,
                 action: ActionType.LOCKER_UPDATE_STATUS_FAILED,
-                actorId: req.user!.id || undefined,
+                actorId: req.user!.userId,
                 entityId: lockerBoxId,
                 entityType: 'LockerBox',
                 details: {reason: `Failed to update Locker status`}
@@ -232,7 +232,7 @@ export class LockerBoxServiceImplPostgres {
             await logAudit({
                 req,
                 action: ActionType.LOCKER_DELETE,
-                actorId: req.user!.id || undefined,
+                actorId: req.user!.userId,
                 entityId: lockerBoxId,
                 entityType: 'LockerBox',
             });
@@ -243,7 +243,7 @@ export class LockerBoxServiceImplPostgres {
             await logAudit({
                 req,
                 action: ActionType.LOCKER_DELETE_FAILED,
-                actorId: req.user!.id || undefined,
+                actorId: req.user!.userId,
                 entityId: lockerBoxId,
                 entityType: 'LockerBox',
                 details: {reason: `Failed to delete Locker`}
