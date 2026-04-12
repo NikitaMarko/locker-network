@@ -9,6 +9,9 @@ frontend:
     build:
       commands:
         # Запускаем скрипт сборки
+        - echo "VITE_API_URL_CLOUDFRONT=$VITE_API_URL_CLOUDFRONT" >> .env
+        - echo "VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID" >> .env
+
         - npm run build
   artifacts:
     # Указываем, где лежит результат сборки относительно корня
