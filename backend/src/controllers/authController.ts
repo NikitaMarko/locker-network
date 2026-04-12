@@ -52,13 +52,13 @@ export const refresh = async (req: Request, res: Response, next: NextFunction) =
 
 export const logout = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const user = req.user;
+        const { sessionId, userId } = req.user as TokenPayload;
 
-        if (!user) {
+        if (!userId) {
             throw new HttpError(401, "Unauthorized");
         }
 
-        await authService.logout(res, req, user.userId);
+        await authService.logout(res, req, sessionId, userId);
     } catch (e) {
         next(e);
     }

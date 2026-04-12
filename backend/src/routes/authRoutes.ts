@@ -74,4 +74,3 @@ authRouter.post('/refresh', refreshLimiter, validateRequest(refreshSchema), auth
 authRouter.use(auth.protect);
 authRouter.post('/logout', authController.logout);
 authRouter.get('/me', authController.me);
-

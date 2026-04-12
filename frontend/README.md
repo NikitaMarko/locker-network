@@ -1,4 +1,4 @@
-# Smart Locker Network System — Frontend
+﻿# Smart Locker Network System — Frontend
 
 > 📌 This document describes frontend architecture, API integration, and system behavior.
 
@@ -177,8 +177,6 @@ frontend/
 │  │  │  ├─ pages/
 │  │  │  │  ├─ ForbiddenPage.tsx
 │  │  │  │  ├─ HomePage.tsx
-│  │  │  │  ├─ HomePage2.tsx
-│  │  │  │  ├─ HomePage.tsx
 │  │  │  │  └─ RedirectByRole.tsx
 │  │  │  └─ types/
 │  │  │     ├─ locker.ts
@@ -229,10 +227,21 @@ adminApi.ts
 - errorsApi.ts
 -HTTP Clients
 - httpClient.ts — main
-- httpClient2.ts — experimental
-- httpClientTest.ts — testing
 ---
 ## 🔐 Authentication
+
+- Register via email/password
+- Login via email/password
+- Google login supported
+
+Validation:
+- Email format required
+- Password минимум 6 символов
+- Name минимум 2 символа
+
+Если есть ошибки → запрос не отправляется
+
+После успешной регистрации → redirect на /login
 
 ### Endpoints
 

@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 import { Prisma } from "@prisma/client";
 
 import * as tokenService from "../utils/jwt"
-import {hashToken, TokenPayload} from "../utils/jwt"
+import {hashToken, timingSafeTokenCompare, TokenPayload} from "../utils/jwt"
 import {env} from "../config/env";
 import {HttpError} from "../errorHandler/HttpError";
 import {logAudit} from '../utils/audit';
@@ -24,16 +24,31 @@ function extractConstraintField(error: Prisma.PrismaClientKnownRequestError): st
 }
 
 export class AuthServiceImplPostgres {
-   
-    async auth(res: Response, user: TokenPayload) {
-        const { accessToken, refreshToken } = await tokenService.generateTokens(user);
-        await tokenService.saveToken(user.userId, refreshToken);
-        const expires = new Date(Date.now() + 1000 * 60 * 60 * 24 * env.JWT_REFRESH_TOKEN_TTL);
-        tokenService.cookieToken(refreshToken, res, expires)
 
-        return res.status(200).json({
-            accessToken,
+    async auth(res: Response, req: Request, user: { userId: string; role: TokenPayload['role'] }) {
+        const sessionId = await prismaService.refreshSession.create({
+            data: {
+                userId: user.userId,
+                tokenHash: "",
+                ipAddress: req.ip ?? null,
+                deviceInfo: req.headers["user-agent"] ?? null,
+                expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * env.JWT_REFRESH_TOKEN_TTL),
+            },
         });
+
+        const payload: TokenPayload = { userId: user.userId, role: user.role, sessionId: sessionId.id };
+        const { accessToken, refreshToken } =
+            tokenService.generateTokens(payload);
+
+        await prismaService.refreshSession.update({
+            where: { id: sessionId.id },
+            data: { tokenHash: hashToken(refreshToken) },
+        });
+
+        const expires = new Date(Date.now() + 1000 * 60 * 60 * 24 * env.JWT_REFRESH_TOKEN_TTL);
+        tokenService.cookieToken(refreshToken, res, expires);
+
+        return res.status(200).json({ accessToken });
     }
 
     async register(res: Response, req: Request, dto: SignupDto) {
@@ -51,7 +66,6 @@ export class AuthServiceImplPostgres {
                 select: {
                     userId: true,
                     role: true,
-                    tokenVersion: true,
                 },
             });
         } catch (error) {
@@ -68,7 +82,7 @@ export class AuthServiceImplPostgres {
             entityId: user.userId,
         });
 
-        return this.auth(res, user);
+        return this.auth(res, req, user);
     }
 
     async login(res: Response, req: Request, dto: LoginDto) {
@@ -82,7 +96,6 @@ export class AuthServiceImplPostgres {
                 userId: true,
                 password: true,
                 role: true,
-                tokenVersion: true,
             },
         });
 
@@ -117,12 +130,12 @@ export class AuthServiceImplPostgres {
             entityId: user.userId,
         });
         const {password: _, ...safeUser} = user;
-        return this.auth(res, safeUser);
+        return this.auth(res, req, safeUser);
     }
 
 
-    async logout(res: Response, req: Request, userId: string) {
-        await tokenService.removeToken(userId);
+    async logout(res: Response, req: Request, sessionId: string, userId: string) {
+        await tokenService.refreshSession(sessionId, userId);
         tokenService.clearCookies(res);
         await logAudit({
             req,
@@ -154,7 +167,6 @@ export class AuthServiceImplPostgres {
     }
 
     async refresh(res: Response, req: Request, refreshToken: string) {
-
         let payload: TokenPayload;
 
         try {
@@ -163,72 +175,62 @@ export class AuthServiceImplPostgres {
             }) as TokenPayload;
         } catch {
             tokenService.clearCookies(res);
-
             throw new HttpError(401, 'Invalid refresh token');
         }
 
-        const user = await prismaService.user.findUnique({
-            where: {userId: payload.userId},
-            select: {
-                userId: true,
-                role: true,
-                refreshToken: true,
-                tokenVersion: true
-            },
+        const session = await prismaService.refreshSession.findUnique({
+            where: { id: payload.sessionId },
+            include: { user: { select: { userId: true, role: true } } },
         });
 
-        if (!user || !user.refreshToken) {
-            throw new HttpError(401, "User not found");
+        if (!session || session.userId !== payload.userId) {
+            tokenService.clearCookies(res);
+            throw new HttpError(401, 'Session not found');
         }
 
-        const hashedIncoming = hashToken(refreshToken);
-
-        if (hashedIncoming !== user.refreshToken) {
-            throw new HttpError(401,'Invalid refresh token');
-        }
-
-        if (payload.tokenVersion !== user.tokenVersion) {
-            await logAudit({
-                req,
-                action: ActionType.TOKEN_REVOKED,
-                actorId: user.userId,
-                entityId: user.userId,
-                details: { reason: 'Token version mismatch' },
+        if (session.revokedAt) {
+            await prismaService.refreshSession.updateMany({
+                where: { userId: session.userId, revokedAt: null },
+                data: { revokedAt: new Date() },
             });
-            throw new HttpError(401, 'Token revoked');
+
+            tokenService.clearCookies(res);
+            throw new HttpError(401, "Token reuse detected");
         }
 
-        const newPayload: TokenPayload = {
-            userId: user.userId,
-            role: user.role,
-            tokenVersion: user.tokenVersion,
-        };
+        if (session.expiresAt < new Date()) {
+            tokenService.clearCookies(res);
+            throw new HttpError(401, "Token expired");
+        }
 
-        const { accessToken, refreshToken: newRefreshToken } = await tokenService.generateTokens(newPayload);
-        const hashed = hashToken(newRefreshToken);
+        const incomingHash = hashToken(refreshToken);
 
-        const result = await prismaService.user.updateMany({
+        if (!timingSafeTokenCompare(incomingHash, session.tokenHash)) {
+            tokenService.clearCookies(res);
+            throw new HttpError(401, "Invalid token");
+        }
+
+        const updated = await prismaService.refreshSession.updateMany({
             where: {
-                userId: user.userId,
-                refreshToken: user.refreshToken,
+                id: session.id,
+                revokedAt: null,
             },
-            data: {
-                refreshToken: hashed,
-            },
+            data: { revokedAt: new Date() },
         });
 
-        if (result.count === 0) {
-            throw new HttpError(401, 'Refresh token already used');
+        if (updated.count === 0) {
+            tokenService.clearCookies(res);
+            throw new HttpError(401, "Token already used");
         }
-        const expires = new Date(Date.now() + 1000 * 60 * 60 * 24 * env.JWT_REFRESH_TOKEN_TTL);
-        tokenService.cookieToken(newRefreshToken, res, expires);
+
         await logAudit({
             req,
             action: ActionType.TOKEN_REFRESH,
-            actorId: user.userId,
-            entityId: user.userId,
+            actorId: session.user.userId,
+            entityId: session.id,
         });
-        return res.json({ accessToken });
+
+        return this.auth(res, req, session.user);
     }
 }
 
