@@ -46,19 +46,17 @@ export class LockerBoxServiceImplPostgres {
 
         try{
             const result = await prismaService.$transaction(async (tx) => {
-                const stationExists = await tx.lockerStation.findUnique({
-                    where: {stationId},
+                const stationExists = await tx.lockerStation.findFirst({
+                    where: {stationId, isDeleted: false},
                 })
                 if (!stationExists) {
                     throw new HttpError(404, `Station not found`);
                 }
-                const boxExists = await tx.lockerBox.findUnique({
+                const boxExists = await tx.lockerBox.findFirst({
                     where: {
-                        stationId_code: {
-                            stationId,
-                            code,
-                        }
-                    }
+                        stationId,
+                        code,
+                    },
                 });
                 if (boxExists) {
                     throw new HttpError(400, `Locker already exists`);
@@ -76,19 +74,20 @@ export class LockerBoxServiceImplPostgres {
                     }
                 });
 
-                await logAudit({
-                    req,
-                    action: ActionType.LOCKER_CREATE,
-                    actorId: req.user!.userId,
-                    entityId: box.lockerBoxId,
-                    entityType: 'LockerBox',
-                });
                 return box;
-            })
+            });
 
+            await logAudit({
+                req,
+                action: ActionType.LOCKER_CREATE,
+                actorId: req.user!.userId,
+                entityId: result.lockerBoxId,
+                entityType: 'LockerBox',
+            });
             // ToDo DynamoDB
 
             return res.status(200).json({id: result.lockerBoxId, stationId: stationId});
+
         }
         catch(e: any){
             await logAudit({
@@ -211,6 +210,9 @@ export class LockerBoxServiceImplPostgres {
                     data: {status}
                 });
 
+               return updatedLocker;
+                });
+
                 await logAudit({
                     req,
                     action: ActionType.LOCKER_UPDATE_STATUS,
@@ -219,11 +221,10 @@ export class LockerBoxServiceImplPostgres {
                     entityType: 'LockerBox',
                 });
 
-               return updatedLocker;
-                })
-
                 //ToDo DynamoDB
+
                 return res.json(result);
+
             } catch (e: any) {
                 await logAudit({
                     req,
@@ -262,19 +263,21 @@ export class LockerBoxServiceImplPostgres {
                         }
                     });
 
-                    await logAudit({
-                        req,
-                        action: ActionType.LOCKER_DELETE,
-                        actorId: req.user!.userId,
-                        entityId: lockerBoxId,
-                        entityType: 'LockerBox',
-                    });
-
                     return deleteLocker;
-                })
+                });
+
+                await logAudit({
+                    req,
+                    action: ActionType.LOCKER_DELETE,
+                    actorId: req.user!.userId,
+                    entityId: lockerBoxId,
+                    entityType: 'LockerBox',
+                });
 
                 //ToDo DynamoDB
+
                 return res.json({message: "Locker deleted", result});
+
             } catch (e: any) {
                 await logAudit({
                     req,

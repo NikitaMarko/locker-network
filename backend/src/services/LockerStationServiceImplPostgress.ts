@@ -63,17 +63,20 @@ export class LockerStationServiceImplPostgres {
                     SET location = ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)
                     WHERE "stationId" = ${station.stationId}
                 `;
-                await logAudit({
-                    req,
-                    action: ActionType.STATION_CREATE,
-                    actorId: req.user!.userId,
-                    entityId: station.stationId,
-                    entityType: 'LockerStation',
-                });
+
                 return station;
-            })
+            });
+
+            await logAudit({
+                req,
+                action: ActionType.STATION_CREATE,
+                actorId: req.user!.userId,
+                entityId: result.stationId,
+                entityType: 'LockerStation',
+            });
 
             //ToDo DynamoDB
+
             return res.status(200).json({id: result.stationId, city: city});
         }
         catch(e:any){
@@ -247,17 +250,19 @@ export class LockerStationServiceImplPostgres {
                     data: {status}
                 });
 
-                await logAudit({
-                    req,
-                    action: ActionType.STATION_UPDATE_STATUS,
-                    actorId: req.user!.userId,
-                    entityId: stationId,
-                    entityType: 'LockerStation',
-                });
                 return updatedStation;
-            })
+            });
+
+            await logAudit({
+                req,
+                action: ActionType.STATION_UPDATE_STATUS,
+                actorId: req.user!.userId,
+                entityId: stationId,
+                entityType: 'LockerStation',
+            });
 
             //ToDo DynamoDB
+
             return res.json(result);
 
         } catch (e: any) {
@@ -299,17 +304,20 @@ export class LockerStationServiceImplPostgres {
                     }
                });
 
-               await logAudit({
-                    req,
-                    action: ActionType.STATION_DELETE,
-                    actorId: req.user!.userId,
-                    entityId: stationId,
-                    entityType: 'LockerStation',
-               });
+
                return deleteStation;
-            })
+            });
+
+            await logAudit({
+                req,
+                action: ActionType.STATION_DELETE,
+                actorId: req.user!.userId,
+                entityId: stationId,
+                entityType: 'LockerStation',
+            });
 
             //ToDo DynamoDB
+
             return res.json({message: "Station deleted", result});
 
         } catch (e: any) {
