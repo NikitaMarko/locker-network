@@ -1,0 +1,16 @@
+# Библиотеки (самое важное!)
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+# Настройки IDE
+.idea/
+*.xml
+*.iml
+
+# Секреты и сборка
+.env
+frontend/.env
+backend/.env
+dist/
+frontend/dist/
