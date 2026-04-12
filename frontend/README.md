@@ -135,7 +135,7 @@ frontend/
 │  │  ├─ auth/
 │  │  │  ├─ pages/
 │  │  │  │  ├─ LoginPage.tsx
-│  │  │  │  ├─ LoginPageTest.tsx
+│  │  │  │  ├─ LoginPage.tsx
 │  │  │  │  └─ RegisterPage.tsx
 │  │  ├─ user/
 │  │  │  ├─ pages/

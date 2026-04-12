@@ -11,6 +11,7 @@ node_modules
 /backend/
 /backend/prisma/migrations/
 dist
+.env
 dist-ssr
 *.local
 

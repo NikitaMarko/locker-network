@@ -1,8 +1,10 @@
-import { Link } from 'react-router-dom';
-import { useAuth } from '../../../app/providers/useAuth';
+import {Link, useNavigate} from 'react-router-dom';
+import { useAuth } from '../../../hooks/useAuth';
 import {useRef, useState} from 'react';
 import bg from '/smart-locker-project.jpeg';
-import { Paths } from "../../../app/utils/paths.ts";
+import { Paths } from "../../../config/paths/paths.ts";
+import { Button } from "@mui/material";
+import {ROLES} from "../../../config/roles/roles.ts";
 
 interface AsyncOperation{
     operationId: string;
@@ -26,6 +28,7 @@ const mapToOperation = (data:any): AsyncOperation =>({
 
 export function HomePage() {
 
+    const navigate = useNavigate();
     const { user } = useAuth();
     const [health, setHealth] = useState<any>(null);
     const [loading, setLoading] = useState(false);
@@ -37,9 +40,7 @@ export function HomePage() {
 
     // const HEALTH_URL = 'http://localhost:3555/health';
     // const HEALTH_URL = 'http://locker-lb-823207158.eu-north-1.elb.amazonaws.com/health';
-    const HEALTH_URL = 'https://d31p0ponhhqgks.cloudfront.net/health';
-    const ASYNC_STATUS_HEALTH_POST_URL = 'https://d31p0ponhhqgks.cloudfront.net/operations/health';
-    const ASYNC_STATUS_HEALTH_GET_URL = (id:string)=>`https://d31p0ponhhqgks.cloudfront.net/operations/${id}`;
+    const BASE_URL = import.meta.env.VITE_BASE_URL;
 
     const MAX_ATTEMPTS = 12;
     const POLLING_INTERVAL = 5000;
@@ -58,7 +59,7 @@ export function HomePage() {
         try {
             setLoading(true);
 
-            const res = await fetch(HEALTH_URL);
+            const res = await fetch(`${BASE_URL}/health`);
 
             if (!res.ok) {
                 throw new Error(`HTTP error: ${res.status}`);
@@ -95,7 +96,7 @@ export function HomePage() {
             setCount(0);
             isPollingRef.current = true;
 
-            const initRes = await fetch(ASYNC_STATUS_HEALTH_POST_URL, {method: 'POST'});
+            const initRes = await fetch(`${BASE_URL}/operations/health`, {method: 'POST'});
             const initData = await initRes.json();
 
             if(!initData.success) {
@@ -122,7 +123,7 @@ export function HomePage() {
             return;
         }
         try{
-            const res = await fetch(ASYNC_STATUS_HEALTH_GET_URL(operId));
+            const res = await fetch(`${BASE_URL}/operations/${operId}`);
             if (res.status === 404){
                 throw new Error("Operation not found");
             }
@@ -171,6 +172,17 @@ export function HomePage() {
     const isFailed = asyncOperation?.operationStatus === 'FAILED';
     const isTimeout = asyncOperation?.operationStatus === 'TIMEOUT';
 
+    const handleDashboardClick = () => {
+        if (!user) {
+            navigate(Paths.LOGIN);
+        } else if (user.role === ROLES.ADMIN) {
+            navigate(Paths.ADMIN);
+        } else if (user.role === ROLES.OPERATOR) {
+            navigate(Paths.OPERATOR);
+        } else {
+            navigate(Paths.USER);
+        }
+    };
 
     return (
         <div
@@ -238,9 +250,9 @@ export function HomePage() {
                     marginBottom: "20px"
                 }}>
                     {user ? (
-                        <Link to="/redirect-by-role" style={buttonStyle}>
-                            Go to dashboard
-                        </Link>
+                        <Button onClick={handleDashboardClick} style={{...buttonStyle, textTransform: 'none'}}>
+                            Go to Dashboard
+                        </Button>
                     ) : (
                         <Link to={Paths.LOGIN} style={buttonStyle}>
                             Get started

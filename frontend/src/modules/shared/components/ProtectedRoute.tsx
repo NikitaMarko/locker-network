@@ -1,23 +1,20 @@
-import { Navigate } from 'react-router-dom';
-import { useAuth } from '../../../app/providers/useAuth.ts';
-import type { ReactNode } from "react";
+import type {ReactNode} from "react";
+import { Navigate } from "react-router-dom";
+import { useAuth } from "../../../hooks/useAuth";
+import {Paths} from "../../../config/paths/paths.ts";
 
-interface ProtectedRouteProps {
+type Props = {
     children: ReactNode;
-}
+};
 
-export function ProtectedRoute({ children }: ProtectedRouteProps) {
-    const { user, loading } = useAuth();
+export function ProtectedRoute({ children }: Props): JSX.Element {
+    const { user } = useAuth();
 
-    if (loading) return <div>Loading...</div>;
 
-    // const token = localStorage.getItem('access_token');
-
-    if (!user
-        // || !token
-    ) {
-        return <Navigate to="/login" replace />;
+    if (!user) {
+        return <Navigate to={Paths.LOGIN} />;
     }
 
-    return children;
+
+    return <>{children}</>;
 }

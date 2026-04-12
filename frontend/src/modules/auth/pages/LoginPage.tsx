@@ -6,50 +6,50 @@ import {
 } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import axios from 'axios';
 
 import { useAuth } from '../../../hooks/useAuth';
 import { Paths } from "../../../config/paths/paths.ts";
 import GoogleLoginTest from "./GoogleLoginTest.tsx";
+import { ROLES } from "../../../config/roles/roles.ts";
 
-export function RegisterPage() {
+export function LoginPage() {
     const navigate = useNavigate();
-    const { register } = useAuth();
+    const { login } = useAuth();
     const [email, setEmail] = useState('');
-    const [name, setName] = useState('');
-    const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
-    const [validationError, setValidationError] = useState('');
     const [loading, setLoading] = useState(false);
-
-    function validate() {
-        if (name.trim().length < 2) return "Name must be at least 2 characters";
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) return "Invalid email format";
-        if (phone.trim().length < 10) return "Valid phone number is required";
-        if (password.length < 6) return "Password must be at least 6 characters";
-        return "";
-    }
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         setError('');
-        setValidationError('');
-
-        const validation = validate();
-        if (validation) {
-            setValidationError(validation);
-            return;
-        }
-
         setLoading(true);
 
         try {
-            await register(email, password, name, phone);
-            navigate('/login');
-        } catch (e: any) {
-            setError(e?.response?.data?.message || 'Registration failed. Please try again.');
+
+            const loggedInUser = await login(email, password);
+            if (loggedInUser.role === ROLES.ADMIN) {
+                navigate(Paths.ADMIN, { replace: true });
+            } else if (loggedInUser.role === ROLES.OPERATOR) {
+                navigate(Paths.OPERATOR, { replace: true });
+            } else if (loggedInUser.role === ROLES.USER) {
+                navigate(Paths.USER, { replace: true });
+            } else {
+                navigate(Paths.FORBIDDEN, { replace: true });
+            }
+
+        } catch (error: unknown) {
+            if (error instanceof Error && error.name === "BLOCK_TIME") {
+                setError(error.message);
+                return;
+            }
+            if (axios.isAxiosError(error)) {
+                setError(error.response?.data?.message || "Wrong email or password");
+                return;
+            }
+            setError("Unexpected error occurred");
         } finally {
             setLoading(false);
         }
@@ -59,43 +59,24 @@ export function RegisterPage() {
         <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f8fafc', p: 2 }}>
             <Paper elevation={0} sx={{ p: { xs: 4, md: 5 }, width: '100%', maxWidth: 450, borderRadius: 4, border: '1px solid #e2e8f0' }}>
                 <Typography variant="h4" fontWeight={800} textAlign="center" mb={4} color="#1e293b">
-                    Create Account
+                    Welcome to Smart Locker App!
                 </Typography>
 
                 <form onSubmit={handleSubmit}>
                     <Box display="flex" flexDirection="column" gap={2.5}>
                         <TextField
-                            label="Enter your name *"
-                            value={name}
-                            onChange={e => setName(e.target.value)}
-                            disabled={loading}
-                            required
-                            fullWidth
-                        />
-                        <TextField
-                            label="Email address *"
+                            label="Email address"
                             type="email"
                             value={email}
                             onChange={e => setEmail(e.target.value)}
-                            disabled={loading}
                             required
                             fullWidth
                         />
                         <TextField
-                            label="Phone number *"
-                            type="tel" placeholder={'+972'}
-                            value={phone}
-                            onChange={e => setPhone(e.target.value)}
-                            disabled={loading}
-                            required
-                            fullWidth
-                        />
-                        <TextField
-                            label="Password *"
+                            label="Password"
                             type={showPassword ? "text" : "password"}
                             value={password}
                             onChange={e => setPassword(e.target.value)}
-                            disabled={loading}
                             required
                             fullWidth
                             InputProps={{
@@ -112,7 +93,6 @@ export function RegisterPage() {
                             }}
                         />
 
-                        {validationError && <Alert severity="warning">{validationError}</Alert>}
                         {error && <Alert severity="error">{error}</Alert>}
 
                         <Button
@@ -122,7 +102,7 @@ export function RegisterPage() {
                             size="large"
                             sx={{ mt: 1, bgcolor: '#6baf5c', fontWeight: 'bold', '&:hover': { bgcolor: '#5a994c' } }}
                         >
-                            {loading ? 'Creating...' : 'SIGN UP'}
+                            {loading ? 'Logging in...' : 'Login'}
                         </Button>
                     </Box>
                 </form>
@@ -136,9 +116,9 @@ export function RegisterPage() {
                 </Box>
 
                 <Typography textAlign="center" variant="body2" color="text.secondary">
-                    Already have an account?{' '}
-                    <Link component={RouterLink} to={Paths.LOGIN} sx={{ color: '#6baf5c', fontWeight: 'bold', textDecoration: 'none' }}>
-                        Login
+                    Don't have an account?{' '}
+                    <Link component={RouterLink} to={Paths.REGISTER} sx={{ color: '#6baf5c', fontWeight: 'bold', textDecoration: 'none' }}>
+                        Sign up
                     </Link>
                 </Typography>
             </Paper>

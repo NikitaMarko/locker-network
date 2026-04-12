@@ -1,41 +1,43 @@
-import { http } from './httpClient';
+import { apiClient } from "./apiClient";
+import type {
+    LockerBox,
+    LockerSize,
+    LockerStatus,
+    CreateLockerResponse
+} from "../types/lockers/lockers.ts";
 
-// Получить список всех ячеек (для USER или OPERATOR)
-export async function getLockers() {
-    const res = await http.get('/lockers');
-    return res.data;
-}
 
-// Получить статус конкретной ячейки
-export async function getLockerById(id: string) {
-    const res = await http.get(`/lockers/${id}`);
-    return res.data;
-}
+export const lockersApi = {
 
-// Открыть ячейку (оператор)
-export async function openLocker(id: string) {
-    const res = await http.post(`/lockers/${id}/open`);
-    return res.data;
-}
+    getAllLockers: async (): Promise<LockerBox[]> => {
+        const { data } = await apiClient.get<LockerBox[]>("/lockers/");
+        return data;
+    },
 
-// Закрыть ячейку (оператор)
-export async function closeLocker(id: string) {
-    const res = await http.post(`/lockers/${id}/close`);
-    return res.data;
-}
 
-// Забронировать ячейку (пользователь)
-export async function bookLocker(id: string) {
-    const res = await http.post(`/lockers/${id}/book`);
-    return res.data;
-}
+    createLocker: async (payload: {
+        stationId: string;
+        code: string;
+        size: LockerSize;
+    }): Promise<CreateLockerResponse> => {
+        const { data } = await apiClient.post<CreateLockerResponse>(
+            "/lockers/boxes",
+            payload
+        );
+        return data;
+    },
 
-// Освободить ячейку (пользователь)
-export async function releaseLocker(id: string) {
-    const res = await http.post(`/lockers/${id}/release`);
-    return res.data;
-}
 
-export const resetLockerError = (id:string ) =>
-    http.post(`/lockers/${id}/reset-error`);
+    updateLockerStatus: async (id: string, status: LockerStatus): Promise<LockerBox> => {
+        const { data } = await apiClient.patch<LockerBox>(
+            `/lockers/boxes/${id}/status`,
+            { status }
+        );
+        return data;
+    },
 
+
+    deleteLocker: async (id: string): Promise<void> => {
+        await apiClient.patch(`/lockers/boxes/${id}/delete`);
+    }
+};
