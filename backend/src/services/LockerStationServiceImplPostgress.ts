@@ -37,49 +37,60 @@ export class LockerStationServiceImplPostgres {
 
     async createStation(req: Request, res: Response) {
         const {city, latitude, longitude, address} = req.body;
-        const cityForStation = await prismaService.city.findUnique({
-            where: {code: city}
-        });
+        try{
+            const result = await prismaService.$transaction(async (tx) => {
+                const cityForStation = await tx.city.findUnique({
+                    where: {code: city}
+                });
 
+                if (!cityForStation) {
+                    throw new HttpError(404, "City not found");
+                }
+                const station = await tx.lockerStation.create({
+                    data: {
+                        cityId: cityForStation.cityId,
+                        latitude,
+                        longitude,
+                        address
+                    },
+                    select: {
+                        stationId: true,
+                        status: true
+                    }
+                });
+                await tx.$executeRaw`
+                    UPDATE "LockerStation"
+                    SET location = ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)
+                    WHERE "stationId" = ${station.stationId}
+                `;
+                await logAudit({
+                    req,
+                    action: ActionType.STATION_CREATE,
+                    actorId: req.user!.userId,
+                    entityId: station.stationId,
+                    entityType: 'LockerStation',
+                });
+                return station;
+            })
 
-        if (!cityForStation) {
+            //ToDo DynamoDB
+            return res.status(200).json({id: result.stationId, city: city});
+        }
+        catch(e:any){
             await logAudit({
                 req,
                 action: ActionType.STATION_CREATE_FAILED,
                 actorId: req.user!.userId,
                 entityId: "undefined",
                 entityType: 'LockerStation',
-                details: {reason: `City not found`}
+                details: {reason: e.message}
             });
-            throw new HttpError(400, "City not found");
-        }
-        const station = await prismaService.lockerStation.create({
-            data: {
-                cityId: cityForStation.cityId,
-                latitude,
-                longitude,
-                address
-            },
-            select: {
-                stationId: true,
-                status: true
+            if (e instanceof HttpError) {
+                throw e;
             }
-        });
-        await prismaService.$executeRaw`
-            UPDATE "LockerStation"
-            SET location = ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)
-            WHERE "stationId" = ${station.stationId}
-        `;
+            throw new HttpError(500, "Failed to create station");
+        }
 
-        await logAudit({
-            req,
-            action: ActionType.STATION_CREATE,
-            actorId: req.user!.userId,
-            entityId: station.stationId,
-            entityType: 'LockerStation',
-        });
-
-        return res.status(200).json({id: station.stationId, city: city});
     }
 
     async getStations(req: Request, res: Response) {
@@ -214,23 +225,40 @@ export class LockerStationServiceImplPostgres {
         const stationId = req.params.id as string;
         const status = req.body.status;
         try {
-            const updatedStation = await prismaService.lockerStation.update({
-                where: {
-                    stationId,
-                    isDeleted: false
-                },
-                data: {status}
-            });
+            const result = await prismaService.$transaction(async (tx) => {
+                const station = await tx.lockerStation.findUnique({
+                    where: {stationId}
+                });
+                if (!station) {
+                    throw new HttpError(404, "Station not found");
+                }
+                if (station.isDeleted){
+                    throw new HttpError(400, "Station is deleted");
+                }
+                if (station.status === status) {
+                    throw new HttpError(400, "Station is already " + status);
+                }
 
-            await logAudit({
-                req,
-                action: ActionType.STATION_UPDATE_STATUS,
-                actorId: req.user!.userId,
-                entityId: stationId,
-                entityType: 'LockerStation',
-            });
+                const updatedStation = await tx.lockerStation.update({
+                    where: {
+                        stationId,
+                        isDeleted: false
+                    },
+                    data: {status}
+                });
 
-            return res.json(updatedStation);
+                await logAudit({
+                    req,
+                    action: ActionType.STATION_UPDATE_STATUS,
+                    actorId: req.user!.userId,
+                    entityId: stationId,
+                    entityType: 'LockerStation',
+                });
+                return updatedStation;
+            })
+
+            //ToDo DynamoDB
+            return res.json(result);
 
         } catch (e: any) {
             await logAudit({
@@ -239,12 +267,11 @@ export class LockerStationServiceImplPostgres {
                 actorId: req.user!.userId,
                 entityId: stationId,
                 entityType: 'LockerStation',
-                details: {reason: `Failed to update station status`}
+                details: {reason: e.message}
             });
-            if (e.code === "P2025") {
-                throw new HttpError(404, "Station not found");
+            if (e instanceof HttpError) {
+                throw e;
             }
-
             throw new HttpError(500, "Failed to update station status");
         }
     }
@@ -252,24 +279,38 @@ export class LockerStationServiceImplPostgres {
     async deleteStation(req: Request, res: Response) {
         const stationId = req.params.id as string;
         try {
+            const result = await prismaService.$transaction(async (tx) => {
+               const station = await tx.lockerStation.findUnique({
+                   where: {stationId}
+               });
 
-            const station = await prismaService.lockerStation.update({
-                where: {stationId},
-                data: {
-                    isDeleted: true,
-                    deletedAt: new Date()
-                }
-            });
+               if (!station) {
+                   throw new HttpError(404, "Station not found");
+               }
+               if (station.isDeleted){
+                   throw new HttpError(400, "Station is already deleted");
+               }
 
-            await logAudit({
-                req,
-                action: ActionType.STATION_DELETE,
-                actorId: req.user!.userId,
-                entityId: stationId,
-                entityType: 'LockerStation',
-            });
+               const deleteStation = await tx.lockerStation.update({
+                    where: {stationId},
+                    data: {
+                        isDeleted: true,
+                        deletedAt: new Date()
+                    }
+               });
 
-            return res.json({message: "Station deleted", station});
+               await logAudit({
+                    req,
+                    action: ActionType.STATION_DELETE,
+                    actorId: req.user!.userId,
+                    entityId: stationId,
+                    entityType: 'LockerStation',
+               });
+               return deleteStation;
+            })
+
+            //ToDo DynamoDB
+            return res.json({message: "Station deleted", result});
 
         } catch (e: any) {
             await logAudit({
@@ -278,15 +319,12 @@ export class LockerStationServiceImplPostgres {
                 actorId: req.user!.userId,
                 entityId: stationId,
                 entityType: 'LockerStation',
-                details: {reason: `Failed to delete station`}
+                details: {reason: e.message}
             });
-            if (e.code === "P2025") {
-                throw new HttpError(404, "Station not found");
+            if (e instanceof HttpError) {
+                throw e;
             }
-            return res.status(500).json({
-                message: "Failed to delete station",
-                error: e.message
-            });
+            throw new HttpError(500, "Failed to delete station");
         }
     }
 

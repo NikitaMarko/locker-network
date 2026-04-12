@@ -44,61 +44,68 @@ export class LockerBoxServiceImplPostgres {
     async createBox(req: Request, res: Response) {
         const {stationId, code, size} = req.body;
 
-        const stationExists = await prismaService.lockerStation.findUnique({
-            where: {stationId},
-        })
-        if (!stationExists) {
-            await logAudit({
-                req,
-                action: ActionType.LOCKER_CREATE_FAILED,
-                actorId: req.user!.userId,
-                entityId: stationId,
-                entityType: 'LockerBox',
-                details: {reason: `Station not found`}
-            });
-            throw new HttpError(400, `Station doesn't exists`);
-        }
-        const boxExists = await prismaService.lockerBox.findUnique({
-            where: {
-                stationId_code: {
-                    stationId,
-                    code,
+        try{
+            const result = await prismaService.$transaction(async (tx) => {
+                const stationExists = await tx.lockerStation.findUnique({
+                    where: {stationId},
+                })
+                if (!stationExists) {
+                    throw new HttpError(404, `Station not found`);
                 }
-            }
-        });
-        if (boxExists) {
+                const boxExists = await tx.lockerBox.findUnique({
+                    where: {
+                        stationId_code: {
+                            stationId,
+                            code,
+                        }
+                    }
+                });
+                if (boxExists) {
+                    throw new HttpError(400, `Locker already exists`);
+                }
+                const box = await tx.lockerBox.create({
+                    data: {
+                        stationId,
+                        code,
+                        size,
+                    },
+                    select: {
+                        lockerBoxId: true,
+                        status: true,
+                        createdAt: true
+                    }
+                });
+
+                await logAudit({
+                    req,
+                    action: ActionType.LOCKER_CREATE,
+                    actorId: req.user!.userId,
+                    entityId: box.lockerBoxId,
+                    entityType: 'LockerBox',
+                });
+                return box;
+            })
+
+            // ToDo DynamoDB
+
+            return res.status(200).json({id: result.lockerBoxId, stationId: stationId});
+        }
+        catch(e: any){
             await logAudit({
                 req,
                 action: ActionType.LOCKER_CREATE_FAILED,
                 actorId: req.user!.userId,
                 entityId: stationId,
                 entityType: 'LockerBox',
-                details: {reason: `Locker already exists`}
+                details: {reason: e.message}
             });
-            throw new HttpError(400, `Locker already exists`);
-        }
-        const box = await prismaService.lockerBox.create({
-            data: {
-                stationId,
-                code,
-                size,
-            },
-            select: {
-                lockerBoxId: true,
-                status: true,
-                createdAt: true
+            if (e instanceof HttpError) {
+                throw e;
             }
-        });
+            throw new HttpError(500, "Failed to create locker");
+        }
 
-        await logAudit({
-            req,
-            action: ActionType.LOCKER_CREATE,
-            actorId: req.user!.userId,
-            entityId: box.lockerBoxId,
-            entityType: 'LockerBox',
-        });
 
-        return res.status(200).json({id: box.lockerBoxId, stationId: stationId});
     }
 
     async getBoxes(req: Request, res: Response) {
@@ -180,82 +187,108 @@ export class LockerBoxServiceImplPostgres {
 
         const lockerBoxId = req.params.id as string;
         const status = req.body.status;
-        try {
-            const updatedLocker = await prismaService.lockerBox.update({
-                where: {
-                    lockerBoxId,
-                    isDeleted: false
-                },
-                data: {status}
-            });
 
-            await logAudit({
-                req,
-                action: ActionType.LOCKER_UPDATE_STATUS,
-                actorId: req.user!.userId,
-                entityId: lockerBoxId,
-                entityType: 'LockerBox',
-            });
+            try {
+                const result = await prismaService.$transaction(async (tx) => {
+                    const locker = await tx.lockerBox.findUnique({
+                        where: {lockerBoxId}
+                    })
+                    if (!locker) {
+                        throw new HttpError(404, "Locker doesn't exist");
+                    }
+                    if (locker.isDeleted) {
+                        throw new HttpError(400, "Locker deleted");
+                    }
+                    if(locker.status === status) {
+                        throw new HttpError(400, "Locker is already " + status);
+                    }
 
-            return res.json(updatedLocker);
+                    const updatedLocker = await tx.lockerBox.update({
+                    where: {
+                        lockerBoxId,
+                        isDeleted: false
+                    },
+                    data: {status}
+                });
 
-        } catch (e: any) {
-            await logAudit({
-                req,
-                action: ActionType.LOCKER_UPDATE_STATUS_FAILED,
-                actorId: req.user!.userId,
-                entityId: lockerBoxId,
-                entityType: 'LockerBox',
-                details: {reason: `Failed to update Locker status`}
-            });
-            if (e.code === "P2025") {
-                throw new HttpError(404, "Locker not found");
+                await logAudit({
+                    req,
+                    action: ActionType.LOCKER_UPDATE_STATUS,
+                    actorId: req.user!.userId,
+                    entityId: lockerBoxId,
+                    entityType: 'LockerBox',
+                });
+
+               return updatedLocker;
+                })
+
+                //ToDo DynamoDB
+                return res.json(result);
+            } catch (e: any) {
+                await logAudit({
+                    req,
+                    action: ActionType.LOCKER_UPDATE_STATUS_FAILED,
+                    actorId: req.user!.userId,
+                    entityId: lockerBoxId,
+                    entityType: 'LockerBox',
+                    details: {reason: e.message}
+                });
+                if (e instanceof HttpError) {
+                    throw e;
+                }
+                throw new HttpError(500, "Failed to update locker status");
             }
-
-            throw new HttpError(500, "Failed to update Locker status");
-        }
     }
 
     async deleteBox(req: Request, res: Response) {
         const lockerBoxId = req.params.id as string;
-        try {
 
+            try {
+                const result = await prismaService.$transaction(async (tx) => {
+                    const locker = await tx.lockerBox.findUnique({
+                        where: {lockerBoxId}
+                    })
+                    if (!locker) {
+                        throw new HttpError(404, "Locker doesn't exist");
+                    }
+                    if (locker.isDeleted) {
+                        throw new HttpError(400, "Locker already deleted");
+                    }
+                    const deleteLocker = await tx.lockerBox.update({
+                        where: {lockerBoxId},
+                        data: {
+                            isDeleted: true,
+                            deletedAt: new Date()
+                        }
+                    });
 
-            const station = await prismaService.lockerBox.update({
-                where: {lockerBoxId},
-                data: {
-                    isDeleted: true,
-                    deletedAt: new Date()
+                    await logAudit({
+                        req,
+                        action: ActionType.LOCKER_DELETE,
+                        actorId: req.user!.userId,
+                        entityId: lockerBoxId,
+                        entityType: 'LockerBox',
+                    });
+
+                    return deleteLocker;
+                })
+
+                //ToDo DynamoDB
+                return res.json({message: "Locker deleted", result});
+            } catch (e: any) {
+                await logAudit({
+                    req,
+                    action: ActionType.LOCKER_DELETE_FAILED,
+                    actorId: req.user!.userId,
+                    entityId: lockerBoxId,
+                    entityType: 'LockerBox',
+                    details: {reason: e.message}
+                });
+                if (e instanceof HttpError) {
+                    throw e;
                 }
-            });
-
-            await logAudit({
-                req,
-                action: ActionType.LOCKER_DELETE,
-                actorId: req.user!.userId,
-                entityId: lockerBoxId,
-                entityType: 'LockerBox',
-            });
-
-            return res.json({message: "Locker deleted", station});
-
-        } catch (e: any) {
-            await logAudit({
-                req,
-                action: ActionType.LOCKER_DELETE_FAILED,
-                actorId: req.user!.userId,
-                entityId: lockerBoxId,
-                entityType: 'LockerBox',
-                details: {reason: `Failed to delete Locker`}
-            });
-            if (e.code === "P2025") {
-                throw new HttpError(404, "Locker not found");
+                throw new HttpError(500, "Failed to delete locker");
             }
-            return res.status(500).json({
-                message: "Failed to delete Locker",
-                error: e.message
-            });
-        }
 
     }
 
