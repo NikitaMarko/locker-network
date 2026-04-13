@@ -85,6 +85,65 @@ Resources:
           Properties:
             Queue: !GetAtt OperationsQueue.Arn
             BatchSize: 1
+   # ── Cache Projection SQS Queue ──
+  CacheProjectionQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub locker-${Environment}-cache-projection
+      VisibilityTimeout: 60
+      MessageRetentionPeriod: 86400
+ 
+  # ── Station Cache DynamoDB Table ──
+  StationCacheTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub locker-${Environment}-station-cache
+      AttributeDefinitions:
+        - AttributeName: stationId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: stationId
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+ 
+  # ── Locker Cache DynamoDB Table ──
+  LockerCacheTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub locker-${Environment}-locker-cache
+      AttributeDefinitions:
+        - AttributeName: lockerBoxId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: lockerBoxId
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+ 
+  # ── Cache Projection Handler Lambda ──
+  CacheProjectionHandlerFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: nodejs20.x
+    Properties:
+      FunctionName: !Sub locker-${Environment}-cache-projection-handler
+      Handler: dist/functions/cache/cacheProjectionHandler.handler
+      CodeUri: .
+      Description: Processes cache projection events from SQS
+      Environment:
+        Variables:
+          STATION_CACHE_TABLE: !Ref StationCacheTable
+          LOCKER_CACHE_TABLE: !Ref LockerCacheTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref StationCacheTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref LockerCacheTable
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt CacheProjectionQueue.Arn
+            BatchSize: 10
 
 Outputs:
   HealthCheckApi:
@@ -99,3 +158,15 @@ Outputs:
   OperationsTableName:
     Description: DynamoDB table name
     Value: !Ref OperationsTable
+  CacheProjectionQueueUrl:
+    Description: SQS URL for cache projections
+    Value: !Ref CacheProjectionQueue
+  CacheProjectionQueueArn:
+    Description: SQS ARN for cache projections
+    Value: !GetAtt CacheProjectionQueue.Arn
+  StationCacheTableName:
+    Description: DynamoDB table for station cache
+    Value: !Ref StationCacheTable
+  LockerCacheTableName:
+    Description: DynamoDB table for locker cache
+    Value: !Ref LockerCacheTable
