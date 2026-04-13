@@ -3,19 +3,15 @@ frontend:
   phases:
     preBuild:
       commands:
-        - cd frontend && npm ci
+        - cd frontend
+        - npm ci
     build:
       commands:
-        - |
-          cd frontend
-          echo "VITE_API_URL_CLOUDFRONT=$VITE_API_URL_CLOUDFRONT" >> .env
-          echo "VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID" >> .env
-          echo "VITE_API_URL_BACKEND=$VITE_API_URL_BACKEND" >> .env
-          npm run build
+        - npm run build
   artifacts:
     baseDirectory: frontend/dist
     files:
       - '**/*'
   cache:
     paths:
-      - frontend/node_modules/**/*
+      - frontend/node_modules
