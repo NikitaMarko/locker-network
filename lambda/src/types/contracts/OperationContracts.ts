@@ -1,5 +1,6 @@
 export enum OperationType {
   HEALTH_CHECK = 'HEALTH_CHECK',
+  SECURITY_EVENT = 'SECURITY_EVENT',
 }
 
 export enum OperationStatus {
