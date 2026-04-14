@@ -1,6 +1,7 @@
 import {NextFunction, Request, Response} from "express";
 
 import {HttpError} from '../errorHandler/HttpError';
+import { logSecurityEvent, SecurityEventType } from "../services/securityEventService";
 import {authService} from '../services/AuthServiceImplPostgres';
 import {TokenPayload} from "../utils/jwt";
 
@@ -15,6 +16,14 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
 export const login = async (req: Request, res: Response, next: NextFunction) => {
     try {
         return await authService.login(res, req, req.body);
+    } catch (e) {
+        next(e);
+    }
+};
+
+export const googleLogin = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await authService.googleLogin(res, req, req.body);
     } catch (e) {
         next(e);
     }
@@ -41,6 +50,11 @@ export const refresh = async (req: Request, res: Response, next: NextFunction) =
         const token = req.cookies?.refreshToken;
 
         if (!token) {
+            void logSecurityEvent({
+                req,
+                eventType: SecurityEventType.AUTH_MISSING_TOKEN,
+                reason: "Missing refresh token cookie",
+            });
             throw new HttpError(401, "No refresh token");
         }
 

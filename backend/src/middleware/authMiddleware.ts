@@ -5,13 +5,21 @@ import {Role} from "@prisma/client"
 import {env} from "../config/env";
 import {HttpError} from "../errorHandler/HttpError";
 import {logger} from "../Logger/winston";
+import { logSecurityEvent, SecurityEventType } from "../services/securityEventService";
 import {TokenPayload} from "../utils/jwt";
 
 export const protect: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
 
     const token = req.headers.authorization?.split(' ')[1];
 
-    if (!token) return next(new HttpError(401, 'You are not logged in'));
+    if (!token) {
+        void logSecurityEvent({
+            req,
+            eventType: SecurityEventType.AUTH_MISSING_TOKEN,
+            reason: "Missing bearer token in Authorization header",
+        });
+        return next(new HttpError(401, 'You are not logged in'));
+    }
     try {
         const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET!) as TokenPayload;
 
@@ -24,7 +32,12 @@ export const protect: RequestHandler = async (req: Request, res: Response, next:
         req.user = currentUser;
         next();
     } catch (e) {
-        logger.warn("Invalid auth token");
+        (req.log || logger).warn("Invalid auth token");
+        void logSecurityEvent({
+            req,
+            eventType: SecurityEventType.AUTH_INVALID_TOKEN,
+            reason: e instanceof Error ? e.message : "Invalid access token",
+        });
         next(new HttpError(401, 'Invalid token'));
     }
 };
@@ -32,14 +45,29 @@ export const protect: RequestHandler = async (req: Request, res: Response, next:
 export const authorize = (...roles: Role[]) => {
     return (req: Request, res: Response, next: NextFunction) => {
         if (!req.user) {
+            void logSecurityEvent({
+                req,
+                eventType: SecurityEventType.AUTH_MISSING_TOKEN,
+                reason: "Authorization attempted without authenticated user context",
+                details: { requiredRoles: roles },
+            });
             return next(new HttpError(401, 'Not authenticated'));
         }
-// ToDo logging and notification
+
         if (!roles.includes(req.user.role)) {
+            void logSecurityEvent({
+                req,
+                actorId: req.user.userId,
+                eventType: SecurityEventType.AUTH_FORBIDDEN,
+                reason: "Authenticated user does not have required role",
+                details: {
+                    requiredRoles: roles,
+                    actualRole: req.user.role,
+                },
+            });
             return next(new HttpError(403, 'Access denied'));
         }
 
         next();
     };
 };
-

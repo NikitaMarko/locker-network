@@ -4,6 +4,7 @@ import { logger } from "./Logger/winston";
 import { launchServer } from "./server";
 import {prismaService} from "./services/prismaService";
 import {assertAwsCredentialsConfigured} from "./utils/awsClient";
+import {assertSqsCredentialsConfigured} from "./utils/sqsClient";
 
 let server: Server;
 let isShuttingDown = false;
@@ -21,6 +22,7 @@ logger.info('Starting server initialization...');
         logger.info('PostgreSQL connected successfully');
 
         await assertAwsCredentialsConfigured();
+        await assertSqsCredentialsConfigured();
         logger.info('AWS credentials resolved successfully');
 
         server = await launchServer();

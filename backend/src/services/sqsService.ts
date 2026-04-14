@@ -5,26 +5,34 @@ import {env} from "../config/env";
 
 import {OperationType} from "./dto/operationDto";
 
-const QUEUE_URL = env.SQS_URL;
+const QUEUE_URL = env.OPERATIONS_QUEUE_URL || env.SQS_URL;
 
-type SQSCommand = {
+export type QueueCommand = {
     operationId: string;
     type: OperationType;
     payload?: Record<string, unknown>;
 };
 
-export async function sendOperationToQueue(operation: SQSCommand) {
+async function sendCommandToQueue(command: QueueCommand) {
     await sqsClient.send(
         new SendMessageCommand({
             QueueUrl: QUEUE_URL,
-            MessageBody: JSON.stringify(operation),
+            MessageBody: JSON.stringify(command),
 
             MessageAttributes: {
                 type: {
                     DataType: "String",
-                    StringValue: operation.type,
+                    StringValue: command.type,
                 },
             },
         })
     );
+}
+
+export async function sendOperationToQueue(operation: QueueCommand) {
+    await sendCommandToQueue(operation);
+}
+
+export async function sendSecurityEventToQueue(event: QueueCommand) {
+    await sendCommandToQueue(event);
 }

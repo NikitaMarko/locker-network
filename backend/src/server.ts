@@ -19,11 +19,12 @@ import {healthRouter} from "./routes/healthRoutes";
 import {HttpError} from './errorHandler/HttpError';
 import {lockersRoutes} from "./routes/lockersRoutes";
 import {operationsRouter} from "./routes/operationsRoutes";
+import { logSecurityEvent, SecurityEventType } from "./services/securityEventService";
+import { sendError } from "./utils/response";
 import { citiesRoutes } from './routes/citiesRoutes';
 
 const PORT = env.PORT;
-    //const baseUrl = `http://localhost:${PORT}`;
-    const baseUrl = env.SERVER_URL || `http://localhost:${PORT}`;
+const baseUrl = env.SERVER_URL || `http://localhost:${PORT}`;
 
 export const createApp = () => {
 
@@ -49,6 +50,16 @@ export const createApp = () => {
     }));
 
     app.use(cookieParser());
+
+    //==============Correlation ID==========
+    app.use((req: Request, res: Response, next: NextFunction) => {
+        const correlationId = (req.headers['x-correlation-id'] as string) || randomUUID();
+        req.headers['x-correlation-id'] = correlationId;
+        req.correlationId = correlationId;
+        req.log = logger.child({ correlationId });
+        res.setHeader('x-correlation-id', correlationId);
+        next();
+    });
 
     //===============Logging============
 
@@ -86,9 +97,25 @@ export const createApp = () => {
         skip: (req) => req.path.startsWith('/api/v1/auth'),
         max: 200,
         windowMs: 60 * 60 * 1000,
-        message: 'Too many requests from this IP, please try again in an hour!',
         standardHeaders: true,
         legacyHeaders: false,
+        handler: (req, res) => {
+            void logSecurityEvent({
+                req,
+                eventType: SecurityEventType.RATE_LIMIT_EXCEEDED,
+                reason: "Global API rate limit exceeded",
+                actorId: req.user?.userId,
+                details: {
+                    limiterName: "global",
+                    limit: req.rateLimit?.limit,
+                    current: req.rateLimit?.used,
+                    remaining: req.rateLimit?.remaining,
+                    resetTime: req.rateLimit?.resetTime?.toISOString?.(),
+                },
+            });
+
+            return sendError(res, 429, "RATE_LIMIT_EXCEEDED", "Too many requests from this IP, please try again in an hour!");
+        },
     });
 
     app.use(globalLimiter);
@@ -97,15 +124,6 @@ export const createApp = () => {
         const swaggerDoc = require("../docs/openapi.json");
         app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDoc));
     }
-
-    //==============Correlation ID==========
-    app.use((req: Request, res: Response, next: NextFunction) => {
-        const correlationId = (req.headers['x-correlation-id'] as string) || randomUUID();
-        req.headers['x-correlation-id'] = correlationId;
-        res.setHeader('x-correlation-id', correlationId);
-        next();
-    });
-
 
     //===============Router================
     const API_PREFIX = '/api/v1';

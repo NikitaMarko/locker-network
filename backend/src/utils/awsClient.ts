@@ -25,20 +25,30 @@ function getBaseCredentialsProvider() {
     return fromNodeProviderChain();
 }
 
-const baseCredentialsProvider = getBaseCredentialsProvider();
-const dynamoCredentialsProvider = env.DYNAMO_ROLE_ARN
-    ? fromTemporaryCredentials({
+function createRoleAwareProvider(roleArn?: string, roleSessionName?: string) {
+    if (!roleArn) {
+        return baseCredentialsProvider;
+    }
+
+    return fromTemporaryCredentials({
         masterCredentials: baseCredentialsProvider,
         params: {
-            RoleArn: env.DYNAMO_ROLE_ARN,
-            RoleSessionName: env.DYNAMO_ROLE_SESSION_NAME || "locker-backend-dynamo"
+            RoleArn: roleArn,
+            RoleSessionName: roleSessionName || env.AWS_ROLE_SESSION_NAME || "locker-backend-aws"
         }
-    })
-    : baseCredentialsProvider;
+    });
+}
+
+const baseCredentialsProvider = getBaseCredentialsProvider();
+const dynamoCredentialsProvider = createRoleAwareProvider(
+    env.DYNAMO_ROLE_ARN || env.AWS_ROLE_ARN,
+    env.DYNAMO_ROLE_SESSION_NAME || env.AWS_ROLE_SESSION_NAME || "locker-backend-dynamo"
+);
 
 const dynamoClient = new DynamoDBClient({
     region: env.AWS_REGION,
-    credentials: dynamoCredentialsProvider
+    credentials: dynamoCredentialsProvider,
+    endpoint: env.DYNAMODB_ENDPOINT_URL || env.AWS_ENDPOINT_URL,
 });
 
 export const dynamoDocClient = DynamoDBDocumentClient.from(dynamoClient);
@@ -57,3 +67,5 @@ export async function assertAwsCredentialsConfigured() {
         );
     }
 }
+
+export { baseCredentialsProvider, createRoleAwareProvider };

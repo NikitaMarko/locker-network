@@ -2,29 +2,20 @@ import {NextFunction, Request, Response} from "express";
 import {ZodError} from "zod";
 
 import {logger} from "../Logger/winston";
+import {sendError} from "../utils/response";
 
 import {HttpError} from "./HttpError";
 
 
 export const errorHandler = (err: Error, req: Request, res: Response, next: NextFunction) => {
     if (err instanceof ZodError) {
-        return res.status(400).json({
-            status: "fail",
-            message: "Validation failed",
-            errors: err.flatten().fieldErrors,
-        });
+        return sendError(res, 400, "VALIDATION_ERROR", "Validation failed", err.flatten().fieldErrors);
     }
     if (err instanceof HttpError) {
-        return res.status(err.status).json({
-            status: "error",
-            message: err.message,
-        });
+        return sendError(res, err.status, "HTTP_ERROR", err.message);
     }
 
-    logger.error("Internal Server Error", err);
+    (req.log || logger).error("Internal Server Error", err);
 
-    return res.status(500).json({
-        status: "error",
-        message: "Internal Server Error",
-    });
+    return sendError(res, 500, "INTERNAL_SERVER_ERROR", "Internal Server Error");
 };

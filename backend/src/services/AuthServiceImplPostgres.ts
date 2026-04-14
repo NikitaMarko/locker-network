@@ -1,18 +1,22 @@
 import {Request, Response} from "express";
 import {hash, verify} from "argon2";
+import {OAuth2Client} from "google-auth-library";
 import jwt from "jsonwebtoken";
 import { Prisma } from "@prisma/client";
+import { randomUUID } from "crypto";
 
 import * as tokenService from "../utils/jwt"
-import {hashToken, timingSafeTokenCompare, TokenPayload} from "../utils/jwt"
+import {getRefreshTokenExpiresAt, hashToken, timingSafeTokenCompare, TokenPayload} from "../utils/jwt"
 import {env} from "../config/env";
 import {HttpError} from "../errorHandler/HttpError";
 import {logAudit} from '../utils/audit';
 
 import {prismaService} from "./prismaService";
-import {LoginDto, SignupDto} from "./dto/applDto";
+import {GoogleLoginDto, LoginDto, SignupDto} from "./dto/applDto";
 import {ActionType} from "./dto/operationDto";
+import { logSecurityEvent, SecurityEventType } from "./securityEventService";
 
+const googleClient = new OAuth2Client();
 
 function isPrismaUniqueConstraintError(error: unknown): error is Prisma.PrismaClientKnownRequestError {
     return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
@@ -26,13 +30,23 @@ function extractConstraintField(error: Prisma.PrismaClientKnownRequestError): st
 export class AuthServiceImplPostgres {
 
     async auth(res: Response, req: Request, user: { userId: string; role: TokenPayload['role'] }) {
+        await prismaService.refreshSession.updateMany({
+            where: {
+                userId: user.userId,
+                revokedAt: null,
+            },
+            data: {
+                revokedAt: new Date(),
+            },
+        });
+
         const sessionId = await prismaService.refreshSession.create({
             data: {
                 userId: user.userId,
                 tokenHash: "",
                 ipAddress: req.ip ?? null,
                 deviceInfo: req.headers["user-agent"] ?? null,
-                expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * env.JWT_REFRESH_TOKEN_TTL),
+                expiresAt: getRefreshTokenExpiresAt(),
             },
         });
 
@@ -45,7 +59,7 @@ export class AuthServiceImplPostgres {
             data: { tokenHash: hashToken(refreshToken) },
         });
 
-        const expires = new Date(Date.now() + 1000 * 60 * 60 * 24 * env.JWT_REFRESH_TOKEN_TTL);
+        const expires = getRefreshTokenExpiresAt();
         tokenService.cookieToken(refreshToken, res, expires);
 
         return res.status(200).json({ accessToken });
@@ -100,6 +114,12 @@ export class AuthServiceImplPostgres {
         });
 
         if (!user) {
+            void logSecurityEvent({
+                req,
+                eventType: SecurityEventType.AUTH_INVALID_CREDENTIALS,
+                reason: "Login failed: user not found",
+                details: { email },
+            });
             await logAudit({
                 req,
                 action: ActionType.USER_LOGIN_FAILED,
@@ -113,6 +133,13 @@ export class AuthServiceImplPostgres {
         const isValidPassword = await verify(user.password, password);
 
         if (!isValidPassword) {
+            void logSecurityEvent({
+                req,
+                actorId: user.userId,
+                eventType: SecurityEventType.AUTH_INVALID_CREDENTIALS,
+                reason: "Login failed: wrong password",
+                details: { email },
+            });
             await logAudit({
                 req,
                 action: ActionType.USER_LOGIN_FAILED,
@@ -131,6 +158,81 @@ export class AuthServiceImplPostgres {
         });
         const {password: _, ...safeUser} = user;
         return this.auth(res, req, safeUser);
+    }
+
+    async googleLogin(res: Response, req: Request, dto: GoogleLoginDto) {
+        if (!env.GOOGLE_CLIENT_ID) {
+            throw new HttpError(500, "GOOGLE_CLIENT_ID is not configured");
+        }
+
+        let ticket;
+
+        try {
+            ticket = await googleClient.verifyIdToken({
+                idToken: dto.idToken,
+                audience: env.GOOGLE_CLIENT_ID,
+            });
+        } catch {
+            void logSecurityEvent({
+                req,
+                eventType: SecurityEventType.AUTH_INVALID_CREDENTIALS,
+                reason: "Google login failed: invalid id token",
+            });
+            throw new HttpError(401, "Invalid Google token");
+        }
+
+        const payload = ticket.getPayload();
+        const email = payload?.email?.trim().toLowerCase();
+        const name = payload?.name?.trim();
+
+        if (!email || !payload?.email_verified) {
+            void logSecurityEvent({
+                req,
+                eventType: SecurityEventType.AUTH_INVALID_CREDENTIALS,
+                reason: "Google login failed: email is missing or not verified",
+            });
+            throw new HttpError(401, "Google account email is not verified");
+        }
+
+        let user = await prismaService.user.findUnique({
+            where: { email },
+            select: {
+                userId: true,
+                role: true,
+            },
+        });
+
+        if (!user) {
+            user = await prismaService.user.create({
+                data: {
+                    email,
+                    name: name || email.split("@")[0] || "Google User",
+                    password: await hash(randomUUID()),
+                },
+                select: {
+                    userId: true,
+                    role: true,
+                },
+            });
+
+            await logAudit({
+                req,
+                action: ActionType.USER_REGISTER,
+                actorId: user.userId,
+                entityId: user.userId,
+                details: { authProvider: "google", email },
+            });
+        }
+
+        await logAudit({
+            req,
+            action: ActionType.USER_LOGIN,
+            actorId: user.userId,
+            entityId: user.userId,
+            details: { authProvider: "google", email },
+        });
+
+        return this.auth(res, req, user);
     }
 
 
@@ -175,6 +277,11 @@ export class AuthServiceImplPostgres {
             }) as TokenPayload;
         } catch {
             tokenService.clearCookies(res);
+            void logSecurityEvent({
+                req,
+                eventType: SecurityEventType.AUTH_REFRESH_FAILED,
+                reason: "Refresh failed: invalid refresh token signature or format",
+            });
             throw new HttpError(401, 'Invalid refresh token');
         }
 
@@ -185,6 +292,13 @@ export class AuthServiceImplPostgres {
 
         if (!session || session.userId !== payload.userId) {
             tokenService.clearCookies(res);
+            void logSecurityEvent({
+                req,
+                actorId: payload.userId,
+                eventType: SecurityEventType.AUTH_REFRESH_FAILED,
+                reason: "Refresh failed: session not found",
+                details: { sessionId: payload.sessionId },
+            });
             throw new HttpError(401, 'Session not found');
         }
 
@@ -195,11 +309,25 @@ export class AuthServiceImplPostgres {
             });
 
             tokenService.clearCookies(res);
+            void logSecurityEvent({
+                req,
+                actorId: session.userId,
+                eventType: SecurityEventType.AUTH_REFRESH_FAILED,
+                reason: "Refresh failed: token reuse detected",
+                details: { sessionId: session.id },
+            });
             throw new HttpError(401, "Token reuse detected");
         }
 
         if (session.expiresAt < new Date()) {
             tokenService.clearCookies(res);
+            void logSecurityEvent({
+                req,
+                actorId: session.userId,
+                eventType: SecurityEventType.AUTH_REFRESH_FAILED,
+                reason: "Refresh failed: token expired",
+                details: { sessionId: session.id },
+            });
             throw new HttpError(401, "Token expired");
         }
 
@@ -207,6 +335,13 @@ export class AuthServiceImplPostgres {
 
         if (!timingSafeTokenCompare(incomingHash, session.tokenHash)) {
             tokenService.clearCookies(res);
+            void logSecurityEvent({
+                req,
+                actorId: session.userId,
+                eventType: SecurityEventType.AUTH_REFRESH_FAILED,
+                reason: "Refresh failed: token hash mismatch",
+                details: { sessionId: session.id },
+            });
             throw new HttpError(401, "Invalid token");
         }
 
@@ -220,6 +355,13 @@ export class AuthServiceImplPostgres {
 
         if (updated.count === 0) {
             tokenService.clearCookies(res);
+            void logSecurityEvent({
+                req,
+                actorId: session.userId,
+                eventType: SecurityEventType.AUTH_REFRESH_FAILED,
+                reason: "Refresh failed: token already used",
+                details: { sessionId: session.id },
+            });
             throw new HttpError(401, "Token already used");
         }
 

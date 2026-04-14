@@ -5,13 +5,36 @@ import jwt from "jsonwebtoken";
 import * as authController from "../controllers/authController";
 import {validateRequest} from "../middleware/validateRequest";
 import {
+    googleLoginSchema,
     loginSchema,
     refreshSchema,
     signupSchema,
 } from "../validation/authSchemas";
 import * as auth from "../middleware/authMiddleware";
 import {env} from "../config/env";
+import { logSecurityEvent, SecurityEventType } from "../services/securityEventService";
+import { sendError } from "../utils/response";
 import {TokenPayload} from "../utils/jwt";
+
+function createRateLimitHandler(message: string, limiterName: string) {
+    return (req: Request, res: express.Response) => {
+        void logSecurityEvent({
+            req,
+            eventType: SecurityEventType.RATE_LIMIT_EXCEEDED,
+            reason: `${limiterName} rate limit exceeded`,
+            details: {
+                limiterName,
+                limit: req.rateLimit?.limit,
+                current: req.rateLimit?.used,
+                remaining: req.rateLimit?.remaining,
+                resetTime: req.rateLimit?.resetTime?.toISOString?.(),
+                email: typeof req.body?.email === "string" ? req.body.email : undefined,
+            },
+        });
+
+        return sendError(res, 429, "RATE_LIMIT_EXCEEDED", message);
+    };
+}
 
 const loginLimiter = rateLimit({
     max: 5,
@@ -25,23 +48,13 @@ const loginLimiter = rateLimit({
         const ip = ipKeyGenerator(req.ip);
         return `${email}:${ip}`;
     },
-    handler: (req, res) => {
-        res.status(429).json({
-            status: 'error',
-            message: 'Too many login attempts. Try again later.',
-        });
-    }
+    handler: createRateLimitHandler("Too many login attempts. Try again later.", "auth.login"),
 });
 
 const signupLimiter = rateLimit({
     max: 5,
     windowMs: 60 * 60 * 1000,  // 1 час
-    handler: (req, res) => {
-        res.status(429).json({
-            status: 'error',
-            message: 'Too many signup attempts. Try again later.',
-        });
-    }
+    handler: createRateLimitHandler("Too many signup attempts. Try again later.", "auth.signup"),
 });
 
 
@@ -64,12 +77,14 @@ const refreshLimiter = rateLimit({
             return ipKeyGenerator(req.ip ?? 'unknown');
         }
     },
+    handler: createRateLimitHandler("Too many refresh attempts. Try again later.", "auth.refresh"),
 });
 
 export const authRouter = express.Router()
 
 authRouter.post('/signup', signupLimiter, validateRequest(signupSchema), authController.register);
 authRouter.post('/login', loginLimiter, validateRequest(loginSchema), authController.login);
+authRouter.post('/google', loginLimiter, validateRequest(googleLoginSchema), authController.googleLogin);
 authRouter.post('/refresh', refreshLimiter, validateRequest(refreshSchema), authController.refresh);
 authRouter.use(auth.protect);
 authRouter.post('/logout', authController.logout);
