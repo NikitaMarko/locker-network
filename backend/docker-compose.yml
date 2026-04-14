@@ -11,18 +11,87 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U root -d locker"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  localstack:
+    image: localstack/localstack:3.8.1
+    container_name: locker-localstack
+    restart: always
+    environment:
+      SERVICES: sqs,dynamodb,lambda,logs,iam
+      AWS_DEFAULT_REGION: eu-west-1
+      DEBUG: 1
+      PERSISTENCE: 1
+      LAMBDA_EXECUTOR: docker-reuse
+    ports:
+      - "4566:4566"
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./docker/localstack/init:/etc/localstack/init/ready.d
+      - ../lambda:/opt/locker-localstack/ts-lambda:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:4566/_localstack/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: locker-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   backend:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: locker-backend
     restart: always
     ports:
       - "3555:3555"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     env_file:
-      - .env
-
+      - .env.localstack.example
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://root:root@postgres:5432/locker
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      AWS_REGION: eu-west-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_ENDPOINT_URL: http://localstack:4566
+      DYNAMODB_ENDPOINT_URL: http://localstack:4566
+      REDIS_URL: redis://redis:6379
+      SQS_ENDPOINT_URL: http://localstack:4566
+      DYNAMO_TABLE_NAME: locker-dev-operations-dynamodb
+      DYNAMO_LOCKER_CACHE_TABLE_NAME: locker-dev-locker-cache
+      OPERATIONS_QUEUE_URL: http://localstack:4566/000000000000/locker-operations-queue
+      SQS_URL: http://localstack:4566/000000000000/locker-operations-queue
+      USE_LAMBDA_HEALTH: "false"
+      LAMBDA_HEALTH_URL: ""
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3555/health >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
 
 volumes:
   postgres_data:
+  localstack_data:

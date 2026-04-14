@@ -3,7 +3,7 @@
   "info": {
     "title": "Locker Network API",
     "version": "1.0.0",
-    "description": "🔐 Locker Network - Secure smart locker management system",
+    "description": "Locker Network backend. Public station data is served from Redis, locker runtime state and async operations use DynamoDB.",
     "contact": {
       "name": "API Support",
       "email": "support@lockernetwork.com"
@@ -79,11 +79,37 @@
           }
         }
       },
+      "GoogleLoginRequest": {
+        "type": "object",
+        "required": ["idToken"],
+        "properties": {
+          "idToken": { "type": "string", "description": "Google ID token from client OAuth flow" }
+        }
+      },
       "UserResponse": {
         "type": "object",
         "properties": {
           "status": { "type": "string", "example": "success" },
           "data": { "$ref": "#/components/schemas/User" }
+        }
+      },
+      "City": {
+        "type": "object",
+        "properties": {
+          "cityId": { "type": "string", "format": "uuid" },
+          "code": { "type": "string", "example": "TLV" },
+          "name": { "type": "string", "example": "Tel Aviv" }
+        }
+      },
+      "Operation": {
+        "type": "object",
+        "properties": {
+          "operationId": { "type": "string", "format": "uuid" },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "status": { "type": "string", "enum": ["PENDING", "PROCESSING", "COMPLETED", "FAILED"] },
+          "type": { "type": "string", "enum": ["HEALTH_CHECK"] },
+          "result": { "type": "object", "nullable": true },
+          "error": { "type": "string", "nullable": true }
         }
       },
       "LockerBox": {
@@ -189,9 +215,189 @@
       "Error": {
         "type": "object",
         "properties": {
-          "status": { "type": "string", "example": "error" },
-          "message": { "type": "string" },
-          "statusCode": { "type": "integer" }
+          "success": { "type": "boolean", "example": false },
+          "correlationId": { "type": "string", "nullable": true },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": { "type": "string", "example": "UNAUTHORIZED" },
+              "message": { "type": "string", "example": "You are not logged in" },
+              "details": {}
+            }
+          }
+        }
+      },
+      "CreateStationRequest": {
+        "type": "object",
+        "required": ["city", "latitude", "longitude"],
+        "properties": {
+          "city": { "type": "string", "example": "TLV" },
+          "latitude": { "type": "number", "example": 32.0853 },
+          "longitude": { "type": "number", "example": 34.7818 },
+          "address": { "type": "string", "example": "Dizengoff 10" }
+        }
+      },
+      "ChangeStationStatusRequest": {
+        "type": "object",
+        "required": ["status"],
+        "properties": {
+          "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "MAINTENANCE"] }
+        }
+      },
+      "CreateLockerRequest": {
+        "type": "object",
+        "required": ["stationId", "code", "size"],
+        "properties": {
+          "stationId": { "type": "string", "format": "uuid" },
+          "code": { "type": "string", "example": "A007" },
+          "size": { "type": "string", "enum": ["S", "M", "L"] }
+        }
+      },
+      "ChangeLockerStatusRequest": {
+        "type": "object",
+        "required": ["status"],
+        "properties": {
+          "status": { "type": "string", "enum": ["AVAILABLE", "RESERVED", "OCCUPIED", "FAULTY", "EXPIRED"] }
+        }
+      },
+      "StationCacheLocker": {
+        "type": "object",
+        "properties": {
+          "lockerBoxId": { "type": "string", "format": "uuid" },
+          "stationId": { "type": "string", "format": "uuid" },
+          "code": { "type": "string" },
+          "size": { "type": "string", "enum": ["S", "M", "L"] },
+          "status": { "type": "string", "enum": ["AVAILABLE", "RESERVED", "OCCUPIED", "FAULTY", "EXPIRED"] },
+          "version": { "type": "integer" },
+          "lastStatusChangedAt": { "type": "string", "format": "date-time" },
+          "pricePerHour": { "type": "string", "nullable": true }
+        }
+      },
+      "StationListItem": {
+        "type": "object",
+        "properties": {
+          "stationId": { "type": "string", "format": "uuid" },
+          "cityId": { "type": "string", "format": "uuid" },
+          "address": { "type": "string", "nullable": true },
+          "latitude": { "type": "number" },
+          "longitude": { "type": "number" },
+          "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "MAINTENANCE"] },
+          "version": { "type": "integer" },
+          "distance": { "type": "number", "nullable": true },
+          "city": {
+            "type": "object",
+            "properties": {
+              "code": { "type": "string" },
+              "name": { "type": "string" }
+            }
+          },
+          "_count": {
+            "type": "object",
+            "properties": {
+              "lockers": { "type": "integer" }
+            }
+          }
+        }
+      },
+      "StationDetails": {
+        "type": "object",
+        "properties": {
+          "stationId": { "type": "string", "format": "uuid" },
+          "cityId": { "type": "string", "format": "uuid" },
+          "address": { "type": "string", "nullable": true },
+          "latitude": { "type": "number" },
+          "longitude": { "type": "number" },
+          "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "MAINTENANCE"] },
+          "version": { "type": "integer" },
+          "availableLockers": { "type": "integer" },
+          "city": {
+            "type": "object",
+            "properties": {
+              "code": { "type": "string" },
+              "name": { "type": "string" }
+            }
+          },
+          "lockers": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/StationCacheLocker" }
+          }
+        }
+      },
+      "LockerDetails": {
+        "type": "object",
+        "properties": {
+          "lockerBoxId": { "type": "string", "format": "uuid" },
+          "stationId": { "type": "string", "format": "uuid" },
+          "code": { "type": "string" },
+          "size": { "type": "string", "enum": ["S", "M", "L"] },
+          "status": { "type": "string", "enum": ["AVAILABLE", "RESERVED", "OCCUPIED", "FAULTY", "EXPIRED"] },
+          "version": { "type": "integer" },
+          "lastStatusChangedAt": { "type": "string", "format": "date-time" },
+          "pricePerHour": { "type": "string", "nullable": true },
+          "station": {
+            "type": "object",
+            "properties": {
+              "address": { "type": "string", "nullable": true },
+              "city": { "type": "string" },
+              "latitude": { "type": "number" },
+              "longitude": { "type": "number" }
+            }
+          }
+        }
+      },
+      "StationMutationMeta": {
+        "type": "object",
+        "properties": {
+          "stationCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED"] }
+        }
+      },
+      "StationLockerMutationMeta": {
+        "type": "object",
+        "properties": {
+          "stationCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED"] },
+          "lockerCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED"] }
+        }
+      },
+      "LockerMutationMeta": {
+        "type": "object",
+        "properties": {
+          "stationCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED"] },
+          "lockerCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED"] }
+        }
+      },
+      "CacheReconcileMeta": {
+        "type": "object",
+        "properties": {
+          "stationCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED"] },
+          "lockerCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED"] }
+        }
+      },
+      "CacheReconcileResponse": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "object",
+            "properties": {
+              "stations": { "type": "string", "enum": ["compare-and-fill", "rds-fallback-full-resync"] },
+              "lockers": { "type": "string", "enum": ["compare-and-fill", "rds-fallback-full-resync"] }
+            }
+          },
+          "stations": {
+            "type": "object",
+            "properties": {
+              "sourceCount": { "type": "integer" },
+              "queuedCount": { "type": "integer" },
+              "deleteQueuedCount": { "type": "integer" }
+            }
+          },
+          "lockers": {
+            "type": "object",
+            "properties": {
+              "sourceCount": { "type": "integer" },
+              "queuedCount": { "type": "integer" },
+              "deleteQueuedCount": { "type": "integer" }
+            }
+          }
         }
       }
     },
@@ -201,7 +407,7 @@
         "content": {
           "application/json": {
             "schema": { "$ref": "#/components/schemas/Error" },
-            "example": { "status": "error", "message": "You are not logged in", "statusCode": 401 }
+            "example": { "success": false, "error": { "code": "UNAUTHORIZED", "message": "You are not logged in" } }
           }
         }
       },
@@ -210,7 +416,7 @@
         "content": {
           "application/json": {
             "schema": { "$ref": "#/components/schemas/Error" },
-            "example": { "status": "error", "message": "Too many requests", "statusCode": 429 }
+            "example": { "success": false, "error": { "code": "RATE_LIMIT_EXCEEDED", "message": "Too many requests" } }
           }
         }
       }
@@ -417,6 +623,46 @@
         }
       }
     },
+    "/api/v1/auth/google": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Authenticate with Google ID token",
+        "operationId": "googleLogin",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/GoogleLoginRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successfully authenticated",
+            "headers": {
+              "Set-Cookie": {
+                "description": "httpOnly refresh token cookie",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuthResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid Google token",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/TooManyRequests" }
+        }
+      }
+    },
     "/api/v1/auth/me": {
       "get": {
         "tags": ["Auth", "Users"],
@@ -446,6 +692,96 @@
         }
       }
     },
+    "/api/v1/cities": {
+      "get": {
+        "tags": ["Stations"],
+        "summary": "Get active cities",
+        "operationId": "getCities",
+        "responses": {
+          "200": {
+            "description": "Active cities list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/City" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/operations/health": {
+      "post": {
+        "tags": ["System"],
+        "summary": "Create async health-check operation",
+        "operationId": "createHealthOperation",
+        "responses": {
+          "200": {
+            "description": "Operation queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "correlationId": { "type": "string" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "operationId": { "type": "string", "format": "uuid" },
+                        "status": { "type": "string", "enum": ["PENDING"] }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/operations/{id}": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Get async operation status",
+        "operationId": "getOperationStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "correlationId": { "type": "string" },
+                    "data": { "$ref": "#/components/schemas/Operation" }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Operation not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/logout": {
       "post": {
         "tags": ["Auth"],
@@ -462,6 +798,533 @@
                   "type": "object",
                   "properties": {
                     "message": { "type": "string", "example": "Logged out" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/lockers/stations": {
+      "get": {
+        "tags": ["Stations"],
+        "summary": "Get public station list",
+        "description": "Returns station list from Redis station cache by default. Falls back to RDS projections if Redis is unavailable.",
+        "parameters": [
+          { "name": "city", "in": "query", "schema": { "type": "string" } },
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "MAINTENANCE"] } },
+          { "name": "lat", "in": "query", "schema": { "type": "number" } },
+          { "name": "lng", "in": "query", "schema": { "type": "number" } },
+          { "name": "radius", "in": "query", "schema": { "type": "number" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Station list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "correlationId": { "type": "string" },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/StationListItem" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/stations/{id}": {
+      "get": {
+        "tags": ["Stations"],
+        "summary": "Get station details",
+        "description": "Returns one station from Redis station cache by default. Falls back to RDS projection if Redis is unavailable.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Station details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "correlationId": { "type": "string" },
+                    "data": { "$ref": "#/components/schemas/StationDetails" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/lockers/boxes": {
+      "get": {
+        "tags": ["Lockers"],
+        "summary": "Get public locker list",
+        "description": "Returns locker list from DynamoDB locker cache. Runtime locker statuses are sourced only from DynamoDB.",
+        "parameters": [
+          { "name": "stationId", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "size", "in": "query", "schema": { "type": "string", "enum": ["S", "M", "L"] } },
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["AVAILABLE", "RESERVED", "OCCUPIED", "FAULTY", "EXPIRED"] } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Locker list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "correlationId": { "type": "string" },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/LockerDetails" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/boxes/{id}": {
+      "get": {
+        "tags": ["Lockers"],
+        "summary": "Get locker details",
+        "description": "Returns one locker from DynamoDB locker cache. Runtime locker statuses are sourced only from DynamoDB.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Locker details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "correlationId": { "type": "string" },
+                    "data": { "$ref": "#/components/schemas/LockerDetails" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/stations": {
+      "get": {
+        "tags": ["Stations"],
+        "summary": "Get admin station list",
+        "description": "Returns admin station list built from PostgreSQL station metadata and current locker state.",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Admin station list"
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Stations"],
+        "summary": "Create station",
+        "description": "Creates station in RDS and then writes station cache directly to Redis from backend.",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateStationRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Station created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "correlationId": { "type": "string" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "city": { "type": "string" }
+                      }
+                    },
+                    "meta": { "$ref": "#/components/schemas/StationMutationMeta" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/stations/{id}": {
+      "get": {
+        "tags": ["Stations"],
+        "summary": "Get admin station details",
+        "description": "Returns admin station details built from PostgreSQL station metadata and current locker state.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": { "description": "Admin station details" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/stations/{id}/status": {
+      "patch": {
+        "tags": ["Stations"],
+        "summary": "Change station status",
+        "description": "Updates station metadata in PostgreSQL, rewrites dependent locker projections in DynamoDB, and refreshes station cache directly in Redis.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ChangeStationStatusRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Station status changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "correlationId": { "type": "string" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "stationId": { "type": "string", "format": "uuid" },
+                        "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "MAINTENANCE"] }
+                      }
+                    },
+                    "meta": { "$ref": "#/components/schemas/StationLockerMutationMeta" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/stations/{id}/resync-cache": {
+      "post": {
+        "tags": ["Stations"],
+        "summary": "Resync station cache",
+        "description": "Rebuilds station projection from RDS and writes it directly to Redis. No outbox or lambda step is used for station cache.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "202": {
+            "description": "Station cache resynced",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "correlationId": { "type": "string" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "stationId": { "type": "string", "format": "uuid" }
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "stationCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED"] }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/boxes": {
+      "get": {
+        "tags": ["Lockers"],
+        "summary": "Get admin locker list",
+        "description": "Returns admin locker list built from PostgreSQL locker metadata and current locker state.",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Admin locker list" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Lockers"],
+        "summary": "Create locker",
+        "description": "Creates locker metadata in RDS, writes locker runtime projection directly to DynamoDB, and updates related station cache directly in Redis.",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateLockerRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Locker created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "correlationId": { "type": "string" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "stationId": { "type": "string", "format": "uuid" }
+                      }
+                    },
+                    "meta": { "$ref": "#/components/schemas/LockerMutationMeta" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/boxes/{id}": {
+      "get": {
+        "tags": ["Lockers"],
+        "summary": "Get admin locker details",
+        "description": "Returns admin locker details built from PostgreSQL locker metadata and current locker state.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": { "description": "Admin locker details" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/boxes/{id}/status": {
+      "patch": {
+        "tags": ["Lockers"],
+        "summary": "Change locker status",
+        "description": "Updates locker runtime status in DynamoDB, bumps related station version in RDS, and refreshes station cache directly in Redis.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ChangeLockerStatusRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Locker status changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "correlationId": { "type": "string" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "lockerBoxId": { "type": "string", "format": "uuid" },
+                        "stationId": { "type": "string", "format": "uuid" },
+                        "status": { "type": "string", "enum": ["AVAILABLE", "RESERVED", "OCCUPIED", "FAULTY", "EXPIRED"] }
+                      }
+                    },
+                    "meta": { "$ref": "#/components/schemas/LockerMutationMeta" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/boxes/{id}/resync-cache": {
+      "post": {
+        "tags": ["Lockers"],
+        "summary": "Resync locker cache",
+        "description": "Rebuilds locker projection from backend state and writes it directly to DynamoDB. No outbox or lambda step is used for locker cache.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "202": {
+            "description": "Locker cache resynced",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "correlationId": { "type": "string" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "lockerBoxId": { "type": "string", "format": "uuid" }
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "lockerCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED"] }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/lockers/oper/boxes/{id}/delete": {
+      "patch": {
+        "tags": ["Lockers"],
+        "summary": "Delete locker",
+        "description": "Soft-deletes locker metadata in PostgreSQL, removes locker runtime state from DynamoDB, and refreshes the related station cache in Redis.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Locker deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "correlationId": { "type": "string" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "message": { "type": "string" },
+                        "lockerBoxId": { "type": "string", "format": "uuid" },
+                        "stationId": { "type": "string", "format": "uuid" }
+                      }
+                    },
+                    "meta": { "$ref": "#/components/schemas/LockerMutationMeta" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/lockers/oper/stations/{id}/delete": {
+      "patch": {
+        "tags": ["Stations"],
+        "summary": "Delete station",
+        "description": "Soft-deletes station metadata in PostgreSQL, removes dependent locker projections from DynamoDB, and removes the station cache entry from Redis.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Station deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "correlationId": { "type": "string" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "message": { "type": "string" },
+                        "stationId": { "type": "string", "format": "uuid" }
+                      }
+                    },
+                    "meta": { "$ref": "#/components/schemas/StationLockerMutationMeta" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/cache/reconcile": {
+      "post": {
+        "tags": ["Stations", "Lockers"],
+        "summary": "Reconcile catalog cache",
+        "description": "Reconciles station cache against Redis and locker cache against DynamoDB. Both station and locker cache writes happen directly in backend.",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "202": {
+            "description": "Cache reconcile started/completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "correlationId": { "type": "string" },
+                    "data": { "$ref": "#/components/schemas/CacheReconcileResponse" },
+                    "meta": { "$ref": "#/components/schemas/CacheReconcileMeta" }
                   }
                 }
               }
