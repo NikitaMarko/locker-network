@@ -1,8 +1,10 @@
-import {Request, Response} from "express";
-import {v4 as uuidv4} from "uuid";
+import { Request, Response } from "express";
+import { v4 as uuidv4 } from "uuid";
 
-import {HttpError} from "../errorHandler/HttpError";
-import {logAudit} from "../utils/audit";
+import { HttpError } from "../errorHandler/HttpError";
+import { operationRepository } from "../repositories/operation/OperationRepository";
+import { logAudit } from "../utils/audit";
+import { sendSuccess } from "../utils/response";
 
 import {
     ActionType,
@@ -10,105 +12,87 @@ import {
     OperationStatus,
     OperationType
 } from "./dto/operationDto";
-import {createOperation, getOperation, updateOperationStatus} from "./dynamoService";
-import {sendOperationToQueue} from "./sqsService";
+import { idempotencyService } from "./IdempotencyService";
+import { sendOperationToQueue } from "./sqsService";
 
+export class OperationCommandService {
+    async createHealthCheckOperation(req: Request, res: Response) {
+        return idempotencyService.execute(
+            req,
+            res,
+            "operation:health-check",
+            req.body,
+            async () => {
+                const operationId = uuidv4();
+                const operation: Operation = {
+                    operationId,
+                    timestamp: new Date().toISOString(),
+                    status: OperationStatus.PENDING,
+                    type: OperationType.HEALTH_CHECK
+                };
 
-export class OperationService {
+                try {
+                    await operationRepository.create(operation);
+                    await sendOperationToQueue({
+                        operationId,
+                        type: operation.type,
+                        payload: {
+                            timestamp: operation.timestamp,
+                        }
+                    });
 
-    async createOper(req: Request, res: Response) {
-        const operationId = uuidv4();
-        const operation: Operation = {
-            operationId,
-            timestamp: new Date().toISOString(),
-            status: OperationStatus.PENDING,
-            type: OperationType.HEALTH_CHECK
-        }
-        try{
-            await createOperation(operation);
-        }catch(e){
-            const errorMessage = e instanceof Error ? e.message : "DynamoDB error";
+                    await logAudit({
+                        req,
+                        action: ActionType.OPERATION_CREATE,
+                        actorId: req.user?.userId,
+                        entityId: operationId,
+                        entityType: "Operation"
+                    });
 
-            await logAudit({
-                req,
-                action: ActionType.OPERATION_CREATE_FAILED,
-                actorId: undefined,
-                entityId: operationId,
-                entityType: 'Operation',
-                details: {reason: errorMessage}
-            });
-            throw new HttpError(500, errorMessage);
-        }
+                    return {
+                        body: {
+                            operationId,
+                            status: OperationStatus.PENDING,
+                        }
+                    };
+                } catch (e) {
+                    const errorMessage = e instanceof Error ? e.message : "Failed to create operation";
 
-        try{
-            await sendOperationToQueue({
-                operationId,
-                type: operation.type,
-                payload: {
-                    timestamp: operation.timestamp,
+                    await operationRepository.updateStatus(operationId, OperationStatus.FAILED, errorMessage);
+                    await logAudit({
+                        req,
+                        action: ActionType.OPERATION_CREATE_FAILED,
+                        actorId: req.user?.userId,
+                        entityId: operationId,
+                        entityType: "Operation",
+                        details: { reason: errorMessage }
+                    });
+
+                    throw new HttpError(500, errorMessage);
                 }
-            });
-        }catch(e){
-        await updateOperationStatus(operationId, OperationStatus.FAILED, "Failed to send command sqs");
-            await logAudit({
-                req,
-                action: ActionType.OPERATION_CREATE_FAILED,
-                actorId: undefined,
-                entityId: operationId,
-                entityType: 'Operation',
-                details: {reason: 'Sqs error'}
-            });
-            return res.status(500).json({
-                success: false,
-                data: {
-                    operationId: operationId,
-                    status: OperationStatus.FAILED,
-                    errorMessage: "Failed to send command sqs"
-                }
-            })
-        }
-        // //========= mock sqs ===============
-        // setTimeout(async () => {
-        //     await updateOperationStatus(operationId, OperationStatus.PROCESSING);
-        //
-        //     setTimeout(async () => {
-        //         await updateOperationStatus(operationId, OperationStatus.SUCCESS);
-        //     }, 10000);
-        //
-        // }, 10000);
-        // // =======================================
-        // await logAudit({
-        //     req,
-        //     action: ActionType.OPERATION_CREATE,
-        //     actorId: undefined,
-        //     entityId: operationId,
-        //     entityType: 'Operation'
-        // });
-
-        return res.status(200).json({
-            success: true,
-            data: {
-                operationId: operationId,
-                status: OperationStatus.PENDING
             }
-        })
+        );
     }
+}
 
+export class OperationReadService {
     async getOperationStatus(req: Request, res: Response) {
         let operation;
-        try{
-            operation = await getOperation(req.params.id as string);
-        }catch(e){
+
+        try {
+            operation = await operationRepository.findById(req.params.id as string);
+        } catch (e) {
             const errorMessage = e instanceof Error ? e.message : "DynamoDB error";
 
             await logAudit({
                 req,
                 action: ActionType.OPERATION_INFO_FAILED,
-                actorId: undefined,
+                actorId: req.user?.userId,
                 entityId: req.params.id as string,
-                entityType: 'Operation',
-                details: {reason: errorMessage},
+                entityType: "Operation",
+                details: { reason: errorMessage },
             });
+
             throw new HttpError(500, errorMessage);
         }
 
@@ -116,23 +100,25 @@ export class OperationService {
             await logAudit({
                 req,
                 action: ActionType.OPERATION_INFO_FAILED,
-                actorId: undefined,
+                actorId: req.user?.userId,
                 entityId: req.params.id as string,
-                entityType: 'Operation',
-                details: {reason: 'Not found'},
+                entityType: "Operation",
+                details: { reason: "Not found" },
             });
-            throw new HttpError(404, 'Operation not found');
+            throw new HttpError(404, "Operation not found");
         }
+
         await logAudit({
             req,
             action: ActionType.OPERATION_INFO,
-            actorId: undefined,
+            actorId: req.user?.userId,
             entityId: operation.operationId,
-            entityType: 'Operation'
+            entityType: "Operation"
         });
-        return res.status(200).json({success: true, data: operation});
-    }
 
+        return sendSuccess(res, operation);
+    }
 }
 
-export const operationsService = new OperationService();
+export const operationCommandService = new OperationCommandService();
+export const operationReadService = new OperationReadService();

@@ -1,300 +1,296 @@
-import {Response, Request} from "express";
+import { Request, Response } from "express";
+import { LockerStatus } from "@prisma/client";
 
-import {attachPricesToLockers} from "../utils/tools";
-import {HttpError} from "../errorHandler/HttpError";
-import {logAudit} from "../utils/audit";
+import { HttpError } from "../errorHandler/HttpError";
+import { lockerCacheRepository } from "../repositories/cache/LockerCacheRepository";
+import { lockerCatalogProjectionService } from "../repositories/prisma/LockerCatalogProjectionService";
+import { logAudit } from "../utils/audit";
+import { sendSuccess } from "../utils/response";
 
-import {prismaService} from "./prismaService";
-import {ActionType} from "./dto/operationDto";
-
+import { ActionType } from "./dto/operationDto";
+import { idempotencyService } from "./IdempotencyService";
+import {
+    deleteLockerProjection,
+    loadLockers,
+    loadOneLocker,
+    LockerQuery,
+    lockerMeta,
+    syncLockerProjection,
+    toLockerResponse,
+} from "./lockerBox/lockerBoxService.helpers";
+import { prismaService } from "./prismaService";
 
 export class LockerBoxServiceImplPostgres {
-
-    async getAllBoxes(req: Request, res: Response) {
-        const lockers = await prismaService.lockerBox.findMany({
-            where: {
-                isDeleted: false,
-                station: {
-                    isDeleted: false,
-                },
-            },
-            include: {
-                station: {
-                    select: {
-                        stationId: true,
-                        address: true,
-                        cityId: true,
-                        city: {
-                            select: {
-                                code: true,
-                                name: true,
-                                Pricing: true
-                            },
-                        },
-                    },
-                },
-            },
-        });
-
-        const result = await attachPricesToLockers(lockers);
-
-        return res.json(result);
+    async getAllBoxes(_req: Request, res: Response) {
+        const lockers = await lockerCatalogProjectionService.getAllLockersAdminView();
+        return sendSuccess(res, lockers);
     }
 
     async createBox(req: Request, res: Response) {
-        const {stationId, code, size} = req.body;
+        return idempotencyService.execute(
+            req,
+            res,
+            "locker:create",
+            req.body,
+            async () => {
+                const { stationId, code, size } = req.body as { stationId: string; code: string; size: "S" | "M" | "L" };
 
-        try{
-            const result = await prismaService.$transaction(async (tx) => {
-                const stationExists = await tx.lockerStation.findFirst({
-                    where: {stationId, isDeleted: false},
-                })
-                if (!stationExists) {
-                    throw new HttpError(404, `Station not found`);
-                }
-                const boxExists = await tx.lockerBox.findFirst({
-                    where: {
-                        stationId,
-                        code,
-                    },
-                });
-                if (boxExists) {
-                    throw new HttpError(400, `Locker already exists`);
-                }
-                const box = await tx.lockerBox.create({
-                    data: {
-                        stationId,
-                        code,
-                        size,
-                    },
-                    select: {
-                        lockerBoxId: true,
-                        status: true,
-                        createdAt: true
+                try {
+                    const result = await prismaService.$transaction(async (tx) => {
+                        const stationExists = await tx.lockerStation.findFirst({ where: { stationId, isDeleted: false } });
+                        if (!stationExists) throw new HttpError(404, "Station not found");
+
+                        const boxExists = await tx.lockerBox.findFirst({ where: { stationId, code } });
+                        if (boxExists) throw new HttpError(400, "Locker already exists");
+
+                        const box = await tx.lockerBox.create({
+                            data: {
+                                stationId,
+                                code,
+                                size,
+                            },
+                            select: {
+                                lockerBoxId: true,
+                                stationId: true,
+                            },
+                        });
+
+                        return box;
+                    });
+
+                    const lockerProjection = await lockerCatalogProjectionService.getLockerCacheProjection(result.lockerBoxId);
+                    if (!lockerProjection) {
+                        throw new HttpError(500, "Failed to build locker cache projection after locker create");
                     }
-                });
 
-                return box;
-            });
+                    const lockerCacheStatus = await syncLockerProjection(lockerProjection);
+                    const stationCacheStatus = "DEFERRED" as const;
 
-            await logAudit({
-                req,
-                action: ActionType.LOCKER_CREATE,
-                actorId: req.user!.userId,
-                entityId: result.lockerBoxId,
-                entityType: 'LockerBox',
-            });
-            // ToDo DynamoDB
+                    await logAudit({
+                        req,
+                        action: ActionType.LOCKER_CREATE,
+                        actorId: req.user?.userId,
+                        entityId: result.lockerBoxId,
+                        entityType: "LockerBox",
+                    });
 
-            return res.status(200).json({id: result.lockerBoxId, stationId: stationId});
+                    return {
+                        body: { id: result.lockerBoxId, stationId: result.stationId },
+                        meta: lockerMeta(stationCacheStatus, lockerCacheStatus),
+                    };
+                } catch (e: unknown) {
+                    await logAudit({
+                        req,
+                        action: ActionType.LOCKER_CREATE_FAILED,
+                        actorId: req.user?.userId,
+                        entityId: stationId,
+                        entityType: "LockerBox",
+                        details: { reason: e instanceof Error ? e.message : "Unknown error" }
+                    });
 
-        }
-        catch(e: any){
-            await logAudit({
-                req,
-                action: ActionType.LOCKER_CREATE_FAILED,
-                actorId: req.user!.userId,
-                entityId: stationId,
-                entityType: 'LockerBox',
-                details: {reason: e.message}
-            });
-            if (e instanceof HttpError) {
-                throw e;
+                    if (e instanceof HttpError) {
+                        throw e;
+                    }
+
+                    throw new HttpError(500, "Failed to create locker");
+                }
             }
-            throw new HttpError(500, "Failed to create locker");
-        }
-
-
+        );
     }
 
     async getBoxes(req: Request, res: Response) {
         const stationId = req.query.stationId as string | undefined;
-        const size = req.query.size as "S" | "M" | "L" | undefined;
-        const status = req.query.status as
-            | "AVAILABLE"
-            | "RESERVED"
-            | "OCCUPIED"
-            | "FAULTY"
-            | "EXPIRED"
-            | undefined;
+        const size = req.query.size as LockerQuery["size"] | undefined;
+        const status = req.query.status as LockerQuery["status"] | undefined;
 
-        const lockers = await prismaService.lockerBox.findMany({
-            where: {
-                isDeleted: false,
-                ...(stationId && {stationId}),
-                ...(size && {size}),
-                ...(status && {status}),
-                station: {
-                    isDeleted: false,
-                    status: "ACTIVE"
-                },
-            },
-            include: {
-                station: {
-                    select: {
-                        stationId: true,
-                        address: true,
-                        cityId: true,
-                        city: {
-                            select: {
-                                code: true,
-                                name: true,
-                                Pricing: true
-                            },
-                        },
-                    },
-                },
-            }
-        });
+        const lockers = await loadLockers();
 
-        const result = await attachPricesToLockers(lockers);
+        const result = lockers
+            .filter((locker) => !stationId || locker.stationId === stationId)
+            .filter((locker) => !size || locker.size === size)
+            .filter((locker) => !status || locker.status === status)
+            .filter((locker) => locker.station.status === "ACTIVE")
+            .map(toLockerResponse);
 
-        return res.json(result);
+        return sendSuccess(res, result);
     }
 
     async getOneBox(req: Request, res: Response) {
         const lockerBoxId = req.params.id as string;
-        const locker = await prismaService.lockerBox.findUnique({
-            where: {
-                lockerBoxId,
-            },
-            include: {
-                station: {
-                    select: {
-                        stationId: true,
-                        address: true,
-                        cityId: true,
-                        city: {
-                            select: {
-                                code: true,
-                                name: true,
-                                Pricing: true
-                            },
-                        },
-                    },
-                },
-            }
-        });
+        const locker = await loadOneLocker(lockerBoxId);
+
         if (!locker) {
             throw new HttpError(404, "Locker doesn't exist");
         }
-        const [result] = await attachPricesToLockers([locker]);
-        return res.json(result);
+
+        return sendSuccess(res, toLockerResponse(locker));
+    }
+
+    async getOneBoxAdmin(req: Request, res: Response) {
+        const lockerBoxId = req.params.id as string;
+        const locker = await lockerCatalogProjectionService.getLockerCacheProjection(lockerBoxId);
+
+        if (!locker) {
+            throw new HttpError(404, "Locker doesn't exist");
+        }
+
+        return sendSuccess(res, locker);
     }
 
     async changeBoxStatus(req: Request, res: Response) {
-
         const lockerBoxId = req.params.id as string;
         const status = req.body.status;
 
-            try {
-                const result = await prismaService.$transaction(async (tx) => {
-                    const locker = await tx.lockerBox.findUnique({
-                        where: {lockerBoxId}
-                    })
-                    if (!locker) {
-                        throw new HttpError(404, "Locker doesn't exist");
+        return idempotencyService.execute(
+            req,
+            res,
+            `locker:status:${lockerBoxId}`,
+            req.body,
+            async () => {
+                try {
+                    const result = await prismaService.$transaction(async (tx) => {
+                        const locker = await tx.lockerBox.findUnique({ where: { lockerBoxId } });
+                        if (!locker) throw new HttpError(404, "Locker doesn't exist");
+                        if (locker.isDeleted) throw new HttpError(400, "Locker deleted");
+                        if (locker.status === status) throw new HttpError(400, "Locker is already " + status);
+
+                        const updatedLocker = await tx.lockerBox.update({
+                            where: { lockerBoxId, isDeleted: false },
+                            data: { status },
+                            select: {
+                                lockerBoxId: true,
+                                stationId: true,
+                            },
+                        });
+
+                        return updatedLocker;
+                    });
+
+                    const currentProjection = await lockerCatalogProjectionService.getLockerCacheProjection(lockerBoxId);
+                    if (!currentProjection) throw new HttpError(500, "Failed to build locker cache projection after status change");
+
+                    const nextProjection = {
+                        ...currentProjection,
+                        status: status as LockerStatus,
+                        version: currentProjection.version + 1,
+                        lastStatusChangedAt: new Date().toISOString(),
+                    };
+
+                    const lockerCacheStatus = await syncLockerProjection(nextProjection);
+                    const stationCacheStatus = "DEFERRED" as const;
+
+                    await logAudit({
+                        req,
+                        action: ActionType.LOCKER_UPDATE_STATUS,
+                        actorId: req.user?.userId,
+                        entityId: lockerBoxId,
+                        entityType: "LockerBox",
+                    });
+
+                    return {
+                        body: { lockerBoxId, stationId: result.stationId, status },
+                        meta: lockerMeta(stationCacheStatus, lockerCacheStatus),
+                    };
+                } catch (e: unknown) {
+                    await logAudit({
+                        req,
+                        action: ActionType.LOCKER_UPDATE_STATUS_FAILED,
+                        actorId: req.user?.userId,
+                        entityId: lockerBoxId,
+                        entityType: "LockerBox",
+                        details: { reason: e instanceof Error ? e.message : "Unknown error" }
+                    });
+
+                    if (e instanceof HttpError) {
+                        throw e;
                     }
-                    if (locker.isDeleted) {
-                        throw new HttpError(400, "Locker deleted");
-                    }
-                    if(locker.status === status) {
-                        throw new HttpError(400, "Locker is already " + status);
-                    }
 
-                    const updatedLocker = await tx.lockerBox.update({
-                    where: {
-                        lockerBoxId,
-                        isDeleted: false
-                    },
-                    data: {status}
-                });
-
-               return updatedLocker;
-                });
-
-                await logAudit({
-                    req,
-                    action: ActionType.LOCKER_UPDATE_STATUS,
-                    actorId: req.user!.userId,
-                    entityId: lockerBoxId,
-                    entityType: 'LockerBox',
-                });
-
-                //ToDo DynamoDB
-
-                return res.json(result);
-
-            } catch (e: any) {
-                await logAudit({
-                    req,
-                    action: ActionType.LOCKER_UPDATE_STATUS_FAILED,
-                    actorId: req.user!.userId,
-                    entityId: lockerBoxId,
-                    entityType: 'LockerBox',
-                    details: {reason: e.message}
-                });
-                if (e instanceof HttpError) {
-                    throw e;
+                    throw new HttpError(500, "Failed to update locker status");
                 }
-                throw new HttpError(500, "Failed to update locker status");
             }
+        );
     }
 
     async deleteBox(req: Request, res: Response) {
         const lockerBoxId = req.params.id as string;
 
-            try {
-                const result = await prismaService.$transaction(async (tx) => {
-                    const locker = await tx.lockerBox.findUnique({
-                        where: {lockerBoxId}
-                    })
-                    if (!locker) {
-                        throw new HttpError(404, "Locker doesn't exist");
-                    }
-                    if (locker.isDeleted) {
-                        throw new HttpError(400, "Locker already deleted");
-                    }
-                    const deleteLocker = await tx.lockerBox.update({
-                        where: {lockerBoxId},
-                        data: {
-                            isDeleted: true,
-                            deletedAt: new Date()
-                        }
+        return idempotencyService.execute(
+            req,
+            res,
+            `locker:delete:${lockerBoxId}`,
+            { lockerBoxId },
+            async () => {
+                try {
+                    const result = await prismaService.$transaction(async (tx) => {
+                        const locker = await tx.lockerBox.findUnique({ where: { lockerBoxId } });
+                        if (!locker) throw new HttpError(404, "Locker doesn't exist");
+                        if (locker.isDeleted) throw new HttpError(400, "Locker already deleted");
+
+                        const deletedLocker = await tx.lockerBox.update({
+                            where: { lockerBoxId },
+                            data: {
+                                isDeleted: true,
+                                deletedAt: new Date(),
+                            },
+                            select: {
+                                lockerBoxId: true,
+                                stationId: true,
+                            },
+                        });
+
+                        return deletedLocker;
                     });
 
-                    return deleteLocker;
-                });
+                    const currentProjection = await lockerCacheRepository.findById(lockerBoxId);
+                    const lockerCacheStatus = await deleteLockerProjection(lockerBoxId, currentProjection?.version);
+                    const stationCacheStatus = "DEFERRED" as const;
 
-                await logAudit({
-                    req,
-                    action: ActionType.LOCKER_DELETE,
-                    actorId: req.user!.userId,
-                    entityId: lockerBoxId,
-                    entityType: 'LockerBox',
-                });
+                    await logAudit({
+                        req,
+                        action: ActionType.LOCKER_DELETE,
+                        actorId: req.user?.userId,
+                        entityId: lockerBoxId,
+                        entityType: "LockerBox",
+                    });
 
-                //ToDo DynamoDB
+                    return {
+                        body: { message: "Locker deleted", lockerBoxId, stationId: result.stationId },
+                        meta: lockerMeta(stationCacheStatus, lockerCacheStatus),
+                    };
+                } catch (e: unknown) {
+                    await logAudit({
+                        req,
+                        action: ActionType.LOCKER_DELETE_FAILED,
+                        actorId: req.user?.userId,
+                        entityId: lockerBoxId,
+                        entityType: "LockerBox",
+                        details: { reason: e instanceof Error ? e.message : "Unknown error" }
+                    });
 
-                return res.json({message: "Locker deleted", result});
+                    if (e instanceof HttpError) {
+                        throw e;
+                    }
 
-            } catch (e: any) {
-                await logAudit({
-                    req,
-                    action: ActionType.LOCKER_DELETE_FAILED,
-                    actorId: req.user!.userId,
-                    entityId: lockerBoxId,
-                    entityType: 'LockerBox',
-                    details: {reason: e.message}
-                });
-                if (e instanceof HttpError) {
-                    throw e;
+                    throw new HttpError(500, "Failed to delete locker");
                 }
-                throw new HttpError(500, "Failed to delete locker");
             }
-
+        );
     }
 
+    async resyncLockerCache(req: Request, res: Response) {
+        const lockerBoxId = req.params.id as string;
+        const projection = await lockerCatalogProjectionService.getLockerCacheProjection(lockerBoxId);
+
+        if (!projection) {
+            throw new HttpError(404, "Locker not found");
+        }
+
+        const lockerCacheStatus = await syncLockerProjection(projection);
+
+        return sendSuccess(res, { lockerBoxId }, 202, {
+            lockerCacheStatus,
+        });
+    }
 }
 
 export const boxService = new LockerBoxServiceImplPostgres();

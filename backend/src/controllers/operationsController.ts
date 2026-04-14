@@ -1,11 +1,11 @@
 import {NextFunction, Request, Response} from "express";
 
-import {operationsService} from "../services/OperationService";
+import { operationCommandService, operationReadService } from "../services/OperationService";
 
 
 export const createOperation = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        return await operationsService.createOper(req,res);
+        return await operationCommandService.createHealthCheckOperation(req,res);
     } catch (e) {
         next(e);
     }
@@ -13,7 +13,7 @@ export const createOperation = async (req: Request, res: Response, next: NextFun
 
 export const getOperationStatus = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        return await operationsService.getOperationStatus(req,res);
+        return await operationReadService.getOperationStatus(req,res);
     } catch (e) {
         next(e);
     }

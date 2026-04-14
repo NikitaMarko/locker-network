@@ -27,17 +27,25 @@ lockersRoutes.get('/boxes', validateRequest(getLockersWithParamsSchema), lockerB
 lockersRoutes.get('/stations', validateRequest(getStationsWithParamsSchema), lockerStationController.getStations);
 
 lockersRoutes.use(auth.protect);
-// boxes routers
-lockersRoutes.get('/', authorize(Role.OPERATOR, Role.ADMIN), lockerBoxController.getAllBoxes);
-lockersRoutes.get('/boxes/:id', authorize(Role.OPERATOR, Role.ADMIN, Role.USER), validateRequest(oneLockerSchema), lockerBoxController.getOneBox);
-lockersRoutes.post('/boxes', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(createLockerSchema), lockerBoxController.createBox);
-lockersRoutes.patch('/boxes/:id/status', authorize(Role.OPERATOR,  Role.ADMIN), validateRequest(changeStatusLockerSchema), lockerBoxController.changeBoxStatus);
-lockersRoutes.patch('/boxes/:id/delete', authorize(Role.OPERATOR), validateRequest(oneLockerSchema), lockerBoxController.deleteBox);
 
+// user cache routes
+lockersRoutes.get('/boxes/:id', authorize(Role.USER), validateRequest(oneLockerSchema), lockerBoxController.getOneBox);
+lockersRoutes.get('/stations/:id', authorize(Role.USER), validateRequest(oneStationSchema), lockerStationController.getOneStation);
 
-// stations routers
-lockersRoutes.get('/stations/all', authorize(Role.OPERATOR,  Role.ADMIN), lockerStationController.getAllStation);
-lockersRoutes.get('/stations/:id', authorize(Role.OPERATOR, Role.ADMIN, Role.USER), validateRequest(oneStationSchema), lockerStationController.getOneStation);
-lockersRoutes.post('/stations', authorize(Role.OPERATOR,  Role.ADMIN), validateRequest(createStationSchema), lockerStationController.createStation);
-lockersRoutes.patch('/stations/:id/status', authorize(Role.OPERATOR,  Role.ADMIN), validateRequest(changeStatusStationSchema), lockerStationController.changeStationStatus);
-lockersRoutes.patch('/stations/:id/delete', authorize(Role.OPERATOR), validateRequest(oneStationSchema), lockerStationController.deleteStation);
+// admin/operator routes backed by RDS
+lockersRoutes.get('/admin/boxes', authorize(Role.OPERATOR, Role.ADMIN), lockerBoxController.getAllBoxes);
+lockersRoutes.get('/admin/boxes/:id', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(oneLockerSchema), lockerBoxController.getOneBoxAdmin);
+lockersRoutes.post('/admin/boxes', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(createLockerSchema), lockerBoxController.createBox);
+lockersRoutes.patch('/admin/boxes/:id/status', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(changeStatusLockerSchema), lockerBoxController.changeBoxStatus);
+lockersRoutes.post('/admin/boxes/:id/resync-cache', authorize(Role.ADMIN), validateRequest(oneLockerSchema), lockerBoxController.resyncLockerCache);
+
+lockersRoutes.get('/admin/stations', authorize(Role.OPERATOR, Role.ADMIN), lockerStationController.getAllStation);
+lockersRoutes.get('/admin/stations/:id', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(oneStationSchema), lockerStationController.getOneStationAdmin);
+lockersRoutes.post('/admin/stations', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(createStationSchema), lockerStationController.createStation);
+lockersRoutes.patch('/admin/stations/:id/status', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(changeStatusStationSchema), lockerStationController.changeStationStatus);
+lockersRoutes.post('/admin/stations/:id/resync-cache', authorize(Role.ADMIN), validateRequest(oneStationSchema), lockerStationController.resyncStationCache);
+lockersRoutes.post('/admin/cache/reconcile', authorize(Role.ADMIN), lockerStationController.reconcileCatalogCache);
+
+// operator-only routes
+lockersRoutes.patch('/oper/boxes/:id/delete', authorize(Role.OPERATOR), validateRequest(oneLockerSchema), lockerBoxController.deleteBox);
+lockersRoutes.patch('/oper/stations/:id/delete', authorize(Role.OPERATOR), validateRequest(oneStationSchema), lockerStationController.deleteStation);
