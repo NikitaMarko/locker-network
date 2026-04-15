@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { Paper, Box, Typography, Stack, Chip, Button } from "@mui/material";
 import LocationOnIcon from '@mui/icons-material/LocationOn';
-import {useStations} from "../../../hooks/useStations.ts";
+import {useLockers} from "../../../hooks/useLockers.ts";
 
 
 export function ActiveLockerCard({ locker }: { locker: any }) {
-    const { cancelBooking } = useStations();
+    const { cancelBooking } = useLockers();
     const [timeLeft, setTimeLeft] = useState("");
 
     useEffect(() => {

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { stationsApi } from "../api/stationsApi";
+import { lockersApi } from "../api/lockersApi";
 import type { Station, StationStatus } from "../types/lockers/lockers";
 
 interface ChangeStationStatusPayload {
@@ -14,12 +15,14 @@ interface CreateStationPayload {
     longitude: number;
 }
 
-export function useStations() {
+// ВЕРНУЛИ publicOnly, чтобы не было ошибки 403 у юзеров и гостей
+export function useStations(options?: { publicOnly?: boolean }) {
     const qc = useQueryClient();
+    const isPublic = options?.publicOnly;
 
     const query = useQuery<Station[]>({
-        queryKey: ["stations"],
-        queryFn: stationsApi.getAllStations
+        queryKey: ["stations", isPublic ? "active" : "all"], // Разделяем кэш
+        queryFn: isPublic ? stationsApi.getActiveStations : stationsApi.getAllStations,
     });
 
     const invalidateAll = () => {
@@ -27,6 +30,7 @@ export function useStations() {
         qc.invalidateQueries({ queryKey: ["station-details"] });
         qc.invalidateQueries({ queryKey: ["operator-stations"] });
         qc.invalidateQueries({ queryKey: ["user-station"] });
+        qc.invalidateQueries({ queryKey: ["bookings-my"] });
     };
 
     // Создание станции
@@ -56,6 +60,17 @@ export function useStations() {
         onSuccess: invalidateAll
     });
 
+    // --- ВЕРНУЛИ ФУНКЦИИ БРОНИРОВАНИЯ ---
+    const book = useMutation({
+        mutationFn: (lockerBoxId: string) => lockersApi.updateLockerStatus(lockerBoxId, "RESERVED"),
+        onSuccess: invalidateAll,
+    });
+
+    const cancel = useMutation({
+        mutationFn: (lockerBoxId: string) => lockersApi.updateLockerStatus(lockerBoxId, "AVAILABLE"),
+        onSuccess: invalidateAll,
+    });
+
     return {
         stations: query.data ?? [],
         isLoading: query.isLoading,
@@ -64,6 +79,9 @@ export function useStations() {
         deleteStation: remove.mutate,
         changeStationStatus: changeStatus.mutate,
         addLocker: addLocker.mutateAsync,
+
+        bookLockerAsync: book.mutateAsync,
+        cancelBooking: cancel.mutate,
 
         refresh: invalidateAll
     };

@@ -42,6 +42,6 @@ export function useLockers() {
     return {
         changeLockerStatus: changeStatus.mutateAsync,
         reserveLocker: reserve.mutateAsync,
-        cancelReservation: cancel.mutateAsync
+        cancelBooking: cancel.mutateAsync
     };
 }

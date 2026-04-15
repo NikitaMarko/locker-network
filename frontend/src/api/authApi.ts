@@ -2,6 +2,8 @@ import { apiClient } from "./apiClient";
 import type { User } from "../types/user/user.ts";
 
 
+export type { User };
+
 export interface LoginResponse {
     accessToken: string;
 }
@@ -44,7 +46,6 @@ export async function googleLoginApi(idToken: string): Promise<LoginResponse> {
 export async function meApi(): Promise<User | null> {
     try {
         const res = await apiClient.get<MeResponse>("/auth/me");
-
         return res.data.data;
     } catch (error: any) {
         if (error.response?.status === 401) {
@@ -57,7 +58,6 @@ export async function meApi(): Promise<User | null> {
 export async function logoutApi(): Promise<void> {
     await apiClient.post("/auth/logout")
 }
-
 
 export async function refreshTokenRequest(): Promise<string> {
     const res = await apiClient.post<{ accessToken: string }>("/auth/refresh");

@@ -5,146 +5,138 @@
 
 import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
-import { loginApi, type LoginResponse, type User } from "../api/authApi";
+
+import { loginApi, meApi, type LoginResponse, type User } from "../api/authApi";
 
 // ============================================================
 // TYPE DEFINITIONS
 // ============================================================
 
-/** Authentication state structure */
 export interface AuthState {
-  user: User | null;
-  token: string | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  error: string | null;
+    user: User | null;
+    token: string | null;
+    isAuthenticated: boolean;
+    isLoading: boolean;
+    error: string | null;
 }
 
-/** Authentication actions */
 export interface AuthActions {
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
-  clearError: () => void;
-  initializeAuth: () => void;
+    login: (email: string, password: string) => Promise<void>;
+    logout: () => void;
+    clearError: () => void;
+    initializeAuth: () => void;
 }
 
-/** Combined auth store type */
 export type AuthStore = AuthState & AuthActions;
 
 // ============================================================
 // AUTH STORE IMPLEMENTATION
 // ============================================================
 
-/**
- * Creates the authentication store with Zustand
- * Handles login, logout, token management, and error states
- */
 export const useAuthStore = create<AuthStore>()(
-  devtools(
-    persist(
-      (set, get) => ({
-        // ─────────────────────────────────────────────────────
-        // State
-        // ─────────────────────────────────────────────────────
-        user: null,
-        token: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: null,
+    devtools(
+        persist(
+            (set, get) => ({
+                // State
+                user: null,
+                token: null,
+                isAuthenticated: false,
+                isLoading: false,
+                error: null,
 
-        // ─────────────────────────────────────────────────────
-        // Actions
-        // ─────────────────────────────────────────────────────
+                // Actions
+                login: async (email: string, password: string) => {
+                    set({ isLoading: true, error: null });
 
-        /**
-         * Authenticates user and stores session
-         */
-        login: async (email: string, password: string) => {
-          set({ isLoading: true, error: null });
+                    try {
+                        // 1. Делаем логин и получаем ТОЛЬКО токен
+                        const response: LoginResponse = await loginApi(email, password);
 
-          try {
-            const response: LoginResponse = await loginApi(email, password);
+                        // 2. Сразу кладем токен в localStorage, чтобы apiClient мог его читать
+                        localStorage.setItem("access_token", response.accessToken);
 
-            set({
-              user: response.user,
-              token: response.token,
-              isAuthenticated: true,
-              isLoading: false,
-              error: null,
-            });
-          } catch (err) {
-            const errorMessage =
-              err instanceof Error ? err.message : "Login failed. Please try again.";
+                        // 3. Дергаем meApi, чтобы получить данные пользователя (роль, имя и т.д.)
+                        const user = await meApi();
 
-            set({
-              user: null,
-              token: null,
-              isAuthenticated: false,
-              isLoading: false,
-              error: errorMessage,
-            });
+                        if (!user) {
+                            throw new Error("Failed to fetch user data after login");
+                        }
 
-            throw new Error(errorMessage);
-          }
-        },
+                        set({
+                            user: user,
+                            token: response.accessToken,
+                            isAuthenticated: true,
+                            isLoading: false,
+                            error: null,
+                        });
+                    } catch (err) {
+                        const errorMessage =
+                            err instanceof Error ? err.message : "Login failed. Please try again.";
 
-        /**
-         * Clears authentication state on logout
-         */
-        logout: () => {
-          set({
-            user: null,
-            token: null,
-            isAuthenticated: false,
-            isLoading: false,
-            error: null,
-          });
-        },
+                        set({
+                            user: null,
+                            token: null,
+                            isAuthenticated: false,
+                            isLoading: false,
+                            error: errorMessage,
+                        });
 
-        /**
-         * Clears any error messages
-         */
-        clearError: () => {
-          set({ error: null });
-        },
+                        localStorage.removeItem("access_token");
 
-        /**
-         * Initializes auth state from stored session
-         * Called on app startup
-         */
-        initializeAuth: () => {
-          const state = get();
-          if (state.token && state.user) {
-            set({ isAuthenticated: true });
-          }
-        },
-      }),
-      {
-        name: "auth-storage", // LocalStorage key
-        partialize: (state) => ({
-          user: state.user,
-          token: state.token,
-          isAuthenticated: state.isAuthenticated,
-        }),
-      }
-    ),
-    { name: "AuthStore" }
-  )
+                        throw new Error(errorMessage);
+                    }
+                },
+
+                logout: () => {
+                    /**
+                     * Clears authentication state on logout
+                     */
+                    localStorage.removeItem("access_token");
+
+                    set({
+                        user: null,
+                        token: null,
+                        isAuthenticated: false,
+                        isLoading: false,
+                        error: null,
+                    });
+                },
+
+                clearError: () => {
+                    set({ error: null });
+                },
+
+                initializeAuth: () => {
+                    const state = get();
+                    if (state.token && state.user) {
+                        /** Select only the authentication status */
+                        localStorage.setItem("access_token", state.token);
+                        set({ isAuthenticated: true });
+                    }
+                },
+            }),
+            {
+                name: "auth-storage", // LocalStorage key для Zustand
+                partialize: (state) => ({
+                    user: state.user,
+                    token: state.token,
+                    isAuthenticated: state.isAuthenticated,
+                }),
+            }
+        ),
+        { name: "AuthStore" }
+    )
 );
 
 // ============================================================
-// SELECTOR HOOKS (Performance Optimization)
+// SELECTOR HOOKS
 // ============================================================
-
 /** Select only the authentication status */
 export const useIsAuthenticated = () =>
-  useAuthStore((state) => state.isAuthenticated);
-
+    useAuthStore((state) => state.isAuthenticated);
 /** Select the current user */
 export const useCurrentUser = () => useAuthStore((state) => state.user);
-
 /** Select loading state */
 export const useAuthLoading = () => useAuthStore((state) => state.isLoading);
-
 /** Select error message */
 export const useAuthError = () => useAuthStore((state) => state.error);
