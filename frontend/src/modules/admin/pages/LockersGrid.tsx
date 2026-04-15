@@ -1,12 +1,39 @@
 import React from 'react';
+import Grid from '@mui/material/GridLegacy';
+import { Paper, Typography, Box, Chip, Skeleton } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import { Grid, Paper, Typography, Box, Chip, Skeleton } from '@mui/material';
 import { lockersApi } from '../../../api/lockersApi';
-import type { LockerBox } from '../../../types/lockers/lockers.ts';
+import type { LockerBox, LockerStatus } from '../../../types/lockers/lockers';
 
 interface LockersGridProps {
     stationId: string;
 }
+
+const getBorderColor = (status: LockerStatus): string => {
+    switch (status) {
+        case 'AVAILABLE':
+            return '#4caf50';
+        case 'RESERVED':
+        case 'OCCUPIED':
+            return '#ffa726';
+        case 'MAINTENANCE':
+            return '#ef4444';
+        default:
+            return '#e0e0e0';
+    }
+};
+
+const getChipColor = (status: LockerStatus): 'success' | 'warning' | 'default' => {
+    switch (status) {
+        case 'AVAILABLE':
+            return 'success';
+        case 'RESERVED':
+        case 'OCCUPIED':
+            return 'warning';
+        default:
+            return 'default';
+    }
+};
 
 const LockersGrid: React.FC<LockersGridProps> = ({ stationId }) => {
     const { data: lockers = [], isLoading } = useQuery<LockerBox[]>({
@@ -21,7 +48,7 @@ const LockersGrid: React.FC<LockersGridProps> = ({ stationId }) => {
         return (
             <Grid container spacing={2}>
                 {[1, 2, 3, 4].map((i) => (
-                    <Grid size={{ xs: 6, sm: 4, md: 3 }} key={i}>
+                    <Grid item xs={6} sm={4} md={3} key={i}>
                         <Skeleton variant="rectangular" height={100} sx={{ borderRadius: 2 }} />
                     </Grid>
                 ))}
@@ -32,7 +59,7 @@ const LockersGrid: React.FC<LockersGridProps> = ({ stationId }) => {
     return (
         <Grid container spacing={2}>
             {lockers.map((locker) => (
-                <Grid size={{ xs: 6, sm: 4, md: 3 }} key={locker.lockerBoxId}>
+                <Grid item xs={6} sm={4} md={3} key={locker.lockerBoxId}>
                     <Paper
                         elevation={0}
                         sx={{
@@ -40,25 +67,37 @@ const LockersGrid: React.FC<LockersGridProps> = ({ stationId }) => {
                             textAlign: 'center',
                             border: '1px solid #e0e0e0',
                             borderRadius: 2,
-                            borderTop: `4px solid ${locker.status === 'AVAILABLE' ? '#4caf50' : '#ffa726'}`
+                            borderTop: `4px solid ${getBorderColor(locker.status)}`
                         }}
                     >
                         <Typography variant="h6" fontWeight={700}>#{locker.code}</Typography>
                         <Typography variant="body2" color="text.secondary">Size: {locker.size}</Typography>
+
                         <Box mt={1}>
                             <Chip
                                 label={locker.status}
                                 size="small"
                                 variant="outlined"
-                                color={locker.status === 'AVAILABLE' ? 'success' : 'warning'}
+                                color={getChipColor(locker.status)}
                             />
                         </Box>
                     </Paper>
                 </Grid>
             ))}
+
             {lockers.length === 0 && (
-                <Box sx={{ p: 4, width: '100%', textAlign: 'center', bgcolor: '#f9f9f9', borderRadius: 2 }}>
-                    <Typography color="text.secondary">No boxes configured for this station yet.</Typography>
+                <Box
+                    sx={{
+                        p: 4,
+                        width: '100%',
+                        textAlign: 'center',
+                        bgcolor: '#f9f9f9',
+                        borderRadius: 2
+                    }}
+                >
+                    <Typography color="text.secondary">
+                        No boxes configured for this station yet.
+                    </Typography>
                 </Box>
             )}
         </Grid>

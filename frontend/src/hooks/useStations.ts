@@ -1,73 +1,70 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { stationsApi } from "../api/stationsApi";
-import { lockersApi } from "../api/lockersApi";
-import type { Station, StationStatus } from "../types/lockers/lockers.ts";
+import type { Station, StationStatus } from "../types/lockers/lockers";
+
+interface ChangeStationStatusPayload {
+    id: string;
+    status: StationStatus;
+}
+
+interface CreateStationPayload {
+    city: string;
+    address: string;
+    latitude: number;
+    longitude: number;
+}
 
 export function useStations() {
     const qc = useQueryClient();
 
-
     const query = useQuery<Station[]>({
         queryKey: ["stations"],
-        queryFn: stationsApi.getAllStations,
+        queryFn: stationsApi.getAllStations
     });
 
-    const invalidate = () => qc.invalidateQueries({ queryKey: ["stations"] });
+    const invalidateAll = () => {
+        qc.invalidateQueries({ queryKey: ["stations"] });
+        qc.invalidateQueries({ queryKey: ["station-details"] });
+        qc.invalidateQueries({ queryKey: ["operator-stations"] });
+        qc.invalidateQueries({ queryKey: ["user-station"] });
+    };
 
-
+    // Создание станции
     const create = useMutation({
-        mutationFn: async (payload: { city: string; address: string; latitude: number; longitude: number }) => {
-            const response = await stationsApi.createStation(payload);
-            return response;
-        },
-        onSuccess: invalidate,
+        mutationFn: (payload: CreateStationPayload) =>
+            stationsApi.createStation(payload),
+        onSuccess: invalidateAll
     });
 
+    // Удаление станции
     const remove = useMutation({
         mutationFn: (id: string) => stationsApi.deleteStation(id),
-        onSuccess: invalidate,
+        onSuccess: invalidateAll
     });
 
-    const updateStatus = useMutation({
-        mutationFn: ({ id, status }: { id: string; status: StationStatus }) =>
+    // Смена статуса станции
+    const changeStatus = useMutation({
+        mutationFn: ({ id, status }: ChangeStationStatusPayload) =>
             stationsApi.updateStationStatus(id, status),
-        onSuccess: invalidate,
+        onSuccess: invalidateAll
     });
 
-
-    const book = useMutation({
-        mutationFn: (lockerBoxId: string) => lockersApi.updateLockerStatus(lockerBoxId, "RESERVED"),
-        onSuccess: () => {
-            invalidate();
-            qc.invalidateQueries({ queryKey: ["bookings-my"] });
-        },
-    });
-
-
-    const cancel = useMutation({
-        mutationFn: (lockerBoxId: string) => lockersApi.updateLockerStatus(lockerBoxId, "AVAILABLE"),
-        onSuccess: () => {
-            invalidate();
-            qc.invalidateQueries({ queryKey: ["bookings-my"] });
-        },
-    });
-
-    const addLockerMutation = useMutation({
-        mutationFn: (payload: { stationId: string; code: string; size: 'S' | 'M' | 'L' }) =>
+    // Добавление бокса к станции
+    const addLocker = useMutation({
+        mutationFn: (payload: { stationId: string; code: string; size: "S" | "M" | "L" }) =>
             stationsApi.addLocker(payload),
-        onSuccess: () => qc.invalidateQueries({ queryKey: ["station-details"] }),
+        onSuccess: invalidateAll
     });
 
     return {
         stations: query.data ?? [],
-        lockers: query.data?.flatMap(s => s.lockers || []) || [],
         isLoading: query.isLoading,
-        deleteStation: remove.mutate,
+
         createStation: create.mutateAsync,
-        updateStatus: updateStatus.mutate,
-        bookLockerAsync: book.mutateAsync,
-        cancelBooking: cancel.mutate,
-        addLocker: addLockerMutation.mutateAsync,
-        refresh: invalidate
+        deleteStation: remove.mutate,
+        changeStationStatus: changeStatus.mutate,
+        addLocker: addLocker.mutateAsync,
+
+        refresh: invalidateAll
     };
 }

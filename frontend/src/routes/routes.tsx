@@ -24,6 +24,9 @@ import { StationDetailsPage } from "../modules/user/pages/StationDetailsPage.tsx
 import { Info } from "../modules/shared/pages/Info.tsx";
 import { Price } from "../modules/shared/pages/Price.tsx";
 import {Paths} from "../config/paths/paths.ts";
+import OperatorDashboardPage from "../modules/operator/pages/OperatorDashboardPage.tsx";
+import OperatorStationsPage from "../modules/operator/pages/OperatorStationsPage.tsx";
+import OperatorStationDetailsPage from "../modules/operator/pages/OperatorStationDetailsPage.tsx";
 
 export function AppRoutes() {
     return (
@@ -69,8 +72,9 @@ export function AppRoutes() {
                 }
             >
 
-                <Route index element={<AdminDashboard />} />
-                <Route path="stations/:stationId" element={<StationDetails />} />
+                <Route index element={<OperatorDashboardPage />} />
+                <Route path="stations" element={<OperatorStationsPage />} />
+                <Route path="stations/:stationId" element={<OperatorStationDetailsPage />} />
                 </Route>
 
             {/* ================= USER ================= */}

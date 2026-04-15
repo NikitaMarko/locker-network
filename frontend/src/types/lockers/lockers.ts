@@ -1,6 +1,6 @@
 
-export type StationStatus = 'ACTIVE' | 'INACTIVE';
-export type LockerStatus = 'AVAILABLE' | 'RESERVED' | 'OCCUPIED' | 'MAINTENANCE';
+export type StationStatus = 'ACTIVE' | 'INACTIVE'| 'READY'| 'MAINTENANCE';
+export type LockerStatus = 'INACTIVE'|'AVAILABLE' | 'RESERVED'|'READY' | 'OCCUPIED' | 'MAINTENANCE';
 export type LockerSize = 'S' | 'M' | 'L' | 'XL';
 
 
