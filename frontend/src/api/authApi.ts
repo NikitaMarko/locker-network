@@ -55,5 +55,11 @@ export async function meApi(): Promise<User | null> {
 }
 
 export async function logoutApi(): Promise<void> {
-    await apiClient.post("/auth/logout").catch(() => {});
+    await apiClient.post("/auth/logout")
+}
+
+
+export async function refreshTokenRequest(): Promise<string> {
+    const res = await apiClient.post<{ accessToken: string }>("/auth/refresh");
+    return res.data.accessToken;
 }

@@ -35,7 +35,7 @@ export default function DashboardLayout() {
 
     const handleLogout = () => {
         logout();
-        navigate(Paths.LOGIN);
+        navigate(Paths.HOME);
     };
 
 
@@ -43,17 +43,32 @@ export default function DashboardLayout() {
         if (user?.role === ROLES.USER) {
             return [
                 { text: 'Find Locker', path: Paths.USER, icon: <DashboardIcon /> },
-                { text: 'My Bookings', path: `${Paths.USER}/my-bookings`, icon: <NotificationsIcon /> }
+                { text: 'My Bookings', path: `${Paths.USER}/my-bookings`, icon: <NotificationsIcon /> },
             ];
         }
 
 
         const dashboardPath = user?.role === ROLES.ADMIN ? Paths.ADMIN : Paths.OPERATOR;
-        return [
-            { text: 'Operator Panel', path: dashboardPath, icon: <DashboardIcon /> },
 
-            { text: 'Active Alerts', path: '#', icon: <NotificationsIcon /> }
-        ];
+        if(user?.role === ROLES.OPERATOR){
+            return [
+                { text: 'Operator Panel', path: dashboardPath, icon: <DashboardIcon /> },
+
+                { text: 'Active Alerts', path: '#', icon: <NotificationsIcon /> },
+
+            ];
+        }
+
+        if(user?.role === ROLES.ADMIN){
+            return [
+                { text: 'Operator Panel', path: dashboardPath, icon: <DashboardIcon /> },
+
+                { text: 'Users', path: dashboardPath+"/users", icon: <DashboardIcon /> },
+
+            ];
+        }
+
+
     };
 
     const drawerContent = (
