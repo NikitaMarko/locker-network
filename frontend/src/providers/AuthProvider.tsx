@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { User } from "../types/user/user.ts";
 import { AuthContext } from "./AuthContext";
-import { googleLoginApi, loginApi, registerApi, meApi } from "../api/authApi";
+import {googleLoginApi, loginApi, registerApi, meApi, logoutApi} from "../api/authApi";
 import { BLOCK_TIME, MAX_ATTEMPTS } from "../config/constants/constants.ts";
 
 interface AuthProviderProps {
@@ -23,7 +23,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 setLoading(false);
                 return;
             }
-
             try {
                 const currentUser = await meApi();
                 setUser(currentUser);
@@ -94,9 +93,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return currentUser;
     };
 
-    const logout = () => {
-        localStorage.removeItem("access_token");
-        setUser(null);
+    const logout = async () => {
+        try{
+            await logoutApi();
+        }catch (err){
+            // логируем
+        }finally {
+            localStorage.removeItem("access_token");
+            setUser(null);
+        }
     };
 
     return (
