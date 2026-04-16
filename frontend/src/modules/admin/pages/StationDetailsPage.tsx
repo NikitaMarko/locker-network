@@ -36,7 +36,7 @@ export default function StationDetailsPage() {
 
     const { data: station, isLoading } = useQuery<LockerStation>({
         queryKey: ["station-details", stationId],
-        queryFn: () => stationsApi.getStationById(stationId!),
+        queryFn: () => stationsApi.getAdminStationById(stationId!),
         enabled: !!stationId
     });
 

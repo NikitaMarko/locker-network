@@ -56,5 +56,11 @@ export const stationsApi = {
     deleteStation: async (id: string): Promise<any> => {
         const { data } = await apiClient.patch<ApiResponse<any>>(`/lockers/oper/stations/${id}/delete`);
         return data.data;
-    }
+    },
+// ADMIN
+    getAdminStationById: async (id: string): Promise<LockerStation> => {
+        const { data } = await apiClient.get<ApiResponse<LockerStation>>(`/lockers/admin/stations/${id}`);
+        return data.data;
+    },
+
 };
