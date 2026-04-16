@@ -1,53 +1,50 @@
-// ─── SQS message from backend ───
-export interface CacheProjectionEvent {
+export type CacheEntityType = 'locker_cache';
+export type CacheEventType = 'UPSERT' | 'DELETE';
+export type LockerSize = 'S' | 'M' | 'L';
+export type LockerStatus =
+  | 'AVAILABLE'
+  | 'RESERVED'
+  | 'OCCUPIED'
+  | 'FAULTY'
+  | 'EXPIRED';
+
+export type StationStatus = 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE';
+
+export interface CacheProjectionEnvelope {
   eventId: string;
   schemaVersion: number;
   correlationId: string;
   occurredAt: string;
   actorId: string | null;
-  entityType: 'station_cache' | 'locker_cache';
   entityId: string;
-  eventType: 'UPSERT' | 'DELETE';
+  eventType: CacheEventType;
   projectionVersion: number;
-  payload: StationCachePayload | LockerCachePayload;
 }
- 
-// ─── Station cache projection ───
-export interface StationCachePayload {
-  stationId: string;
-  cityId: string;
-  address: string | null;
-  latitude: number;
-  longitude: number;
-  status: string;
-  version: number;
-  availableLockers: number;
-  city: {
-    code: string;
-    name: string;
-  };
-  lockers: unknown[];
-}
- 
+
 // ─── Locker cache projection ───
 export interface LockerCachePayload {
   lockerBoxId: string;
   stationId: string;
   code: string;
-  size: string;
-  status: string;
+  size: LockerSize;
+  status: LockerStatus;
   version: number;
   lastStatusChangedAt: string;
-  pricePerHour: string;
+  pricePerHour: string | null;
   station: {
     address: string | null;
     latitude: number;
     longitude: number;
-    status: string;
+    status: StationStatus;
     city: {
       code: string;
       name: string;
     };
   };
 }
- 
+
+// ─── Combined event type ───
+export type CacheProjectionEvent = CacheProjectionEnvelope & {
+  entityType: 'locker_cache';
+  payload: LockerCachePayload;
+};

@@ -93,19 +93,6 @@ Resources:
       VisibilityTimeout: 60
       MessageRetentionPeriod: 86400
  
-  # ── Station Cache DynamoDB Table ──
-  StationCacheTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: !Sub locker-${Environment}-station-cache
-      AttributeDefinitions:
-        - AttributeName: stationId
-          AttributeType: S
-      KeySchema:
-        - AttributeName: stationId
-          KeyType: HASH
-      BillingMode: PAY_PER_REQUEST
- 
   # ── Locker Cache DynamoDB Table ──
   LockerCacheTable:
     Type: AWS::DynamoDB::Table
@@ -128,14 +115,11 @@ Resources:
       FunctionName: !Sub locker-${Environment}-cache-projection-handler
       Handler: dist/functions/cache/cacheProjectionHandler.handler
       CodeUri: .
-      Description: Processes cache projection events from SQS
+      Description: Processes locker cache projection events from SQS
       Environment:
         Variables:
-          STATION_CACHE_TABLE: !Ref StationCacheTable
           LOCKER_CACHE_TABLE: !Ref LockerCacheTable
       Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Ref StationCacheTable
         - DynamoDBCrudPolicy:
             TableName: !Ref LockerCacheTable
       Events:
@@ -144,7 +128,7 @@ Resources:
           Properties:
             Queue: !GetAtt CacheProjectionQueue.Arn
             BatchSize: 10
-
+ 
 Outputs:
   HealthCheckApi:
     Description: Health Check endpoint URL
@@ -164,9 +148,6 @@ Outputs:
   CacheProjectionQueueArn:
     Description: SQS ARN for cache projections
     Value: !GetAtt CacheProjectionQueue.Arn
-  StationCacheTableName:
-    Description: DynamoDB table for station cache
-    Value: !Ref StationCacheTable
   LockerCacheTableName:
     Description: DynamoDB table for locker cache
     Value: !Ref LockerCacheTable
