@@ -56,8 +56,30 @@ export function RegisterPage() {
     }
 
     return (
-        <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f8fafc', p: 2 }}>
+        <Box sx={{position: 'relative',  minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f8fafc', p: 2 }}>
+
             <Paper elevation={0} sx={{ p: { xs: 4, md: 5 }, width: '100%', maxWidth: 450, borderRadius: 4, border: '1px solid #e2e8f0' }}>
+                <Button
+                    onClick={() => navigate('/')}
+                    sx={{
+                        position: 'absolute',
+                        top: 20,
+                        left: 20,
+                        textTransform: 'none',
+                        color: '#64748b',
+                        fontWeight: 600,
+                        fontSize: '16px',
+                        padding: 0,
+                        minWidth: 'auto',
+                        '&:hover': {
+                            color: '#4CAF50',
+                            background: 'transparent'
+                        }
+                    }}
+                    disableRipple
+                >
+                    ← Back to Home
+                </Button>
                 <Typography variant="h4" fontWeight={800} textAlign="center" mb={4} color="#1e293b">
                     Create Account
                 </Typography>
