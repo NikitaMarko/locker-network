@@ -2,7 +2,7 @@ import { StationCacheDto, StationListItemDto } from "../../contracts/cache.dto";
 import { logger } from "../../Logger/winston";
 import { stationCacheRepository } from "../../repositories/cache/StationCacheRepository";
 import { lockerCatalogProjectionService } from "../../repositories/prisma/LockerCatalogProjectionService";
-import { enqueueLockerProjectionDelete, enqueueLockerProjectionUpsert } from "../cacheProjectionQueueService";
+import { enqueueLockerProjectionDelete, enqueueLockerProjectionUpsert } from "../sqsService";
 import { isRedisAccessError } from "../../utils/redisErrors";
 
 export type StationQuery = {

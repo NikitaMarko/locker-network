@@ -4,7 +4,7 @@ import { LockerCacheDto, StationCacheDto } from "../contracts/cache.dto";
 import { lockerCacheRepository } from "../repositories/cache/LockerCacheRepository";
 import { stationCacheRepository } from "../repositories/cache/StationCacheRepository";
 import { lockerCatalogProjectionService } from "../repositories/prisma/LockerCatalogProjectionService";
-import { enqueueLockerProjectionDelete, enqueueLockerProjectionUpsert } from "./cacheProjectionQueueService";
+import { enqueueLockerProjectionDelete, enqueueLockerProjectionUpsert } from "./sqsService";
 import { sendSuccess } from "../utils/response";
 import { isDynamoAccessError } from "../utils/awsErrors";
 import { isRedisAccessError } from "../utils/redisErrors";

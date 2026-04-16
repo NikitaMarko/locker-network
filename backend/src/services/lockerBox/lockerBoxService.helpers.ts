@@ -3,7 +3,7 @@ import { logger } from "../../Logger/winston";
 import { lockerCacheRepository } from "../../repositories/cache/LockerCacheRepository";
 import { lockerCatalogProjectionService } from "../../repositories/prisma/LockerCatalogProjectionService";
 import { isDynamoAccessError } from "../../utils/awsErrors";
-import { enqueueLockerProjectionDelete, enqueueLockerProjectionUpsert } from "../cacheProjectionQueueService";
+import { enqueueLockerProjectionDelete, enqueueLockerProjectionUpsert } from "../sqsService";
 
 export type LockerQuery = {
     stationId?: string;
