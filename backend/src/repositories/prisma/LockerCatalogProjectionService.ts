@@ -7,8 +7,11 @@ import {
     StationCacheLockerDto,
     StationListItemDto
 } from "../../contracts/cache.dto";
+import { logger } from "../../Logger/winston";
 import { lockerCacheRepository } from "../cache/LockerCacheRepository";
 import { prismaService } from "../../services/prismaService";
+import { isDynamoAccessError } from "../../utils/awsErrors";
+
 import { TransactionClient } from "./transactionClient";
 
 function decimalToString(value: Prisma.Decimal | null | undefined) {
@@ -35,6 +38,60 @@ function fallbackLockerState(locker: {
         version: locker.version,
         lastStatusChangedAt: locker.lastStatusChangedAt.toISOString(),
     };
+}
+
+async function loadCachedLockersByStationId(stationId: string, lockerCount: number) {
+    if (lockerCount === 0) {
+        return [];
+    }
+
+    try {
+        return await lockerCacheRepository.findByStationId(stationId);
+    } catch (error) {
+        if (!isDynamoAccessError(error)) {
+            throw error;
+        }
+
+        logger.warn("Locker cache Dynamo read failed while building station projection, falling back to RDS state", {
+            stationId,
+            error,
+        });
+
+        return [];
+    }
+}
+
+async function loadCachedLockerById(lockerBoxId: string) {
+    try {
+        return await lockerCacheRepository.findById(lockerBoxId);
+    } catch (error) {
+        if (!isDynamoAccessError(error)) {
+            throw error;
+        }
+
+        logger.warn("Locker cache Dynamo read failed while building locker projection, falling back to RDS state", {
+            lockerBoxId,
+            error,
+        });
+
+        return null;
+    }
+}
+
+async function loadAllCachedLockers() {
+    try {
+        return await lockerCacheRepository.findAll();
+    } catch (error) {
+        if (!isDynamoAccessError(error)) {
+            throw error;
+        }
+
+        logger.warn("Locker cache Dynamo full read failed while building catalog projections, falling back to RDS state", {
+            error,
+        });
+
+        return [];
+    }
 }
 
 interface ILockerCatalogProjectionService {
@@ -79,7 +136,7 @@ class LockerCatalogProjectionService implements ILockerCatalogProjectionService 
             }))
         );
 
-        const cachedLockers = await lockerCacheRepository.findByStationId(station.stationId);
+        const cachedLockers = await loadCachedLockersByStationId(station.stationId, station.lockers.length);
         const cachedLockersMap = new Map(cachedLockers.map((item) => [item.lockerBoxId, item]));
 
         const lockers: StationCacheLockerDto[] = station.lockers.map((locker) => ({
@@ -137,7 +194,7 @@ class LockerCatalogProjectionService implements ILockerCatalogProjectionService 
         }
 
         const priceItem = locker.station.city.Pricing.find((item) => item.size === locker.size);
-        const cachedLocker = await lockerCacheRepository.findById(lockerBoxId);
+        const cachedLocker = await loadCachedLockerById(lockerBoxId);
         const runtimeState = cachedLocker ?? fallbackLockerState(locker);
 
         return {
@@ -208,7 +265,7 @@ class LockerCatalogProjectionService implements ILockerCatalogProjectionService 
             }
         });
 
-        const cachedLockers = await lockerCacheRepository.findAll();
+        const cachedLockers = await loadAllCachedLockers();
         const cachedLockersMap = new Map(cachedLockers.map((item) => [item.lockerBoxId, item]));
 
         return lockers.map((locker) => {

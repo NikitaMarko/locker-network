@@ -1,4 +1,4 @@
-import { LockerCacheDto, StationCacheDto, StationListItemDto } from "../../contracts/cache.dto";
+import { StationCacheDto, StationListItemDto } from "../../contracts/cache.dto";
 import { logger } from "../../Logger/winston";
 import { lockerCacheRepository } from "../../repositories/cache/LockerCacheRepository";
 import { stationCacheRepository } from "../../repositories/cache/StationCacheRepository";
@@ -127,6 +127,20 @@ export async function syncStationProjection(projection: Parameters<typeof statio
     } catch (error) {
         logger.error("Station cache Redis upsert failed after DB commit", {
             stationId: projection.stationId,
+            error,
+        });
+        return "FAILED" as const;
+    }
+}
+
+export async function deleteStationProjection(stationId: string, version: number) {
+    try {
+        await stationCacheRepository.delete(stationId, version);
+        return "SYNCED" as const;
+    } catch (error) {
+        logger.error("Station cache Redis delete failed after DB commit", {
+            stationId,
+            version,
             error,
         });
         return "FAILED" as const;
