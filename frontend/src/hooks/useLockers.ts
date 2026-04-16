@@ -18,21 +18,21 @@ export function useLockers() {
         qc.invalidateQueries({ queryKey: ["bookings-my"] });
     };
 
-    // Универсальный метод смены статуса бокса
+    // Универсальная смена статуса бокса (используем для админа и оператора)
     const changeStatus = useMutation({
         mutationFn: ({ lockerBoxId, status }: ChangeLockerStatusPayload) =>
             lockersApi.updateLockerStatus(lockerBoxId, status),
         onSuccess: invalidateAll
     });
 
-    // Бронирование (AVAILABLE → RESERVED)
+    // Бронирование (AVAILABLE → RESERVED) — пользователь
     const reserve = useMutation({
         mutationFn: (lockerBoxId: string) =>
             lockersApi.updateLockerStatus(lockerBoxId, "RESERVED"),
         onSuccess: invalidateAll
     });
 
-    // Отмена брони (RESERVED → AVAILABLE)
+    // Отмена брони (RESERVED → AVAILABLE) — пользователь
     const cancel = useMutation({
         mutationFn: (lockerBoxId: string) =>
             lockersApi.updateLockerStatus(lockerBoxId, "AVAILABLE"),

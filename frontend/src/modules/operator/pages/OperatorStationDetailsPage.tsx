@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { stationsApi } from "../../../api/stationsApi";
 import { lockersApi } from "../../../api/lockersApi";
 
-import type { LockerBox, LockerStatus, LockerStation } from '../../../types/index';
+import type { LockerBox, LockerStatus, LockerStation } from "../../../types/index";
 import {
     Box,
     Typography,
@@ -12,7 +12,6 @@ import {
     Button
 } from "@mui/material";
 import Grid from "@mui/material/GridLegacy";
-
 
 const getChipColor = (status: LockerStatus): "success" | "warning" | "default" => {
     switch (status) {
@@ -28,7 +27,6 @@ const getChipColor = (status: LockerStatus): "success" | "warning" | "default" =
 
 export default function OperatorStationDetailsPage() {
     const { stationId } = useParams();
-
 
     const { data: station } = useQuery<LockerStation>({
         queryKey: ["operator-station", stationId],
@@ -73,7 +71,6 @@ export default function OperatorStationDetailsPage() {
                                 />
 
                                 <Box sx={{ mt: 2, display: "flex", gap: 1 }}>
-
                                     {locker.status === "INACTIVE" && (
                                         <Button
                                             size="small"
@@ -81,7 +78,7 @@ export default function OperatorStationDetailsPage() {
                                             onClick={() =>
                                                 handleLockerStatus(
                                                     locker.lockerBoxId,
-                                                    "READY" as LockerStatus
+                                                    "READY"
                                                 )
                                             }
                                         >
@@ -89,8 +86,7 @@ export default function OperatorStationDetailsPage() {
                                         </Button>
                                     )}
 
-
-                                    {locker.status === ("MAINTENANCE" as LockerStatus) && (
+                                    {locker.status === "MAINTENANCE" && (
                                         <Button
                                             size="small"
                                             variant="contained"
@@ -98,7 +94,7 @@ export default function OperatorStationDetailsPage() {
                                             onClick={() =>
                                                 handleLockerStatus(
                                                     locker.lockerBoxId,
-                                                    "READY" as LockerStatus
+                                                    "READY"
                                                 )
                                             }
                                         >

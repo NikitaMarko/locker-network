@@ -22,6 +22,7 @@ import { stationsApi } from '../../../api/stationsApi';
 import { useStations } from '../../../hooks/useStations';
 import { useAuth } from '../../../hooks/useAuth';
 import { ROLES } from '../../../config/roles/roles';
+import { useLockers } from '../../../hooks/useLockers';
 
 import type { LockerStatus, LockerStation } from '../../../types/index';
 
@@ -30,9 +31,10 @@ export default function StationDetailsPage() {
     const navigate = useNavigate();
     const { user } = useAuth();
     const { addLocker } = useStations();
+    const { changeLockerStatus } = useLockers();
+
     const [open, setOpen] = useState(false);
     const [lockerData, setLockerData] = useState({ code: '', size: 'M' as 'S' | 'M' | 'L' });
-
 
     const { data: station, isLoading } = useQuery<LockerStation>({
         queryKey: ["station-details", stationId],
@@ -114,8 +116,43 @@ export default function StationDetailsPage() {
                                 label={locker.status}
                                 size="small"
                                 color={getChipColor(locker.status)}
-                                sx={{ fontWeight: 700 }}
+                                sx={{ fontWeight: 700, mb: 1 }}
                             />
+
+                            {user?.role === ROLES.ADMIN && (
+                                <Box sx={{ mt: 1, display: 'flex', gap: 1, justifyContent: 'center' }}>
+                                    {locker.status === "READY" && (
+                                        <Button
+                                            size="small"
+                                            variant="contained"
+                                            onClick={() =>
+                                                changeLockerStatus({
+                                                    lockerBoxId: locker.lockerBoxId,
+                                                    status: "ACTIVE"
+                                                })
+                                            }
+                                        >
+                                            Activate
+                                        </Button>
+                                    )}
+
+                                    {locker.status === "ACTIVE" && (
+                                        <Button
+                                            size="small"
+                                            variant="contained"
+                                            color="error"
+                                            onClick={() =>
+                                                changeLockerStatus({
+                                                    lockerBoxId: locker.lockerBoxId,
+                                                    status: "MAINTENANCE"
+                                                })
+                                            }
+                                        >
+                                            Maintenance
+                                        </Button>
+                                    )}
+                                </Box>
+                            )}
                         </Paper>
                     </Grid>
                 ))}
