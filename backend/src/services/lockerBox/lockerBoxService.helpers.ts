@@ -1,6 +1,9 @@
 import { LockerCacheDto, LockerResponseDto } from "../../contracts/cache.dto";
 import { logger } from "../../Logger/winston";
 import { lockerCacheRepository } from "../../repositories/cache/LockerCacheRepository";
+import { lockerCatalogProjectionService } from "../../repositories/prisma/LockerCatalogProjectionService";
+import { isDynamoAccessError } from "../../utils/awsErrors";
+import { enqueueLockerProjectionDelete, enqueueLockerProjectionUpsert } from "../cacheProjectionQueueService";
 
 export type LockerQuery = {
     stationId?: string;
@@ -9,7 +12,7 @@ export type LockerQuery = {
 };
 
 export type StationCacheStatus = "SYNCED" | "FAILED" | "DEFERRED";
-export type LockerCacheStatus = "SYNCED" | "FAILED";
+export type LockerCacheStatus = "DEFERRED" | "FAILED";
 
 export function toLockerResponse(locker: LockerCacheDto): LockerResponseDto {
     return {
@@ -37,12 +40,16 @@ export function lockerMeta(stationCacheStatus: StationCacheStatus, lockerCacheSt
     };
 }
 
-export async function syncLockerProjection(projection: Parameters<typeof lockerCacheRepository.upsert>[0]) {
+export async function syncLockerProjection(
+    projection: Parameters<typeof lockerCacheRepository.upsert>[0],
+    correlationId?: string,
+    actorId?: string | null
+) {
     try {
-        await lockerCacheRepository.upsert(projection);
-        return "SYNCED" as const;
+        await enqueueLockerProjectionUpsert(projection, correlationId, actorId);
+        return "DEFERRED" as const;
     } catch (error) {
-        logger.error("Locker cache Dynamo upsert failed", {
+        logger.error("Locker cache projection enqueue failed", {
             lockerBoxId: projection.lockerBoxId,
             error,
         });
@@ -50,12 +57,12 @@ export async function syncLockerProjection(projection: Parameters<typeof lockerC
     }
 }
 
-export async function deleteLockerProjection(lockerBoxId: string, version?: number) {
+export async function deleteLockerProjection(lockerBoxId: string, version?: number, correlationId?: string, actorId?: string | null) {
     try {
-        await lockerCacheRepository.delete(lockerBoxId, version);
-        return "SYNCED" as const;
+        await enqueueLockerProjectionDelete(lockerBoxId, version, correlationId, actorId);
+        return "DEFERRED" as const;
     } catch (error) {
-        logger.error("Locker cache Dynamo delete failed", {
+        logger.error("Locker cache projection delete enqueue failed", {
             lockerBoxId,
             version,
             error,
@@ -65,9 +72,35 @@ export async function deleteLockerProjection(lockerBoxId: string, version?: numb
 }
 
 export async function loadLockers() {
-    return lockerCacheRepository.findAll();
+    try {
+        const cachedLockers = await lockerCacheRepository.findAll();
+        if (cachedLockers.length > 0) {
+            return cachedLockers;
+        }
+
+        return lockerCatalogProjectionService.getAllLockerCacheProjections();
+    } catch (error) {
+        if (!isDynamoAccessError(error)) {
+            throw error;
+        }
+
+        return lockerCatalogProjectionService.getAllLockerCacheProjections();
+    }
 }
 
 export async function loadOneLocker(lockerBoxId: string) {
-    return lockerCacheRepository.findById(lockerBoxId);
+    try {
+        const cachedLocker = await lockerCacheRepository.findById(lockerBoxId);
+        if (cachedLocker) {
+            return cachedLocker;
+        }
+
+        return lockerCatalogProjectionService.getLockerCacheProjection(lockerBoxId);
+    } catch (error) {
+        if (!isDynamoAccessError(error)) {
+            throw error;
+        }
+
+        return lockerCatalogProjectionService.getLockerCacheProjection(lockerBoxId);
+    }
 }

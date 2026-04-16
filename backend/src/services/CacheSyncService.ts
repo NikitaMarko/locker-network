@@ -4,6 +4,7 @@ import { LockerCacheDto, StationCacheDto } from "../contracts/cache.dto";
 import { lockerCacheRepository } from "../repositories/cache/LockerCacheRepository";
 import { stationCacheRepository } from "../repositories/cache/StationCacheRepository";
 import { lockerCatalogProjectionService } from "../repositories/prisma/LockerCatalogProjectionService";
+import { enqueueLockerProjectionDelete, enqueueLockerProjectionUpsert } from "./cacheProjectionQueueService";
 import { sendSuccess } from "../utils/response";
 import { isDynamoAccessError } from "../utils/awsErrors";
 import { isRedisAccessError } from "../utils/redisErrors";
@@ -112,8 +113,12 @@ export class CacheSyncService {
             : [];
 
         const lockerResults = await Promise.allSettled([
-            ...lockerCandidates.map((projection) => lockerCacheRepository.upsert(projection)),
-            ...lockerDeleteCandidates.map(({ lockerBoxId, version }) => lockerCacheRepository.delete(lockerBoxId, version)),
+            ...lockerCandidates.map((projection) =>
+                enqueueLockerProjectionUpsert(projection, req.correlationId, req.user?.userId)
+            ),
+            ...lockerDeleteCandidates.map(({ lockerBoxId, version }) =>
+                enqueueLockerProjectionDelete(lockerBoxId, version, req.correlationId, req.user?.userId)
+            ),
         ]);
 
         const stationResults = await Promise.allSettled([
@@ -132,14 +137,24 @@ export class CacheSyncService {
         }
 
         const lockerCacheStatus = lockerResults.every((result) => result.status === "fulfilled")
-            ? "SYNCED"
+            ? "DEFERRED"
             : "FAILED";
 
         if (lockerCacheStatus === "FAILED") {
-            logger.error("Locker cache reconcile finished with Dynamo write failures", {
+            logger.error("Locker cache reconcile finished with queue enqueue failures", {
                 failedCount: lockerResults.filter((result) => result.status === "rejected").length,
             });
         }
+
+        logger.info("Catalog cache reconcile executed in backend queue mode for locker projections", {
+            actorId: req.user?.userId,
+            stationProjectionCount: stationProjections.length,
+            cachedStationCount: cachedStations.length,
+            lockerProjectionCount: lockerProjections.length,
+            cachedLockerCount: cachedLockers.length,
+            stationDriftCount: stationCandidates.length + stationDeleteCandidates.length,
+            lockerDriftCount: lockerCandidates.length + lockerDeleteCandidates.length,
+        });
 
         return sendSuccess(res, {
             mode: {

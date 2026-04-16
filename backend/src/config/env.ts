@@ -25,6 +25,7 @@ const envSchema = z.object({
     SERVER_URL: optionalUrl,
     SQS_URL: optionalUrl,
     OPERATIONS_QUEUE_URL: optionalUrl,
+    CACHE_PROJECTION_QUEUE_URL: optionalUrl,
     CLOUDFRONT_URL: optionalUrl,
     AWS_REGION: z.string().default("eu-west-1"),
     AWS_PROFILE: z.string().optional(),

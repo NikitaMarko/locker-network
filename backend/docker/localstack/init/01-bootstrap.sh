@@ -4,16 +4,18 @@ set -eu
 AWS_REGION="${AWS_DEFAULT_REGION:-eu-west-1}"
 ACCOUNT_ID="000000000000"
 OPERATIONS_QUEUE="locker-operations-queue"
+CACHE_PROJECTION_QUEUE="locker-dev-cache-projection"
 OPERATIONS_TABLE="locker-dev-operations-dynamodb"
 LOCKER_CACHE_TABLE="locker-dev-locker-cache"
 TS_LAMBDA_DIR="/opt/locker-localstack/ts-lambda"
 OPERATIONS_ZIP_PATH="/tmp/operations-handler.zip"
+CACHE_PROJECTION_ZIP_PATH="/tmp/cache-projection-handler.zip"
 
 LEGACY_CACHE_QUEUE="locker-cache-projection"
-LEGACY_STATION_CACHE_TABLE="locker-station-cache"
 LEGACY_LOCKER_CACHE_TABLE="locker-locker-cache"
 LEGACY_CACHE_LAMBDA="locker-cache-projection"
 OPERATIONS_LAMBDA="locker-command-handler"
+CACHE_PROJECTION_LAMBDA="locker-cache-projection-handler"
 
 awslocal_safe() {
   awslocal "$@" >/dev/null 2>&1 || true
@@ -112,11 +114,11 @@ echo "[localstack-init] cleaning legacy cache resources"
 delete_event_source_mappings_for_function "${LEGACY_CACHE_LAMBDA}"
 awslocal_safe lambda delete-function --function-name "${LEGACY_CACHE_LAMBDA}"
 awslocal_safe sqs delete-queue --queue-url "http://localhost:4566/000000000000/${LEGACY_CACHE_QUEUE}"
-awslocal_safe dynamodb delete-table --table-name "${LEGACY_STATION_CACHE_TABLE}"
 awslocal_safe dynamodb delete-table --table-name "${LEGACY_LOCKER_CACHE_TABLE}"
 
 echo "[localstack-init] creating sqs queues"
 ensure_queue "${OPERATIONS_QUEUE}"
+ensure_queue "${CACHE_PROJECTION_QUEUE}"
 
 echo "[localstack-init] creating dynamodb tables"
 ensure_dynamodb_table "${OPERATIONS_TABLE}" "operationId"
@@ -153,6 +155,18 @@ packages = [
             "package-lock.json",
         },
     ),
+    (
+        pathlib.Path("/opt/locker-localstack/ts-lambda"),
+        pathlib.Path("/tmp/cache-projection-handler.zip"),
+        {
+            "dist/functions/cache",
+            "dist/db",
+            "dist/types",
+            "node_modules",
+            "package.json",
+            "package-lock.json",
+        },
+    ),
 ]
 
 for source_dir, zip_path, allowed_prefixes in packages:
@@ -179,5 +193,17 @@ OPERATIONS_QUEUE_ARN="arn:aws:sqs:${AWS_REGION}:${ACCOUNT_ID}:${OPERATIONS_QUEUE
 
 echo "[localstack-init] binding operations sqs to lambda"
 ensure_event_source_mapping "${OPERATIONS_LAMBDA}" "${OPERATIONS_QUEUE_ARN}" 1
+
+echo "[localstack-init] creating cache projection lambda function"
+ensure_lambda_function \
+  "${CACHE_PROJECTION_LAMBDA}" \
+  "dist/functions/cache/cacheProjectionHandler.handler" \
+  "${CACHE_PROJECTION_ZIP_PATH}" \
+  "LOCKER_CACHE_TABLE=${LOCKER_CACHE_TABLE},AWS_REGION=${AWS_REGION}"
+
+CACHE_PROJECTION_QUEUE_ARN="arn:aws:sqs:${AWS_REGION}:${ACCOUNT_ID}:${CACHE_PROJECTION_QUEUE}"
+
+echo "[localstack-init] binding cache projection sqs to lambda"
+ensure_event_source_mapping "${CACHE_PROJECTION_LAMBDA}" "${CACHE_PROJECTION_QUEUE_ARN}" 10
 
 echo "[localstack-init] done"

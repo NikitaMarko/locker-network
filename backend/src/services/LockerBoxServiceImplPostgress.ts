@@ -2,7 +2,6 @@ import { Request, Response } from "express";
 import { LockerStatus } from "@prisma/client";
 
 import { HttpError } from "../errorHandler/HttpError";
-import { lockerCacheRepository } from "../repositories/cache/LockerCacheRepository";
 import { lockerCatalogProjectionService } from "../repositories/prisma/LockerCatalogProjectionService";
 import { logAudit } from "../utils/audit";
 import { sendSuccess } from "../utils/response";
@@ -63,7 +62,11 @@ export class LockerBoxServiceImplPostgres {
                         throw new HttpError(500, "Failed to build locker cache projection after locker create");
                     }
 
-                    const lockerCacheStatus = await syncLockerProjection(lockerProjection);
+                    const lockerCacheStatus = await syncLockerProjection(
+                        lockerProjection,
+                        req.correlationId,
+                        req.user?.userId
+                    );
                     const stationCacheStatus = "DEFERRED" as const;
 
                     await logAudit({
@@ -176,7 +179,11 @@ export class LockerBoxServiceImplPostgres {
                         lastStatusChangedAt: new Date().toISOString(),
                     };
 
-                    const lockerCacheStatus = await syncLockerProjection(nextProjection);
+                    const lockerCacheStatus = await syncLockerProjection(
+                        nextProjection,
+                        req.correlationId,
+                        req.user?.userId
+                    );
                     const stationCacheStatus = "DEFERRED" as const;
 
                     await logAudit({
@@ -241,8 +248,12 @@ export class LockerBoxServiceImplPostgres {
                         return deletedLocker;
                     });
 
-                    const currentProjection = await lockerCacheRepository.findById(lockerBoxId);
-                    const lockerCacheStatus = await deleteLockerProjection(lockerBoxId, currentProjection?.version);
+                    const lockerCacheStatus = await deleteLockerProjection(
+                        lockerBoxId,
+                        0,
+                        req.correlationId,
+                        req.user?.userId
+                    );
                     const stationCacheStatus = "DEFERRED" as const;
 
                     await logAudit({
@@ -285,7 +296,11 @@ export class LockerBoxServiceImplPostgres {
             throw new HttpError(404, "Locker not found");
         }
 
-        const lockerCacheStatus = await syncLockerProjection(projection);
+        const lockerCacheStatus = await syncLockerProjection(
+            projection,
+            req.correlationId,
+            req.user?.userId
+        );
 
         return sendSuccess(res, { lockerBoxId }, 202, {
             lockerCacheStatus,

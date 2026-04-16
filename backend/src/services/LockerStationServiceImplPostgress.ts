@@ -208,7 +208,11 @@ export class LockerStationServiceImplPostgres {
                     });
 
                     //Change status in cache
-                    const lockerCacheStatus = await syncLockerProjections(result.lockerProjections);
+                    const lockerCacheStatus = await syncLockerProjections(
+                        result.lockerProjections,
+                        req.correlationId,
+                        req.user?.userId
+                    );
                     const stationCacheStatus = "DEFERRED" as const;
 
                     await logAudit({
@@ -271,7 +275,11 @@ export class LockerStationServiceImplPostgres {
                     });
 
                     //Delete from cache
-                    const lockerCacheStatus = await deleteLockerProjections(result.lockerIds);
+                    const lockerCacheStatus = await deleteLockerProjections(
+                        result.lockerIds,
+                        req.correlationId,
+                        req.user?.userId
+                    );
                     const stationCacheStatus = "DEFERRED" as const;
 
                     await logAudit({
