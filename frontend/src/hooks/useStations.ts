@@ -15,7 +15,6 @@ interface CreateStationPayload {
     longitude: number;
 }
 
-// ВЕРНУЛИ publicOnly, чтобы не было ошибки 403 у юзеров и гостей
 export function useStations(options?: { publicOnly?: boolean }) {
     const qc = useQueryClient();
     const isPublic = options?.publicOnly;
@@ -33,34 +32,42 @@ export function useStations(options?: { publicOnly?: boolean }) {
         qc.invalidateQueries({ queryKey: ["bookings-my"] });
     };
 
-    // Создание станции
     const create = useMutation({
         mutationFn: (payload: CreateStationPayload) =>
             stationsApi.createStation(payload),
         onSuccess: invalidateAll
     });
 
-    // Удаление станции
     const remove = useMutation({
         mutationFn: (id: string) => stationsApi.deleteStation(id),
         onSuccess: invalidateAll
     });
 
-    // Смена статуса станции
+    // 🔥 КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ
     const changeStatus = useMutation({
-        mutationFn: ({ id, status }: ChangeStationStatusPayload) =>
-            stationsApi.updateStationStatus(id, status),
+        mutationFn: ({ id, status }: ChangeStationStatusPayload) => {
+
+            // Оператор делает READY
+            if (status === "READY") {
+                return stationsApi.updateStationStatusOperator(id, status);
+            }
+
+            // Админ делает ACTIVE или MAINTENANCE
+            if (status === "ACTIVE" || status === "MAINTENANCE") {
+                return stationsApi.updateStationStatusAdmin(id, status);
+            }
+
+            throw new Error("Invalid status transition");
+        },
         onSuccess: invalidateAll
     });
 
-    // Добавление бокса к станции
     const addLocker = useMutation({
         mutationFn: (payload: { stationId: string; code: string; size: "S" | "M" | "L" }) =>
             stationsApi.addLocker(payload),
         onSuccess: invalidateAll
     });
 
-    // --- ВЕРНУЛИ ФУНКЦИИ БРОНИРОВАНИЯ ---
     const book = useMutation({
         mutationFn: (lockerBoxId: string) => lockersApi.updateLockerStatus(lockerBoxId, "RESERVED"),
         onSuccess: invalidateAll,
@@ -79,10 +86,8 @@ export function useStations(options?: { publicOnly?: boolean }) {
         deleteStation: remove.mutate,
         changeStationStatus: changeStatus.mutate,
         addLocker: addLocker.mutateAsync,
-
         bookLockerAsync: book.mutateAsync,
         cancelBooking: cancel.mutate,
-
         refresh: invalidateAll
     };
 }
