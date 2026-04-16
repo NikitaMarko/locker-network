@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const StationStatusEnum = z.enum([
+    "READY",
     "ACTIVE",
     "INACTIVE",
     "MAINTENANCE",
