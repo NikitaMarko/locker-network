@@ -6,7 +6,6 @@ import {
 } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
-import axios from 'axios';
 
 import { useAuth } from '../../../hooks/useAuth';
 import { Paths } from "../../../config/paths/paths.ts";
@@ -15,7 +14,8 @@ import { ROLES } from "../../../config/roles/roles.ts";
 
 export function LoginPage() {
     const navigate = useNavigate();
-    const { login } = useAuth();
+
+    const { login, user } = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -30,33 +30,53 @@ export function LoginPage() {
         try {
 
             const loggedInUser = await login(email, password);
-            if (loggedInUser.role === ROLES.ADMIN) {
+
+            const currentUser = loggedInUser || user;
+
+            if (currentUser?.role === ROLES.ADMIN) {
                 navigate(Paths.ADMIN, { replace: true });
-            } else if (loggedInUser.role === ROLES.OPERATOR) {
+            } else if (currentUser?.role === ROLES.OPERATOR) {
                 navigate(Paths.OPERATOR, { replace: true });
-            } else if (loggedInUser.role === ROLES.USER) {
+            } else if (currentUser?.role === ROLES.USER) {
                 navigate(Paths.USER, { replace: true });
             } else {
-                navigate(Paths.FORBIDDEN, { replace: true });
+                // Fallback route if the role hasn't synced yet
+                navigate('/', { replace: true });
             }
 
-        } catch (error: unknown) {
-            if (error instanceof Error && error.name === "BLOCK_TIME") {
-                setError(error.message);
-                return;
+        } catch (err: unknown) {
+
+            if (err instanceof Error) {
+                setError(err.message);
+            } else {
+                setError("An unexpected error occurred. Please try again.");
             }
-            if (axios.isAxiosError(error)) {
-                setError(error.response?.data?.message || "Wrong email or password");
-                return;
-            }
-            setError("Unexpected error occurred");
         } finally {
             setLoading(false);
         }
     }
 
     return (
-        <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f8fafc', p: 2 }}>
+        <Box sx={{ position: 'relative', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f8fafc', p: 2 }}>
+
+            {/* "Back to Home" Button - now inside the parent Box and styled with MUI */}
+            <Button
+                onClick={() => navigate('/')}
+                sx={{
+                    position: 'absolute',
+                    top: { xs: 15, md: 20 },
+                    left: { xs: 15, md: 20 },
+                    textTransform: 'none',
+                    color: '#64748b',
+                    fontWeight: 600,
+                    fontSize: '16px',
+                    '&:hover': { color: '#4CAF50', background: 'transparent' }
+                }}
+                disableRipple
+            >
+                ← Back to Home
+            </Button>
+
             <Paper elevation={0} sx={{ p: { xs: 4, md: 5 }, width: '100%', maxWidth: 450, borderRadius: 4, border: '1px solid #e2e8f0' }}>
                 <Typography variant="h4" fontWeight={800} textAlign="center" mb={4} color="#1e293b">
                     Welcome to Smart Locker App!

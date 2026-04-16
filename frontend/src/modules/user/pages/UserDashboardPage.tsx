@@ -2,20 +2,21 @@ import { Box, Typography, Alert, Stack, Paper, Chip, CircularProgress, Button } 
 import Grid from '@mui/material/Grid';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { LocationsMapSection } from "./LocationsMapSection";
-import { stationsApi } from "../../../api/stationsApi";
-import type { Station } from "../../../types/lockers/lockers.ts";
 import {Paths} from "../../../config/paths/paths.ts";
+
+
+import { useStations } from "../../../hooks/useStations.ts";
 
 export default function UserDashboard() {
     const navigate = useNavigate();
 
-    const { data: stations = [], isLoading, error } = useQuery<Station[]>({
-        queryKey: ['user-stations'],
-        queryFn: stationsApi.getUserStations
-    });
+
+    const { stations, isLoading, error } = useStations({ publicOnly: true });
+
+
+    const safeStations = Array.isArray(stations) ? stations : [];
 
     return (
         <Box sx={{ pt: '100px', pb: 8, px: { xs: 2, md: 4 }, maxWidth: '1300px', margin: '0 auto' }}>
@@ -29,7 +30,7 @@ export default function UserDashboard() {
                     </Typography>
                 </Alert>
 
-                <LocationsMapSection stations={stations} />
+                <LocationsMapSection stations={safeStations} />
 
                 <Typography variant="h4" fontWeight={900} sx={{ mt: 4, mb: 2 }}>
                     Available Stations
@@ -41,13 +42,13 @@ export default function UserDashboard() {
                     </Box>
                 ) : error ? (
                     <Alert severity="error">Failed to load stations. Please try again later.</Alert>
-                ) : stations.length === 0 ? (
+                ) : safeStations.length === 0 ? (
                     <Paper sx={{ p: 5, textAlign: 'center', bgcolor: '#f8fafc', borderRadius: 4 }}>
                         <Typography color="text.secondary">No active stations available right now.</Typography>
                     </Paper>
                 ) : (
                     <Grid container spacing={3}>
-                        {stations.map((station) => (
+                        {safeStations.map((station) => (
                             <Grid size={{ xs: 12, sm: 6, md: 4 }} key={station.stationId}>
                                 <Paper
                                     elevation={0}
@@ -69,7 +70,8 @@ export default function UserDashboard() {
                                     <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
                                         <Chip
                                             icon={<LocationOnIcon />}
-                                            label={station.city?.name || "Unknown City"}
+
+                                            label={typeof station.city === 'string' ? station.city : (station.city?.name || "Unknown City")}
                                             size="small"
                                             sx={{ bgcolor: '#f1f5f9', fontWeight: 600 }}
                                         />

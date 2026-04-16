@@ -18,14 +18,14 @@ import AddIcon from '@mui/icons-material/Add';
 import RefreshIcon from '@mui/icons-material/Refresh';
 
 import { stationsApi } from '../../../api/stationsApi';
-import type { Station, StationStatus } from '../../../types/lockers/lockers.ts';
 import {Paths} from "../../../config/paths/paths.ts";
+import type {LockerStation, StationStatus} from "../../../types/index";
 
 const BRAND_GREEN = '#6baf5c';
 
 const StationsTable: React.FC = () => {
     const navigate = useNavigate();
-    const [stations, setStations] = useState<Station[]>([]);
+    const [stations, setStations] = useState<LockerStation[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -72,7 +72,7 @@ const StationsTable: React.FC = () => {
         }
     };
 
-    const columns: GridColDef<Station>[] = [
+    const columns: GridColDef<LockerStation>[] = [
         {
             field: 'stationId',
             headerName: 'ID',
@@ -87,7 +87,8 @@ const StationsTable: React.FC = () => {
             field: 'city',
             headerName: 'City',
             width: 120,
-            valueGetter: (_value, row) => row.city?.name || 'Unknown'
+
+            valueGetter: (_value, row) => typeof row.city === 'string' ? row.city : (row.city?.name || 'Unknown')
         },
         {
             field: 'address',

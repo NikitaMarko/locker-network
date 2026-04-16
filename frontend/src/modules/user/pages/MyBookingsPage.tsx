@@ -4,19 +4,23 @@ import { useNavigate } from "react-router-dom";
 import SentimentDissatisfiedIcon from '@mui/icons-material/SentimentDissatisfied';
 import { lockersApi } from "../../../api/lockersApi";
 import { ActiveLockerCard } from "./ActiveLockerCard.tsx";
-import type { LockerBox } from "../../../types/lockers/lockers.ts";
+import type { LockerBox } from "../../../types/index"; // Обновили путь к типу
 import {Paths} from "../../../config/paths/paths.ts";
 
 export default function MyBookingsPage() {
     const navigate = useNavigate();
 
-
     const { data: lockers = [], isLoading } = useQuery<LockerBox[]>({
         queryKey: ['my-bookings'],
-        queryFn: lockersApi.getAllLockers
+        // Обернули в стрелочную функцию, чтобы починить ошибку No overload matches this call
+        queryFn: () => lockersApi.getLockers()
     });
 
-    const reservedLockers = lockers.filter(
+    // Защита для TypeScript, чтобы метод .filter гарантированно работал
+    const safeLockers = Array.isArray(lockers) ? lockers : [];
+
+    // Статусы пока не трогаем, логика сохранена полностью
+    const reservedLockers = safeLockers.filter(
         (l) => l.status === "OCCUPIED" || (l as any).status === "RESERVED"
     );
 

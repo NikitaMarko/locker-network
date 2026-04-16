@@ -14,8 +14,7 @@ import {
     MenuItem,
     Stack
 } from '@mui/material';
-import
-    Grid from '@mui/material/GridLegacy';
+import Grid from '@mui/material/GridLegacy';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddIcon from '@mui/icons-material/Add';
 import { useQuery } from '@tanstack/react-query';
@@ -23,7 +22,8 @@ import { stationsApi } from '../../../api/stationsApi';
 import { useStations } from '../../../hooks/useStations';
 import { useAuth } from '../../../hooks/useAuth';
 import { ROLES } from '../../../config/roles/roles';
-import type { LockerStatus } from '../../../types/lockers/lockers';
+
+import type { LockerStatus, LockerStation } from '../../../types/index';
 
 export default function StationDetailsPage() {
     const { stationId } = useParams();
@@ -33,7 +33,8 @@ export default function StationDetailsPage() {
     const [open, setOpen] = useState(false);
     const [lockerData, setLockerData] = useState({ code: '', size: 'M' as 'S' | 'M' | 'L' });
 
-    const { data: station, isLoading } = useQuery({
+
+    const { data: station, isLoading } = useQuery<LockerStation>({
         queryKey: ["station-details", stationId],
         queryFn: () => stationsApi.getStationById(stationId!),
         enabled: !!stationId

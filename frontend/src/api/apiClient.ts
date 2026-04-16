@@ -1,7 +1,6 @@
-import axios from "axios";
-import {SERVER_URL} from "../config/env/env.ts";
-import {refreshTokenRequest} from "./authApi.ts";
-
+import axios, { AxiosError } from "axios";
+import { SERVER_URL } from "../config/env/env.ts";
+import { refreshTokenRequest } from "./authApi.ts";
 
 let isRefreshing = false;
 let failedQueue: Array<{
@@ -20,9 +19,7 @@ const processQueue = (error: unknown, token: string | null = null) => {
     failedQueue = [];
 };
 
-
 export const apiClient = axios.create({
-    // baseURL: import.meta.env.VITE_API_URL_CLOUDFRONT ?? import.meta.env.VITE_API_URL_BACKEND_LOCAL,
     baseURL: SERVER_URL,
     withCredentials: true,
     headers: {
@@ -30,10 +27,9 @@ export const apiClient = axios.create({
     },
 });
 
-
 apiClient.interceptors.request.use((config) => {
     const token = localStorage.getItem("access_token");
-    console.log("TOKEN :", JSON.stringify(token));
+
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }
@@ -42,14 +38,22 @@ apiClient.interceptors.request.use((config) => {
     return Promise.reject(error);
 });
 
-
-
 apiClient.interceptors.response.use(
     (response) => response,
-    async (error) => {
-        const originalRequest = error.config;
+    async (error: AxiosError<any>) => {
+        const originalRequest = error.config as any;
 
-        if (error.config.url?.includes('/auth/refresh')) {
+
+        const backendMessage = error.response?.data?.error?.message;
+        const legacyMessage = error.response?.data?.message;
+
+        if (backendMessage || legacyMessage) {
+
+            error.message = (backendMessage || legacyMessage) as string;
+        }
+        // ==========================================
+
+        if (originalRequest.url?.includes('/auth/refresh')) {
             return Promise.reject(error);
         }
 
@@ -69,7 +73,7 @@ apiClient.interceptors.response.use(
             isRefreshing = true;
 
             try {
-                const newToken = await refreshTokenRequest(); // реализуем ниже
+                const newToken = await refreshTokenRequest();
                 localStorage.setItem('access_token', newToken);
 
                 processQueue(null, newToken);
@@ -86,6 +90,7 @@ apiClient.interceptors.response.use(
                 isRefreshing = false;
             }
         }
+
 
         return Promise.reject(error);
     }

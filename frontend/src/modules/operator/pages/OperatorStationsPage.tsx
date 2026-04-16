@@ -1,15 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { stationsApi } from "../../../api/stationsApi";
-import type { Station, StationStatus } from "../../../types/lockers/lockers";
+import type { StationStatus } from "../../../types/lockers/lockers";
 import { Box, Typography, Paper, Chip, Button } from "@mui/material";
 import Grid from "@mui/material/GridLegacy";
+import type {LockerStation} from "../../../types/index";
 
 import { useStations } from "../../../hooks/useStations";
 
 export default function OperatorStationsPage() {
     const { changeStationStatus } = useStations();
 
-    const { data: stations = [], isLoading } = useQuery<Station[]>({
+    const { data: stations = [], isLoading } = useQuery<LockerStation[]>({
         queryKey: ["operator-stations"],
         queryFn: stationsApi.getAllStations
     });

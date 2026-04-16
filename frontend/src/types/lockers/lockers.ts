@@ -1,7 +1,7 @@
 
 export type StationStatus = 'ACTIVE' | 'INACTIVE'| 'READY'| 'MAINTENANCE';
 export type LockerStatus = 'INACTIVE'|'AVAILABLE' | 'RESERVED'|'READY' | 'OCCUPIED' | 'MAINTENANCE';
-export type LockerSize = 'S' | 'M' | 'L' | 'XL';
+export type LockerSize = 'S' | 'M' | 'L';
 
 
 export interface City {

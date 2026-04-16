@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { lockersApi } from "../api/lockersApi";
-import type { LockerStatus } from "../types/lockers/lockers";
+import type { LockerStatus } from "../types/index";
 
 interface ChangeLockerStatusPayload {
     lockerBoxId: string;

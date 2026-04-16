@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { stationsApi } from "../api/stationsApi";
 import { lockersApi } from "../api/lockersApi";
-import type { Station, StationStatus } from "../types/lockers/lockers";
+import type { LockerStation, StationStatus } from "../types/index";
 
 interface ChangeStationStatusPayload {
     id: string;
@@ -20,8 +20,8 @@ export function useStations(options?: { publicOnly?: boolean }) {
     const qc = useQueryClient();
     const isPublic = options?.publicOnly;
 
-    const query = useQuery<Station[]>({
-        queryKey: ["stations", isPublic ? "active" : "all"], // Разделяем кэш
+    const query = useQuery<LockerStation[]>({
+        queryKey: ["stations", isPublic ? "active" : "all"],
         queryFn: isPublic ? stationsApi.getActiveStations : stationsApi.getAllStations,
     });
 
@@ -74,7 +74,7 @@ export function useStations(options?: { publicOnly?: boolean }) {
     return {
         stations: query.data ?? [],
         isLoading: query.isLoading,
-
+        error: query.error,
         createStation: create.mutateAsync,
         deleteStation: remove.mutate,
         changeStationStatus: changeStatus.mutate,

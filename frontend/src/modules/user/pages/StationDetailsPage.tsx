@@ -2,11 +2,7 @@ import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { stationsApi } from "../../../api/stationsApi";
 import { lockersApi } from "../../../api/lockersApi";
-import type {
-    Station,
-    LockerBox,
-    LockerStatus
-} from "../../../types/lockers/lockers";
+import type { LockerBox, LockerStatus, LockerStation } from '../../../types/index';
 import {
     Box,
     Typography,
@@ -30,7 +26,7 @@ const getChipColor = (status: LockerStatus): "success" | "warning" | "default" =
 export function StationDetailsPage() {
     const { id } = useParams();
 
-    const { data: station } = useQuery<Station>({
+    const { data: station } = useQuery<LockerStation>({
         queryKey: ["user-station", id],
         queryFn: () => stationsApi.getStationById(id!),
         enabled: !!id
@@ -38,7 +34,7 @@ export function StationDetailsPage() {
 
     const { data: lockers = [] } = useQuery<LockerBox[]>({
         queryKey: ["user-lockers", id],
-        queryFn: lockersApi.getAllLockers
+        queryFn: () => lockersApi.getLockers()
     });
 
     return (

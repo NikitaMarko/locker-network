@@ -2,11 +2,8 @@ import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { stationsApi } from "../../../api/stationsApi";
 import { lockersApi } from "../../../api/lockersApi";
-import type {
-    Station,
-    LockerBox,
-    LockerStatus
-} from "../../../types/lockers/lockers";
+
+import type { LockerBox, LockerStatus, LockerStation } from '../../../types/index';
 import {
     Box,
     Typography,
@@ -16,7 +13,7 @@ import {
 } from "@mui/material";
 import Grid from "@mui/material/GridLegacy";
 
-// Цвета для статусов
+
 const getChipColor = (status: LockerStatus): "success" | "warning" | "default" => {
     switch (status) {
         case "AVAILABLE":
@@ -32,7 +29,8 @@ const getChipColor = (status: LockerStatus): "success" | "warning" | "default" =
 export default function OperatorStationDetailsPage() {
     const { stationId } = useParams();
 
-    const { data: station } = useQuery<Station>({
+
+    const { data: station } = useQuery<LockerStation>({
         queryKey: ["operator-station", stationId],
         queryFn: () => stationsApi.getStationById(stationId!),
         enabled: !!stationId
@@ -40,7 +38,7 @@ export default function OperatorStationDetailsPage() {
 
     const { data: lockers = [] } = useQuery<LockerBox[]>({
         queryKey: ["operator-lockers", stationId],
-        queryFn: lockersApi.getAllLockers
+        queryFn: () => lockersApi.getAdminLockers()
     });
 
     const handleLockerStatus = async (lockerId: string, status: LockerStatus) => {
@@ -75,7 +73,7 @@ export default function OperatorStationDetailsPage() {
                                 />
 
                                 <Box sx={{ mt: 2, display: "flex", gap: 1 }}>
-                                    {/* Оператор готовит INACTIVE → READY */}
+
                                     {locker.status === "INACTIVE" && (
                                         <Button
                                             size="small"
@@ -83,7 +81,7 @@ export default function OperatorStationDetailsPage() {
                                             onClick={() =>
                                                 handleLockerStatus(
                                                     locker.lockerBoxId,
-                                                    "READY"
+                                                    "READY" as LockerStatus
                                                 )
                                             }
                                         >
@@ -91,8 +89,8 @@ export default function OperatorStationDetailsPage() {
                                         </Button>
                                     )}
 
-                                    {/* Оператор чинит MAINTENANCE → READY */}
-                                    {locker.status === "MAINTENANCE" && (
+
+                                    {locker.status === ("MAINTENANCE" as LockerStatus) && (
                                         <Button
                                             size="small"
                                             variant="contained"
@@ -100,7 +98,7 @@ export default function OperatorStationDetailsPage() {
                                             onClick={() =>
                                                 handleLockerStatus(
                                                     locker.lockerBoxId,
-                                                    "READY"
+                                                    "READY" as LockerStatus
                                                 )
                                             }
                                         >

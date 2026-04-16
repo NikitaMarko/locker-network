@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Modal, Box, Typography, TextField, Button, MenuItem, Stack } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
-import { lockersApi } from '../../../api/lockersApi';
 import type { LockerSize } from '../../../types/lockers/lockers.ts';
+import {stationsApi} from "../../../api/stationsApi.ts";
 
 interface CreateLockerModalProps {
     open: boolean;
@@ -33,7 +33,7 @@ const CreateLockerModal: React.FC<CreateLockerModalProps> = ({ open, stationId, 
         e.preventDefault();
         setLoading(true);
         try {
-            await lockersApi.createLocker({ stationId, code, size });
+            await stationsApi.addLocker({ stationId, code, size });
             queryClient.invalidateQueries({ queryKey: ['lockers', stationId] });
             onSuccess();
             onClose();
@@ -69,7 +69,7 @@ const CreateLockerModal: React.FC<CreateLockerModalProps> = ({ open, stationId, 
                             <MenuItem value="S">Small (S)</MenuItem>
                             <MenuItem value="M">Medium (M)</MenuItem>
                             <MenuItem value="L">Large (L)</MenuItem>
-                            <MenuItem value="XL">Extra Large (XL)</MenuItem>
+
                         </TextField>
                         <Button
                             type="submit"

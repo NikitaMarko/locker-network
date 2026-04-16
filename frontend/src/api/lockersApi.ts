@@ -1,43 +1,59 @@
 import { apiClient } from "./apiClient";
-import type {
-    LockerBox,
-    LockerSize,
-    LockerStatus,
-    CreateLockerResponse
-} from "../types/lockers/lockers.ts";
+import type { LockerBox, LockerStatus } from "../types/index";
 
+
+export interface ApiResponse<T> {
+    success: boolean;
+    correlationId?: string;
+    data: T;
+    error?: {
+        code: string;
+        message: string;
+    };
+}
 
 export const lockersApi = {
-
-    getAllLockers: async (): Promise<LockerBox[]> => {
-        const { data } = await apiClient.get<LockerBox[]>("/lockers/");
-        return data;
+    /**
+     * PUBLIC: Получить список боксов (фильтрация по stationId, size, status)
+     */
+    getLockers: async (params?: { stationId?: string; size?: string; status?: string }): Promise<LockerBox[]> => {
+        const { data } = await apiClient.get<ApiResponse<LockerBox[]>>("/lockers/boxes", { params });
+        return data.data;
     },
 
-
-    createLocker: async (payload: {
-        stationId: string;
-        code: string;
-        size: LockerSize;
-    }): Promise<CreateLockerResponse> => {
-        const { data } = await apiClient.post<CreateLockerResponse>(
-            "/lockers/boxes",
-            payload
-        );
-        return data;
+    /**
+     * USER: Получить данные конкретного бокса по ID
+     */
+    getLockerById: async (id: string): Promise<LockerBox> => {
+        const { data } = await apiClient.get<ApiResponse<LockerBox>>(`/lockers/boxes/${id}`);
+        return data.data;
     },
 
-
+    /**
+     * ADMIN/OPERATOR: Смена статуса бокса (бронирование, активация и т.д.)
+     * Используется в хуках для reserveLocker и cancelBooking
+     */
     updateLockerStatus: async (id: string, status: LockerStatus): Promise<LockerBox> => {
-        const { data } = await apiClient.patch<LockerBox>(
-            `/lockers/boxes/${id}/status`,
+        const { data } = await apiClient.patch<ApiResponse<LockerBox>>(
+            `/lockers/admin/boxes/${id}/status`,
             { status }
         );
-        return data;
+        return data.data;
     },
 
+    /**
+     * ADMIN/OPERATOR: Получить список всех боксов (из RDS)
+     */
+    getAdminLockers: async (): Promise<LockerBox[]> => {
+        const { data } = await apiClient.get<ApiResponse<LockerBox[]>>("/lockers/admin/boxes");
+        return data.data;
+    },
 
-    deleteLocker: async (id: string): Promise<void> => {
-        await apiClient.patch(`/lockers/boxes/${id}/delete`);
+    /**
+     * OPERATOR: Мягкое удаление бокса
+     */
+    deleteLocker: async (id: string): Promise<any> => {
+        const { data } = await apiClient.patch<ApiResponse<any>>(`/lockers/oper/boxes/${id}/delete`);
+        return data.data;
     }
 };

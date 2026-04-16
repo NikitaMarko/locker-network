@@ -1,7 +1,9 @@
-export type StationStatus = "ACTIVE" | "INACTIVE" | "MAINTENANCE";
-export type LockerSize = "S" | "M" | "L";
-export type LockerStatus = "AVAILABLE" | "RESERVED" | "OCCUPIED" | "FAULTY" | "EXPIRED";
 
+export type StationStatus = "ACTIVE" | "INACTIVE" | "MAINTENANCE" | "READY";
+
+export type LockerSize = "S" | "M" | "L";
+
+export type LockerStatus = "AVAILABLE" | "RESERVED" | "OCCUPIED" | "FAULTY" | "EXPIRED" | "INACTIVE";
 
 export interface City {
     code: string;
@@ -18,10 +20,13 @@ export interface LockerBox {
 
 export interface LockerStation {
     stationId: string;
-    city: string;
+    city: string | City;
     address: string | null;
     latitude: number;
     longitude: number;
     status: StationStatus;
     lockers: LockerBox[];
+    _count?: {
+        lockers: number;
+    };
 }

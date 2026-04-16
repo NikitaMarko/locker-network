@@ -3,7 +3,7 @@ import Grid from '@mui/material/GridLegacy';
 import { Paper, Typography, Box, Chip, Skeleton } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { lockersApi } from '../../../api/lockersApi';
-import type { LockerBox, LockerStatus } from '../../../types/lockers/lockers';
+import type { LockerBox, LockerStatus } from '../../../types/index';
 
 interface LockersGridProps {
     stationId: string;
@@ -16,7 +16,8 @@ const getBorderColor = (status: LockerStatus): string => {
         case 'RESERVED':
         case 'OCCUPIED':
             return '#ffa726';
-        case 'MAINTENANCE':
+        case 'FAULTY':
+        case 'INACTIVE':
             return '#ef4444';
         default:
             return '#e0e0e0';
@@ -39,7 +40,7 @@ const LockersGrid: React.FC<LockersGridProps> = ({ stationId }) => {
     const { data: lockers = [], isLoading } = useQuery<LockerBox[]>({
         queryKey: ['lockers', stationId],
         queryFn: async () => {
-            const all = await lockersApi.getAllLockers();
+            const all = await lockersApi.getAdminLockers();
             return all.filter(l => l.stationId === stationId);
         }
     });
