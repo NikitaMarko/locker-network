@@ -1,160 +1,133 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { Box, Typography, Stack, MenuItem, TextField, CircularProgress } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../hooks/useAuth.ts";
 import { Paths } from "../../../config/paths/paths.ts";
 import { useStations } from "../../../hooks/useStations.ts";
 
+
+import { LocationsMapSection } from "../../user/pages/LocationsMapSection.tsx";
+
 export function Location() {
     const { user } = useAuth();
     const navigate = useNavigate();
 
-    // 1. Получаем данные через универсальный хук.
-    // publicOnly: true заставляет хук использовать открытый эндпоинт /lockers/stations
+
     const { stations, isLoading } = useStations({ publicOnly: true });
 
-    // 2. Успокаиваем TypeScript: гарантируем, что работаем с массивом
+
     const safeStations = Array.isArray(stations) ? stations : [];
+    const activeStations = safeStations.filter(s => s.status === 'ACTIVE');
 
-    // 3. Состояние: храним только ID выбранной станции
-    const [selectedId, setSelectedId] = useState<string | null>(null);
 
-    // 4. Вычисляем текущую станцию для карты (Derived State).
-    // Если ничего не выбрано, берем первую из списка активных.
-    const currentStation = safeStations.find(s => s.stationId === selectedId) || safeStations[0] || null;
+    const cities = useMemo(() => {
+        const citySet = new Set(activeStations.map(s => typeof s.city === 'string' ? s.city : (s.city?.name || '')));
+        return Array.from(citySet).filter(c => c !== '');
+    }, [activeStations]);
 
-    const handleAction = (stationId: string) => {
+
+    const [userSelectedCity, setUserSelectedCity] = useState<string>('');
+    const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
+
+
+    const currentCity = userSelectedCity || (cities.length > 0 ? cities[0] : '');
+
+
+    const cityStations = useMemo(() => {
+        return activeStations.filter(s => {
+            const cityName = typeof s.city === 'string' ? s.city : (s.city?.name || '');
+            return cityName === currentCity;
+        });
+    }, [activeStations, currentCity]);
+
+
+    const handleMapAction = (stationId: string) => {
         if (!user) {
-            // Если гость — отправляем на страницу входа
             navigate(Paths.LOGIN);
         } else {
-            // Если авторизован — отправляем в личный кабинет на страницу бронирования бокса
             navigate(`${Paths.USER}/stations/${stationId}`);
         }
     };
 
     if (isLoading) {
         return (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#64748b' }}>Loading Lockers Map...</div>
-            </div>
+            <Box display="flex" justifyContent="center" alignItems="center" minHeight="90vh" bgcolor="#f8fafc">
+                <CircularProgress />
+            </Box>
         );
     }
 
     return (
-        <div style={wrapperStyle}>
-            <div style={containerStyle}>
-                <h1 style={{ textAlign: 'center', marginBottom: '40px', fontSize: '36px', fontWeight: 800 }}>
-                    Lockers Map
-                </h1>
+        <Box sx={{ pt: '100px', pb: 8, px: { xs: 2, md: 4 }, maxWidth: '1400px', margin: '0 auto', minHeight: '92vh' }}>
+            <Typography variant="h3" fontWeight={900} textAlign="center" mb={4} color="#1e293b">
+                Find Your Locker
+            </Typography>
 
-                <div style={layoutStyle}>
-                    {/* Левая колонка: Список станций */}
-                    <div style={listStyle}>
-                        {safeStations.length === 0 ? (
-                            <div style={{ textAlign: 'center', color: '#64748b', padding: '20px' }}>
-                                No active stations available right now.
-                            </div>
-                        ) : (
-                            safeStations.map((loc) => (
-                                <div
-                                    key={loc.stationId}
-                                    onClick={() => setSelectedId(loc.stationId)}
-                                    style={{
-                                        ...listItem,
-                                        ...(currentStation?.stationId === loc.stationId ? activeItem : {})
-                                    }}
-                                >
-
-                                    <div style={{ fontWeight: 800, fontSize: '18px', color: '#1a1a1a' }}>
-                                        {typeof loc.city === 'string' ? loc.city : (loc.city?.name || 'Unknown City')}
-                                    </div>
-                                    <div style={{ fontSize: '14px', color: '#666', margin: '5px 0' }}>
-                                        {loc.address || 'Address not specified'}
-                                    </div>
-
-                                    <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#4CAF50' }}>
-                                        Capacity: {loc._count?.lockers || 0} boxes
-                                    </div>
-
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleAction(loc.stationId);
-                                        }}
-                                        style={actionButtonStyle}
-                                    >
-                                        {user ? "View Station" : "Login to Book"}
-                                    </button>
-                                </div>
-                            ))
-                        )}
-                    </div>
+            <Stack spacing={3} height="100%">
+                {/*<Alert severity="info" sx={{ borderRadius: 4, p: 2, bgcolor: '#f0f7ff', border: '1px solid #d0e3ff' }}>*/}
+                {/*    <Typography variant="h6" fontWeight={800} color="#003e92">*/}
+                {/*        Available Locations*/}
+                {/*    </Typography>*/}
+                {/*    <Typography variant="body2" color="#003e92">*/}
+                {/*        Select a city and address to see station capacity. Login to view locker prices and start a booking.*/}
+                {/*    </Typography>*/}
+                {/*</Alert>*/}
 
 
-                    <div style={mapWrapper}>
-                        {currentStation ? (
-                            <iframe
-                                key={currentStation.stationId}
-                                title="map"
-                                width="100%"
-                                height="100%"
-                                style={{ border: 0 }}
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                    <TextField
+                        select
+                        label="1. Select City"
+                        value={currentCity}
+                        onChange={(e) => {
+                            setUserSelectedCity(e.target.value);
+                            setSelectedStationId(null);
+                        }}
+                        sx={{ minWidth: 250, bgcolor: 'white', borderRadius: 2 }}
+                    >
+                        {cities.length === 0 && <MenuItem disabled value="">No active cities</MenuItem>}
+                        {cities.map(city => (
+                            <MenuItem key={city} value={city}>{city}</MenuItem>
+                        ))}
+                    </TextField>
 
-                                src={`https://maps.google.com/maps?q=${currentStation.latitude},${currentStation.longitude}&z=15&output=embed`}
-                            />
-                        ) : (
-                            <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
-                                Select a station to view on map
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </div>
+                    <TextField
+                        select
+                        label="2. Select Address (Optional)"
+                        value={selectedStationId || ''}
+                        onChange={(e) => setSelectedStationId(e.target.value)}
+                        disabled={cityStations.length === 0}
+                        sx={{ minWidth: 300, bgcolor: 'white', borderRadius: 2, flexGrow: 1 }}
+                    >
+                        <MenuItem value="">
+                            <em>Show all in {currentCity}</em>
+                        </MenuItem>
+                        {cityStations.map(st => (
+                            <MenuItem key={st.stationId} value={st.stationId}>
+                                {st.address} ({st._count?.lockers || 0} boxes)
+                            </MenuItem>
+                        ))}
+                    </TextField>
+                </Stack>
+
+
+                <Box sx={{
+                    height: '65vh',
+                    width: '100%',
+                    borderRadius: 4,
+                    overflow: 'hidden',
+                    border: '2px solid #e2e8f0',
+                    boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
+                    bgcolor: 'white'
+                }}>
+                    <LocationsMapSection
+                        stations={cityStations}
+                        selectedId={selectedStationId}
+                        onMarkerAction={handleMapAction}
+                        actionText={user ? "View Station" : "Login to Book"}
+                    />
+                </Box>
+            </Stack>
+        </Box>
     );
 }
-
-
-const wrapperStyle: React.CSSProperties = { minHeight: "92vh", background: "#f8fafc", padding: "50px 20px" };
-const containerStyle = { maxWidth: "1200px", margin: "0 auto", width: "100%" };
-const layoutStyle = { display: "grid", gridTemplateColumns: "380px 1fr", gap: "30px", height: "650px" };
-const listStyle = {
-    background: "white",
-    borderRadius: "24px",
-    padding: "20px",
-    overflowY: "auto" as const,
-    boxShadow: "0 20px 40px rgba(0,0,0,0.05)",
-    border: '1px solid #e2e8f0'
-};
-const listItem = {
-    padding: "20px",
-    borderRadius: "18px",
-    cursor: "pointer",
-    marginBottom: "15px",
-    border: "1px solid #f1f5f9",
-    transition: "0.2s ease-in-out"
-};
-const activeItem = {
-    borderColor: "#4CAF50",
-    background: "#f0fdf4",
-    boxShadow: '0 4px 12px rgba(76, 175, 80, 0.12)'
-};
-const actionButtonStyle = {
-    marginTop: "15px",
-    width: "100%",
-    padding: "12px",
-    background: "#4CAF50",
-    color: "white",
-    border: "none",
-    borderRadius: "12px",
-    cursor: "pointer",
-    fontWeight: "bold",
-    fontSize: '14px'
-};
-const mapWrapper = {
-    background: "white",
-    borderRadius: "24px",
-    overflow: "hidden",
-    boxShadow: "0 20px 40px rgba(0,0,0,0.05)",
-    border: '1px solid #e2e8f0'
-};

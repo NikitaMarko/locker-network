@@ -10,7 +10,8 @@ const lightTheme = createTheme({
             paper: "#ffffff",
         },
         primary: {
-            main: "#6366f1",
+            main: "#6baf5c",
+            contrastText: "#ffffff",
         },
         text: {
             primary: "#111827",

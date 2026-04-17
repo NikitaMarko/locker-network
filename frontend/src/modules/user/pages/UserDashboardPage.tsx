@@ -1,115 +1,114 @@
-import { Box, Typography, Alert, Stack, Paper, Chip, CircularProgress, Button } from "@mui/material";
-import Grid from '@mui/material/Grid';
-import LocationOnIcon from '@mui/icons-material/LocationOn';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import { useNavigate } from "react-router-dom";
+import { useState, useMemo } from "react";
+import { Box, Typography, Alert, Stack, MenuItem, TextField, CircularProgress } from "@mui/material";
 import { LocationsMapSection } from "./LocationsMapSection";
-import {Paths} from "../../../config/paths/paths.ts";
-
-
 import { useStations } from "../../../hooks/useStations.ts";
 
 export default function UserDashboard() {
-    const navigate = useNavigate();
-
-
     const { stations, isLoading, error } = useStations({ publicOnly: true });
 
 
     const safeStations = Array.isArray(stations) ? stations : [];
+    const activeStations = safeStations.filter(s => s.status === 'ACTIVE');
+
+
+    const cities = useMemo(() => {
+        const citySet = new Set(activeStations.map(s => typeof s.city === 'string' ? s.city : (s.city?.name || '')));
+        return Array.from(citySet).filter(c => c !== '');
+    }, [activeStations]);
+
+
+    const [userSelectedCity, setUserSelectedCity] = useState<string>('');
+    const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
+
+
+    const currentCity = userSelectedCity || (cities.length > 0 ? cities[0] : '');
+
+
+    const cityStations = useMemo(() => {
+        return activeStations.filter(s => {
+            const cityName = typeof s.city === 'string' ? s.city : (s.city?.name || '');
+            return cityName === currentCity;
+        });
+    }, [activeStations, currentCity]);
+
+    if (isLoading) {
+        return (
+            <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
+                <CircularProgress />
+            </Box>
+        );
+    }
 
     return (
-        <Box sx={{ pt: '100px', pb: 8, px: { xs: 2, md: 4 }, maxWidth: '1300px', margin: '0 auto' }}>
-            <Stack spacing={4}>
-                <Alert severity="info" sx={{ borderRadius: 6, p: 3, bgcolor: '#f0f7ff', border: '1px solid #d0e3ff' }}>
+        <Box sx={{ pt: '100px', pb: 8, px: { xs: 2, md: 4 }, maxWidth: '1400px', margin: '0 auto' }}>
+            <Stack spacing={3} height="100%">
+
+                <Alert severity="info" sx={{ borderRadius: 4, p: 2, bgcolor: '#f0f7ff', border: '1px solid #d0e3ff' }}>
                     <Typography variant="h6" fontWeight={800} color="#003e92">
-                        Find a Spare Locker
+                        Find a Station Near You
                     </Typography>
-                    <Typography variant="body1" color="#003e92">
-                        Select a station from the map or list below to see available slots and start a new booking.
+                    <Typography variant="body2" color="#003e92">
+                        Select a city and address, or click directly on a map marker to view available locker sizes and prices.
                     </Typography>
                 </Alert>
 
-                <LocationsMapSection stations={safeStations} />
 
-                <Typography variant="h4" fontWeight={900} sx={{ mt: 4, mb: 2 }}>
-                    Available Stations
-                </Typography>
-
-                {isLoading ? (
-                    <Box display="flex" justifyContent="center" p={5}>
-                        <CircularProgress />
-                    </Box>
-                ) : error ? (
-                    <Alert severity="error">Failed to load stations. Please try again later.</Alert>
-                ) : safeStations.length === 0 ? (
-                    <Paper sx={{ p: 5, textAlign: 'center', bgcolor: '#f8fafc', borderRadius: 4 }}>
-                        <Typography color="text.secondary">No active stations available right now.</Typography>
-                    </Paper>
-                ) : (
-                    <Grid container spacing={3}>
-                        {safeStations.map((station) => (
-                            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={station.stationId}>
-                                <Paper
-                                    elevation={0}
-                                    sx={{
-                                        p: 3,
-                                        borderRadius: 4,
-                                        border: '1px solid #e2e8f0',
-                                        transition: 'all 0.2s',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        height: '100%',
-                                        '&:hover': {
-                                            boxShadow: '0 10px 25px rgba(0,0,0,0.05)',
-                                            borderColor: '#cbd5e1',
-                                            transform: 'translateY(-4px)'
-                                        }
-                                    }}
-                                >
-                                    <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
-                                        <Chip
-                                            icon={<LocationOnIcon />}
-
-                                            label={typeof station.city === 'string' ? station.city : (station.city?.name || "Unknown City")}
-                                            size="small"
-                                            sx={{ bgcolor: '#f1f5f9', fontWeight: 600 }}
-                                        />
-                                        <Chip
-                                            label={`${station._count?.lockers || 0} boxes`}
-                                            size="small"
-                                            color="success"
-                                            variant="outlined"
-                                        />
-                                    </Box>
-
-                                    <Typography variant="h6" fontWeight={800} mb={1}>
-                                        {station.address}
-                                    </Typography>
-
-                                    <Box sx={{ flexGrow: 1 }} />
-
-                                    <Button
-                                        variant="contained"
-                                        fullWidth
-                                        endIcon={<ArrowForwardIcon />}
-                                        onClick={() => navigate(`${Paths.USER}/stations/${station.stationId}`)}
-                                        sx={{
-                                            mt: 3,
-                                            borderRadius: 2,
-                                            bgcolor: '#6baf5c',
-                                            textTransform: 'none',
-                                            fontWeight: 700,
-                                            '&:hover': { bgcolor: '#5a994c' }
-                                        }}
-                                    >
-                                        View Lockers
-                                    </Button>
-                                </Paper>
-                            </Grid>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                    <TextField
+                        select
+                        label="1. Select City"
+                        value={currentCity}
+                        onChange={(e) => {
+                            setUserSelectedCity(e.target.value);
+                            setSelectedStationId(null);
+                        }}
+                        sx={{ minWidth: 250, bgcolor: 'white', borderRadius: 2 }}
+                    >
+                        {cities.map(city => (
+                            <MenuItem key={city} value={city}>{city}</MenuItem>
                         ))}
-                    </Grid>
-                )}
+                    </TextField>
+
+                    <TextField
+                        select
+                        label="2. Select Address (Optional)"
+                        value={selectedStationId || ''}
+                        onChange={(e) => setSelectedStationId(e.target.value)}
+                        disabled={cityStations.length === 0}
+                        sx={{ minWidth: 300, bgcolor: 'white', borderRadius: 2, flexGrow: 1 }}
+                    >
+                        <MenuItem value="">
+                            <em>Show all in {currentCity}</em>
+                        </MenuItem>
+                        {cityStations.map(st => (
+                            <MenuItem key={st.stationId} value={st.stationId}>
+                                {st.address} ({st._count?.lockers || 0} boxes)
+                            </MenuItem>
+                        ))}
+                    </TextField>
+                </Stack>
+
+
+                <Box sx={{
+                    height: '65vh',
+                    width: '100%',
+                    borderRadius: 4,
+                    overflow: 'hidden',
+                    border: '1px solid #6baf5c',
+                    boxShadow: '0 10px 30px rgba(0,0,0,0.05)'
+                }}>
+                    {error ? (
+                        <Box display="flex" justifyContent="center" alignItems="center" height="100%">
+                            <Typography color="error">Failed to load map data.</Typography>
+                        </Box>
+                    ) : (
+                        <LocationsMapSection
+                            stations={cityStations}
+                            selectedId={selectedStationId}
+                        />
+                    )}
+                </Box>
+
             </Stack>
         </Box>
     );
