@@ -2,6 +2,8 @@ import { env } from '../config/env';
 
 import { prismaService } from './prismaService';
 
+const LAMBDA_HEALTH_TIMEOUT_MS = 2000;
+
 type LambdaHealthPayload = {
     status?: string;
     uptime?: number;
@@ -30,12 +32,26 @@ function parseLambdaPayload(raw: unknown): LambdaHealthPayload {
     return raw;
 }
 
-export const getHealthStatus = async () => {
+type HealthStatusOptions = {
+    preferLocal?: boolean;
+};
+
+export const getHealthStatus = async (options: HealthStatusOptions = {}) => {
+    if (options.preferLocal) {
+        return getMock();
+    }
+
     const useLambda = env.USE_LAMBDA_HEALTH === 'true' && env.LAMBDA_HEALTH_URL;
 
     if (useLambda) {
         try {
-            return await callLambda();
+            const lambdaResult = await callLambda();
+
+            if (lambdaResult.status === 'ok') {
+                return lambdaResult;
+            }
+
+            return getMock('mock-fallback');
         } catch {
             return getMock('mock-fallback');
         }
@@ -45,7 +61,7 @@ export const getHealthStatus = async () => {
 
 const callLambda = async () => {
     const response = await fetch(env.LAMBDA_HEALTH_URL!, {
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(LAMBDA_HEALTH_TIMEOUT_MS),
     });
 
     const raw = await response.json();

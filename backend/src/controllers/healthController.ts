@@ -6,12 +6,14 @@ import {ActionType} from "../services/dto/operationDto";
 
 export const healthStatus = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const result = await healthService.getHealthStatus();
-
         const userAgent = req.headers['user-agent'] || '';
+        const isElbHealthChecker = userAgent.includes('ELB-HealthChecker');
+        const result = await healthService.getHealthStatus({
+            preferLocal: isElbHealthChecker,
+        });
 
-        if (!userAgent.includes('ELB-HealthChecker')) {
-            await logAudit({
+        if (!isElbHealthChecker) {
+            void logAudit({
                 req,
                 action: ActionType.HEALTH_CHECK,
                 actorId: undefined,
