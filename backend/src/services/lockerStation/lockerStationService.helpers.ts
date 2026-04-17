@@ -76,19 +76,50 @@ export async function warmupStationsCache(stations: StationCacheDto[]) {
     }
 }
 
+function mergeStationCatalog(
+    cachedStations: StationCacheDto[],
+    projectedStations: StationCacheDto[],
+) {
+    const cachedById = new Map(cachedStations.map((station) => [station.stationId, station]));
+    const staleOrMissingStations: StationCacheDto[] = [];
+
+    for (const projectedStation of projectedStations) {
+        const cachedStation = cachedById.get(projectedStation.stationId);
+        if (!cachedStation || cachedStation.version !== projectedStation.version) {
+            staleOrMissingStations.push(projectedStation);
+        }
+    }
+
+    return {
+        mergedStations: projectedStations,
+        staleOrMissingStations,
+    };
+}
+
 export async function loadStationsWithFallback() {
     try {
         const cachedStations = await stationCacheRepository.findAll();
-        if (cachedStations.length > 0) {
-            return cachedStations;
+        if (cachedStations.length === 0) {
+            const projectedStations = await lockerCatalogProjectionService.getAllStationCacheProjections();
+            if (projectedStations.length > 0) {
+                await warmupStationsCache(projectedStations);
+            }
+
+            return projectedStations;
         }
 
         const projectedStations = await lockerCatalogProjectionService.getAllStationCacheProjections();
-        if (projectedStations.length > 0) {
-            await warmupStationsCache(projectedStations);
+        if (projectedStations.length === 0) {
+            return cachedStations;
         }
 
-        return projectedStations;
+        const { mergedStations, staleOrMissingStations } = mergeStationCatalog(cachedStations, projectedStations);
+
+        if (staleOrMissingStations.length > 0 || cachedStations.length !== projectedStations.length) {
+            await warmupStationsCache(staleOrMissingStations);
+        }
+
+        return mergedStations;
     } catch (error) {
         if (!isRedisAccessError(error)) {
             throw error;
