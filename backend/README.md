@@ -147,7 +147,7 @@ npm --version   # 8+
 cp .env.example .env
 ```
 
-Use [`.env.example`](./.env.example) as the canonical template for local configuration. It reflects the current local CORS, Google login, Redis station cache, DynamoDB locker cache, and SQS queue settings used by the backend.
+Use [`.env.example`](./.env.example) as the canonical template for local configuration. It reflects the current local CORS, Google login, Redis station cache read settings, DynamoDB locker cache read settings, and SQS queue settings used by the backend.
 
 Refresh-session policy:
 
@@ -203,12 +203,14 @@ DYNAMO_ROLE_ARN=                        # Optional: assume-role ARN for DynamoDB
 DYNAMO_ROLE_SESSION_NAME=locker-backend-dynamo
 DYNAMO_TABLE_NAME=locker-dev-operations-dynamodb
 OPERATIONS_QUEUE_URL=https://sqs.eu-west-1.amazonaws.com/131904957044/locker-dev-operations-queue
+CACHE_PROJECTION_QUEUE_URL=https://sqs.eu-west-1.amazonaws.com/131904957044/locker-dev-cache-projection
 SQS_URL=https://sqs.eu-west-1.amazonaws.com/131904957044/locker-dev-operations-queue
 ```
 
 ### AWS credentials are required
 
 The backend validates AWS credentials during startup because async operation endpoints use DynamoDB and SQS.
+Locker cache projection publishing also requires SQS access to `CACHE_PROJECTION_QUEUE_URL`.
 
 Supported local setup options:
 
@@ -284,12 +286,13 @@ docker compose down -v
 
 ### Local Docker stack
 
-For local verification of the mixed cache flow, [docker-compose.yml](/Users/dmitrii/Desktop/BackEnd/locker-network-repository/locker-network-repository/backend/docker-compose.yml:1) starts:
+For local verification of the current cache setup, [docker-compose.yml](/Users/dmitrii/Desktop/BackEnd/locker-network-repository/locker-network-repository/backend/docker-compose.yml:1) starts:
 
 - PostgreSQL with PostGIS
-- Redis for station cache
+- Redis as station cache read source
 - LocalStack for DynamoDB, SQS, Lambda, IAM and logs
 - backend service wired to those local dependencies
+- cache projection queue and lambda for locker cache updates
 
 Important:
 
@@ -348,16 +351,22 @@ docker run --name locker-redis -p 6379:6379 -d redis:7-alpine
 ```
 
 What LocalStack bootstraps automatically:
-
-- Redis:
-  - station cache keys under `REDIS_STATION_CACHE_PREFIX`
 - SQS queues:
   - `locker-operations-queue`
+  - `locker-dev-cache-projection`
 - DynamoDB tables:
   - `locker-dev-operations-dynamodb`
   - `locker-dev-locker-cache`
 - Local operations Lambda:
   - `locker-command-handler`
+- Local cache projection Lambda:
+  - `locker-cache-projection-handler`
+
+Current locker cache write path:
+
+`backend -> locker-dev-cache-projection -> locker-cache-projection-handler -> locker-dev-locker-cache`
+
+Station cache is not handled by this lambda flow. Stations remain backend-owned via Redis cache with RDS fallback.
 
 Bootstrap files:
 
@@ -512,14 +521,14 @@ http://localhost:3555/api/v1
 | `GET` | `/api/v1/lockers/admin/boxes/:id` | Staff locker details from backend projection | Bearer Operator/Admin |
 | `POST` | `/api/v1/lockers/admin/boxes` | Create locker box | Bearer Operator/Admin |
 | `PATCH` | `/api/v1/lockers/admin/boxes/:id/status` | Change locker status | Bearer Operator/Admin |
-| `POST` | `/api/v1/lockers/admin/boxes/:id/resync-cache` | Rebuild locker cache in DynamoDB directly from backend state | Bearer Admin |
+| `POST` | `/api/v1/lockers/admin/boxes/:id/resync-cache` | Immediate locker cache refresh in DynamoDB | Bearer Admin |
 | `PATCH` | `/api/v1/lockers/oper/boxes/:id/delete` | Delete locker box | Bearer Operator |
 | `GET` | `/api/v1/lockers/admin/stations` | Staff station list from backend projection | Bearer Operator/Admin |
 | `GET` | `/api/v1/lockers/admin/stations/:id` | Staff station details from backend projection | Bearer Operator/Admin |
 | `POST` | `/api/v1/lockers/admin/stations` | Create station | Bearer Operator/Admin |
 | `PATCH` | `/api/v1/lockers/admin/stations/:id/status` | Change station status | Bearer Operator/Admin |
-| `POST` | `/api/v1/lockers/admin/stations/:id/resync-cache` | Rebuild station cache in Redis directly from RDS | Bearer Admin |
-| `POST` | `/api/v1/lockers/admin/cache/reconcile` | Reconcile stations against Redis and lockers against DynamoDB | Bearer Admin |
+| `POST` | `/api/v1/lockers/admin/stations/:id/resync-cache` | Immediate station cache refresh in Redis | Bearer Admin |
+| `POST` | `/api/v1/lockers/admin/cache/reconcile` | Admin reconcile endpoint for unscheduled direct cache refresh | Bearer Admin |
 | `PATCH` | `/api/v1/lockers/oper/stations/:id/delete` | Delete station | Bearer Operator |
 
 #### Bookings (coming soon)
@@ -718,20 +727,21 @@ curl -X POST http://localhost:3555/api/v1/lockers/admin/cache/reconcile \
 
 Behaviour:
 
-- stations: compare RDS projections with Redis and write missing/stale station cache directly from backend
-- lockers: compare RDS metadata with DynamoDB and upsert/delete locker cache records directly from backend
-- if Redis cannot be read, station reconcile switches to full station resync from RDS
-- if DynamoDB cannot be read, locker reconcile switches to full locker resync from backend state
+- endpoint is kept for unscheduled cache reconcile / refresh operations
+- stations: compare RDS projections with Redis and upsert/delete cache records directly
+- lockers: compare RDS metadata with DynamoDB and upsert/delete cache records directly
+- if Redis cannot be read, station reconcile switches to `rds-fallback-full-resync`
+- if DynamoDB cannot be read, locker reconcile switches to `rds-fallback-full-resync`
 - station cache freshness depends on the station projection version. Locker create/status/delete operations bump `LockerStation.version`, so `cache/reconcile` can detect stale station cache entries even when only the station's locker set changed
-- station status change and station delete also rewrite dependent locker records in DynamoDB so embedded station state stays consistent
+- locker create/status/delete update locker cache in DynamoDB directly
+- station create stays deferred and does not rewrite Redis directly
+- station status/delete update dependent locker cache in DynamoDB directly, but keep Redis station cache deferred
 - `INACTIVE` stations are not deleted unless they are also `isDeleted = true`
 - After locker mutations, stale station cache symptoms usually look like:
   - `GET /api/v1/lockers/stations` returns `_count.lockers: 0`
   - `GET /api/v1/lockers/stations/:id` returns `lockers: []`
   - `GET /api/v1/lockers/boxes` still returns locker rows from DynamoDB
-- Running `POST /api/v1/lockers/admin/cache/reconcile` should rewrite the missing station projections into Redis and realign locker cache rows in DynamoDB.
-
-Note: catalog cache reconciliation no longer uses outbox/SQS. Stations sync directly to Redis, and lockers sync directly to DynamoDB.
+- Running `POST /api/v1/lockers/admin/cache/reconcile` rewrites drifted cache records immediately.
 
 ## 🏥 Health Check Async
 
@@ -810,7 +820,7 @@ Response `500 Internal Server Error`:
 | `USE_LAMBDA_HEALTH` | Behaviour |
 |---------------------|-----------|
 | `false` (default) | Node.js queries PostgreSQL directly |
-| `true` + valid `LAMBDA_HEALTH_URL` | Calls AWS Lambda first, then falls back to local DB health check on timeout/error |
+| `true` + valid `LAMBDA_HEALTH_URL` | Calls AWS Lambda first, then falls back to local DB health check on timeout, transport error, or non-`ok` Lambda status |
 
 ---
 
@@ -831,10 +841,10 @@ backend/
 │   │   └── operationsController.ts     # Async operation handlers
 │   ├── services/
 │   │   ├── AuthServiceImplPostgres.ts  # Auth business logic
-│   │   ├── CacheSyncService.ts         # Redis station reconcile + Dynamo locker reconcile
+│   │   ├── CacheSyncService.ts         # Direct cache reconcile for Redis + DynamoDB
 │   │   ├── HealthService.ts            # Health check (mock + lambda)
-│   │   ├── LockerBoxServiceImplPostgress.ts # Locker read/write service with Dynamo + Redis cache sync
-│   │   ├── LockerStationServiceImplPostgress.ts # Station read/write service with Redis + Dynamo cache sync
+│   │   ├── LockerBoxServiceImplPostgress.ts # Locker CRUD + locker cache reads
+│   │   ├── LockerStationServiceImplPostgress.ts # Station CRUD + station cache reads
 │   │   ├── OperationService.ts         # Async operation status flow
 │   │   ├── dynamoService.ts            # DynamoDB access
 │   │   ├── prismaService.ts            # Prisma client wrapper

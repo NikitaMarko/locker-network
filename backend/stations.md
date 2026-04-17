@@ -34,6 +34,7 @@ Validation failures are also returned with `error.code = "HTTP_ERROR"` because r
 
 - Roles: all
 - Primary source: Redis station cache
+- Redis catalog is reconciled with RDS projections before response is returned
 - Fallback source: RDS projections when Redis is unavailable or access is denied
 - Query params: `city`, `lat`, `lng`, `radius`, `status`
 
@@ -68,6 +69,7 @@ Example `200 OK` body:
 Responses:
 
 - `200 OK` - station list returned, including empty array
+- response may include stations loaded from RDS when Redis catalog is partial or stale; backend warms missing/stale entries back into Redis
 - `400 Bad Request` - invalid query params:
   invalid `status`, invalid numeric coercion for `lat|lng|radius`, or only one of `lat/lng` was provided
 - `500 Internal Server Error` - unexpected cache/repository/service failure
@@ -239,7 +241,7 @@ Responses:
 
 - Roles: operator, admin
 - Writes station to RDS
-- Updates station cache in Redis directly from backend
+- Backend does not write Redis station cache directly on create
 
 Request body:
 
@@ -296,8 +298,8 @@ Responses:
 
 - Roles: operator, admin
 - Updates RDS first
-- Updates station projection in Redis directly from backend
-- Enqueues dependent locker projections through outbox for DynamoDB
+- Backend does not write Redis station cache directly on status change
+- Rewrites dependent locker projections directly in DynamoDB
 
 Request body:
 
@@ -350,7 +352,8 @@ Responses:
 #### POST /api/v1/lockers/admin/stations/:id/resync-cache
 
 - Roles: admin
-- Rebuilds one station projection from RDS and writes it directly to Redis
+- Rebuilds one station projection from RDS
+- Writes station cache directly to Redis
 
 Example `202 Accepted` body:
 
@@ -369,7 +372,7 @@ Example `202 Accepted` body:
 
 Responses:
 
-- `202 Accepted` - station cache resync requested, response contains `stationId`
+- `202 Accepted` - station cache refreshed, response contains `stationId`
 - `400 Bad Request` - `id` is not a UUID
 - `401 Unauthorized` - missing bearer token or invalid token
 - `403 Forbidden` - authenticated user does not have role `ADMIN`
@@ -379,11 +382,10 @@ Responses:
 #### POST /api/v1/lockers/admin/cache/reconcile
 
 - Roles: admin
+- Administrative endpoint reserved for unscheduled cache reconcile / refresh flow
 - Compares RDS station projections with Redis station cache
-- Upserts missing or stale station projections directly to Redis
-- Deletes stale Redis station records that are absent from RDS projections because they were soft-deleted
-- Falls back to full RDS resync for stations if Redis cannot be read
-- Runs locker reconciliation separately against DynamoDB
+- Compares RDS locker projections with DynamoDB locker cache
+- Upserts and deletes cache records directly
 - Does not delete stations that are only `INACTIVE`
 
 Example `202 Accepted` body:
@@ -417,7 +419,7 @@ Example `202 Accepted` body:
 
 Responses:
 
-- `202 Accepted` - reconciliation started/completed for current request and returns counts plus cache sync meta
+- `202 Accepted` - reconcile started/completed and cache state updated directly
 - `401 Unauthorized` - missing bearer token or invalid token
 - `403 Forbidden` - authenticated user does not have role `ADMIN`
 - `500 Internal Server Error` - unexpected projection/cache/service failure
@@ -427,8 +429,8 @@ Responses:
 - Roles: operator
 - Soft-deletes station in RDS
 - Marks station status as `INACTIVE`
-- Deletes station cache from Redis directly from backend
-- Enqueues locker delete projections through outbox
+- Backend does not delete Redis station cache directly
+- Deletes dependent locker cache records directly from DynamoDB
 
 Example `200 OK` body:
 

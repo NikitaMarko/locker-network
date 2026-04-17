@@ -1,6 +1,6 @@
 # Станции, ячейки и кэширование по ролям
 
-Этот документ описывает актуальную схему после переноса station cache в Redis на стороне backend.
+Этот документ описывает актуальную схему station/locker cache.
 
 ## 1. Источники данных
 
@@ -13,10 +13,10 @@
 ### Станции
 
 ```text
-POST/PATCH/DELETE station or locker
-  -> PostgreSQL
-  -> build station projection from RDS
-  -> backend writes station cache directly to Redis
+GET station
+  -> Redis
+  -> fallback to PostgreSQL projection on miss
+  -> backend warms Redis
 ```
 
 ### Ячейки
@@ -25,7 +25,7 @@ POST/PATCH/DELETE station or locker
 POST/PATCH/DELETE locker
   -> PostgreSQL
   -> build locker projection in backend
-  -> DynamoDB locker cache
+  -> backend writes DynamoDB locker cache directly
 ```
 
 ## 3. Поведение по ролям
@@ -55,8 +55,8 @@ POST/PATCH/DELETE locker
 
 - читает admin-view напрямую из PostgreSQL
 - пишет в PostgreSQL
-- после записи backend сам обновляет station cache в Redis
-- backend сам обновляет locker cache в DynamoDB
+- station CRUD не обновляет Redis напрямую
+- locker CRUD обновляет locker cache в DynamoDB напрямую
 
 ### `admin`
 
@@ -65,14 +65,17 @@ POST/PATCH/DELETE locker
 - `POST /api/v1/lockers/admin/boxes/:id/resync-cache`
 - `POST /api/v1/lockers/admin/cache/reconcile`
 
-`resync-cache` для станции пишет projection напрямую в Redis.
+`resync-cache` endpoints выполняют принудительное точечное обновление кэша:
 
-`resync-cache` для ячейки пишет locker projection напрямую в DynamoDB.
+- station resync пишет projection в Redis напрямую
+- locker resync пишет projection в DynamoDB напрямую
 
-`cache/reconcile` работает раздельно:
+`cache/reconcile` оставлен как административная точка для внепланового reconcile/refresh кэша.
 
-- stations: сравнивает RDS и Redis, затем пишет в Redis напрямую
-- lockers: сравнивает RDS и DynamoDB, затем пишет в DynamoDB напрямую
+Он работает как direct-write reconcile:
+
+- stations: сравнивает RDS и Redis, затем upsert/delete в Redis
+- lockers: сравнивает RDS и DynamoDB, затем upsert/delete в DynamoDB
 
 ## 4. Что лежит в station cache
 
@@ -109,11 +112,14 @@ Locker cache хранится в DynamoDB, а runtime-статусы ячеек 
 Если DynamoDB недоступна:
 
 - locker read endpoint'ы возвращают ошибку, потому что runtime-статусы доступны только в DynamoDB
-- locker reconcile переключается в режим full resync from backend state
+- locker reconcile переключается в режим full resync from RDS projection
 
 ## 7. Итог
 
-- station cache полностью обслуживается backend + Redis
-- locker cache остается в DynamoDB
+- station cache читается backend из Redis и догревается backend при read miss
+- locker cache читается backend из DynamoDB
+- locker CRUD обновляет locker cache напрямую
+- station status/delete обновляют связанные locker cache записи в DynamoDB напрямую
+- admin resync/reconcile обновляют кэши напрямую
 - PostgreSQL хранит station metadata и locker metadata без runtime-статусов
 - DynamoDB является источником истины для locker statuses

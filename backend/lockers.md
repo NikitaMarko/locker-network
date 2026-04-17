@@ -216,8 +216,7 @@ Responses:
 
 - Roles: operator, admin
 - Writes locker to RDS
-- Enqueues locker cache projection through outbox for DynamoDB
-- Updates related station cache in Redis directly from backend
+- Writes locker cache directly to DynamoDB
 
 Request body:
 
@@ -273,8 +272,7 @@ Responses:
 
 - Roles: operator, admin
 - Updates RDS first
-- Enqueues locker cache projection through outbox for DynamoDB
-- Updates related station cache in Redis directly from backend
+- Writes updated locker projection directly to DynamoDB
 - Current route is a generic status change endpoint, not a concurrency-safe booking endpoint
 - Concurrent requests for the same locker are not guarded by atomic booking logic yet
 
@@ -330,7 +328,8 @@ Responses:
 #### POST /api/v1/lockers/admin/boxes/:id/resync-cache
 
 - Roles: admin
-- Enqueues one locker projection into outbox
+- Rebuilds one locker projection from backend state
+- Writes locker cache directly to DynamoDB
 
 Example `202 Accepted` body:
 
@@ -349,7 +348,7 @@ Example `202 Accepted` body:
 
 Responses:
 
-- `202 Accepted` - locker cache resync requested, response contains `lockerBoxId`
+- `202 Accepted` - locker cache refreshed, response contains `lockerBoxId`
 - `400 Bad Request` - `id` is not a UUID
 - `401 Unauthorized` - missing bearer token or invalid token
 - `403 Forbidden` - authenticated user does not have role `ADMIN`
@@ -360,8 +359,7 @@ Responses:
 
 - Roles: operator
 - Soft-deletes in RDS
-- Enqueues locker delete projection through outbox
-- Updates related station cache in Redis directly from backend
+- Deletes locker cache directly from DynamoDB
 
 Example `200 OK` body:
 

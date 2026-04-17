@@ -78,7 +78,7 @@ services:
       AWS_SECRET_ACCESS_KEY: test
       AWS_ENDPOINT_URL: http://localstack:4566
       DYNAMODB_ENDPOINT_URL: http://localstack:4566
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: redis://default:kp9y9aAJefAbkTURGQoUVUht2ied14gf@redis-18826.c6.eu-west-1-1.ec2.cloud.redislabs.com:18826
       SQS_ENDPOINT_URL: http://localstack:4566
       DYNAMO_TABLE_NAME: locker-dev-operations-dynamodb
       DYNAMO_LOCKER_CACHE_TABLE_NAME: locker-dev-locker-cache

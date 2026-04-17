@@ -348,21 +348,21 @@
       "StationMutationMeta": {
         "type": "object",
         "properties": {
-          "stationCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED"] }
+          "stationCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED", "DEFERRED"] }
         }
       },
       "StationLockerMutationMeta": {
         "type": "object",
         "properties": {
-          "stationCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED"] },
-          "lockerCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED"] }
+          "stationCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED", "DEFERRED"] },
+          "lockerCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED", "DEFERRED"] }
         }
       },
       "LockerMutationMeta": {
         "type": "object",
         "properties": {
-          "stationCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED"] },
-          "lockerCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED"] }
+          "stationCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED", "DEFERRED"] },
+          "lockerCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED", "DEFERRED"] }
         }
       },
       "CacheReconcileMeta": {
@@ -947,7 +947,7 @@
       "post": {
         "tags": ["Stations"],
         "summary": "Create station",
-        "description": "Creates station in RDS and then writes station cache directly to Redis from backend.",
+        "description": "Creates station in RDS. Backend does not write Redis station cache directly; refresh remains deferred until read warmup or explicit admin refresh.",
         "security": [{ "bearerAuth": [] }],
         "requestBody": {
           "required": true,
@@ -1003,7 +1003,7 @@
       "patch": {
         "tags": ["Stations"],
         "summary": "Change station status",
-        "description": "Updates station metadata in PostgreSQL, rewrites dependent locker projections in DynamoDB, and refreshes station cache directly in Redis.",
+        "description": "Updates station metadata in PostgreSQL. Backend keeps Redis station cache deferred on station status change, but rewrites dependent locker projections in DynamoDB directly.",
         "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
@@ -1047,7 +1047,7 @@
       "post": {
         "tags": ["Stations"],
         "summary": "Resync station cache",
-        "description": "Rebuilds station projection from RDS and writes it directly to Redis. No outbox or lambda step is used for station cache.",
+        "description": "Administrative station cache refresh endpoint. Rebuilds one station projection from RDS and writes it directly to Redis.",
         "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
@@ -1097,7 +1097,7 @@
       "post": {
         "tags": ["Lockers"],
         "summary": "Create locker",
-        "description": "Creates locker metadata in RDS, writes locker runtime projection directly to DynamoDB, and updates related station cache directly in Redis.",
+        "description": "Creates locker metadata in RDS, then writes the locker cache projection directly to DynamoDB. Backend does not write related Redis station cache directly.",
         "security": [{ "bearerAuth": [] }],
         "requestBody": {
           "required": true,
@@ -1153,7 +1153,7 @@
       "patch": {
         "tags": ["Lockers"],
         "summary": "Change locker status",
-        "description": "Updates locker runtime status in DynamoDB, bumps related station version in RDS, and refreshes station cache directly in Redis.",
+        "description": "Updates locker status in PostgreSQL-backed metadata flow, then writes the updated locker cache projection directly to DynamoDB. Backend does not mutate related Redis station cache directly.",
         "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
@@ -1198,7 +1198,7 @@
       "post": {
         "tags": ["Lockers"],
         "summary": "Resync locker cache",
-        "description": "Rebuilds locker projection from backend state and writes it directly to DynamoDB. No outbox or lambda step is used for locker cache.",
+        "description": "Administrative locker cache refresh endpoint. Rebuilds one locker projection and writes it directly to DynamoDB.",
         "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
@@ -1238,7 +1238,7 @@
       "patch": {
         "tags": ["Lockers"],
         "summary": "Delete locker",
-        "description": "Soft-deletes locker metadata in PostgreSQL, removes locker runtime state from DynamoDB, and refreshes the related station cache in Redis.",
+        "description": "Soft-deletes locker metadata in PostgreSQL, then deletes the locker cache projection directly from DynamoDB. Backend does not refresh related Redis station cache directly.",
         "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
@@ -1275,7 +1275,7 @@
       "patch": {
         "tags": ["Stations"],
         "summary": "Delete station",
-        "description": "Soft-deletes station metadata in PostgreSQL, removes dependent locker projections from DynamoDB, and removes the station cache entry from Redis.",
+        "description": "Soft-deletes station metadata in PostgreSQL. Backend keeps Redis station cache deferred, but removes dependent locker projections from DynamoDB directly.",
         "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
@@ -1311,11 +1311,11 @@
       "post": {
         "tags": ["Stations", "Lockers"],
         "summary": "Reconcile catalog cache",
-        "description": "Reconciles station cache against Redis and locker cache against DynamoDB. Both station and locker cache writes happen directly in backend.",
+        "description": "Administrative reconcile endpoint for unscheduled cache refresh flow. Compares Redis and DynamoDB cache state against RDS projections and upserts or deletes stale cache records directly.",
         "security": [{ "bearerAuth": [] }],
         "responses": {
           "202": {
-            "description": "Cache reconcile started/completed",
+            "description": "Cache reconcile executed in backend direct-write mode",
             "content": {
               "application/json": {
                 "schema": {
