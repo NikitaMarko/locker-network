@@ -50,7 +50,7 @@ const StationsTable: React.FC = () => {
     const handleStatusToggle = async (id: string, currentStatus: StationStatus) => {
         const newStatus: StationStatus = currentStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
         try {
-            await stationsApi.updateStationStatus(id, newStatus);
+            await stationsApi.updateStationStatusAdmin(id, newStatus);
             setStations((prev) =>
                 prev.map((s) => s.stationId === id ? { ...s, status: newStatus } : s)
             );

@@ -58,13 +58,11 @@ export default function DashboardLayout() {
 
             ];
         }
-
         if(user?.role === ROLES.ADMIN){
             return [
                 { text: 'Operator Panel', path: dashboardPath, icon: <DashboardIcon /> },
-
+                { text: 'Active Alerts', path: '#', icon: <NotificationsIcon /> },
                 { text: 'Users', path: dashboardPath+"/users", icon: <DashboardIcon /> },
-
             ];
         }
 

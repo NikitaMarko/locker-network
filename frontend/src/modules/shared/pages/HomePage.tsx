@@ -3,7 +3,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import {useRef, useState} from 'react';
 import bg from '/smart-locker-project.jpeg';
 import { Paths } from "../../../config/paths/paths.ts";
-import { Button } from "@mui/material";
+import {Button} from "@mui/material";
 import {ROLES} from "../../../config/roles/roles.ts";
 
 
@@ -42,7 +42,7 @@ export function HomePage() {
     // const HEALTH_URL = 'http://localhost:3555/health';
     // const HEALTH_URL = 'http://locker-lb-823207158.eu-north-1.elb.amazonaws.com/health';
     const BASE_URL = import.meta.env.VITE_BASE_URL;
-
+    const isDev = false;
     const MAX_ATTEMPTS = 12;
     const POLLING_INTERVAL = 5000;
 
@@ -159,7 +159,7 @@ export function HomePage() {
 
     const buttonStyle = {
         padding: "12px 24px",
-        fontSize: "16px",
+        fontSize: "18px",
         borderRadius: "8px",
         border: "none",
         cursor: "pointer",
@@ -258,16 +258,18 @@ export function HomePage() {
                             Get started
                         </Link>
                     )}
+                    {isDev &&(
+                        <>
+                        <button
+                            onClick={handleHealthCheck}
+                            style={buttonStyle}
+                            disabled={loading}
+                        >
+                            {loading ? 'Checking...' : 'Sync Health Check'}
+                        </button>
+                        {/*</div>*/}
 
-                    <button
-                        onClick={handleHealthCheck}
-                        style={buttonStyle}
-                        disabled={loading}
-                    >
-                        {loading ? 'Checking...' : 'Sync Health Check'}
-                    </button>
-                </div>
-                <div style={{ display: "flex", gap: "15px", justifyContent: "center" }}>
+                        <div style={{ display: "flex", gap: "15px", justifyContent: "center" }}>
                     <button
                         onClick={handleAsyncHealthCheck}
                         style={{ ...buttonStyle, backgroundColor: asyncLoading || isPolling ? '#555' : '#4CAF50', cursor: asyncLoading || isPolling ? 'not-allowed' : 'pointer' }}
@@ -277,6 +279,9 @@ export function HomePage() {
                             ? 'IN_PROGRESS' : isPolling ? `Polling(${count}/${MAX_ATTEMPTS})...` : 'Async Health Check'}
                     </button>
                 </div>
+                        </>
+                    )}
+
 
 
                 {/* HEALTH */}
@@ -359,6 +364,7 @@ export function HomePage() {
 
 
             </div>
+        </div>
         </div>
     );
 }
