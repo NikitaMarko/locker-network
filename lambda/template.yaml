@@ -29,8 +29,6 @@ Parameters:
 Resources:
   HealthCheckFunction:
     Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: nodejs20.x
     Properties:
       FunctionName: !Sub locker-${Environment}-health-check
       Handler: dist/functions/healthCheck.handler
@@ -66,8 +64,6 @@ Resources:
   # ── Command Handler Lambda (triggered by SQS) ──
   CommandHandlerFunction:
     Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: nodejs20.x
     Properties:
       FunctionName: !Sub locker-${Environment}-command-handler
       Handler: dist/functions/operations/commandHandler.handler
@@ -109,8 +105,6 @@ Resources:
   # ── Cache Projection Handler Lambda ──
   CacheProjectionHandlerFunction:
     Type: AWS::Serverless::Function
-    Metadata:
-      BuildMethod: nodejs20.x
     Properties:
       FunctionName: !Sub locker-${Environment}-cache-projection-handler
       Handler: dist/functions/cache/cacheProjectionHandler.handler
