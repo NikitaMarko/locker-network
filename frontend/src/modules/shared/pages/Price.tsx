@@ -5,7 +5,7 @@ import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 const lockers = [
     {
         size: "S",
-        price: "5.00",
+        price: "5",
         description: "For small personal items",
         features: [
             "Phones, wallets, keys",
@@ -15,7 +15,7 @@ const lockers = [
     },
     {
         size: "M",
-        price: "10.00",
+        price: "7.5",
         description: "For everyday storage",
         features: [
             "Backpacks, small bags",
@@ -25,7 +25,7 @@ const lockers = [
     },
     {
         size: "L",
-        price: "15.00",
+        price: "10",
         description: "For larger items",
         features: [
             "Suitcases, equipment",
