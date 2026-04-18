@@ -87,6 +87,7 @@ export function LoginPage() {
                         <TextField
                             label="Email address"
                             type="email"
+                            autoComplete={'email'}
                             value={email}
                             onChange={e => setEmail(e.target.value)}
                             required
@@ -96,6 +97,7 @@ export function LoginPage() {
                             label="Password"
                             type={showPassword ? "text" : "password"}
                             value={password}
+                            autoComplete={'password'}
                             onChange={e => setPassword(e.target.value)}
                             required
                             fullWidth

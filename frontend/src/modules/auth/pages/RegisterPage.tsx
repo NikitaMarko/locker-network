@@ -89,6 +89,7 @@ export function RegisterPage() {
                         <TextField
                             label="Enter your name *"
                             value={name}
+                            autoComplete={'enter your name'}
                             onChange={e => setName(e.target.value)}
                             disabled={loading}
                             required
@@ -97,6 +98,7 @@ export function RegisterPage() {
                         <TextField
                             label="Email address *"
                             type="email"
+                            autoComplete={'enter your email'}
                             value={email}
                             onChange={e => setEmail(e.target.value)}
                             disabled={loading}
@@ -107,6 +109,7 @@ export function RegisterPage() {
                             label="Phone number *"
                             type="tel" placeholder={'+972'}
                             value={phone}
+                            autoComplete={'enter your phone number'}
                             onChange={e => setPhone(e.target.value)}
                             disabled={loading}
                             required
@@ -116,6 +119,7 @@ export function RegisterPage() {
                             label="Password *"
                             type={showPassword ? "text" : "password"}
                             value={password}
+                            autoComplete={'enter your password'}
                             onChange={e => setPassword(e.target.value)}
                             disabled={loading}
                             required
