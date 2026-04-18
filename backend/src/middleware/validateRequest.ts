@@ -17,11 +17,11 @@ export const validateRequest =
                 next();
             } catch (e) {
                 if (e instanceof ZodError) {
-                    const messages = e.issues.map(issue => ({
+                    const details = e.issues.map(issue => ({
                         field: issue.path.join('.'),
                         message: issue.message,
                     }));
-                    return next(new HttpError(400, JSON.stringify(messages)));
+                    return next(new HttpError(400, "Validation failed", "VALIDATION_ERROR", details));
                 }
                 next(e);
             }

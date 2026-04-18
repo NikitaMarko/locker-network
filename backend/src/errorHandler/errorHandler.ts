@@ -12,7 +12,7 @@ export const errorHandler = (err: Error, req: Request, res: Response, next: Next
         return sendError(res, 400, "VALIDATION_ERROR", "Validation failed", err.flatten().fieldErrors);
     }
     if (err instanceof HttpError) {
-        return sendError(res, err.status, "HTTP_ERROR", err.message);
+        return sendError(res, err.status, err.code, err.message, err.details);
     }
 
     (req.log || logger).error("Internal Server Error", err);
