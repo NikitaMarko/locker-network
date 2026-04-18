@@ -7,11 +7,12 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { useStations } from '../../../hooks/useStations';
 import { useAuth } from '../../../hooks/useAuth';
 import { ROLES } from '../../../config/roles/roles.ts';
 import { useNavigate } from 'react-router-dom';
-
+import { apiClient } from '../../../api/apiClient';
 
 const SUPPORTED_CITIES = [
     { code: 'PTK', name: 'Petah Tikva' },
@@ -34,10 +35,12 @@ export function AdminDashboard() {
     const { stations, createStation, deleteStation, refresh } = useStations();
 
     const [open, setOpen] = useState(false);
-
-
     const [formData, setFormData] = useState({ cityCode: '', address: '', latitude: '', longitude: '' });
     const [error, setError] = useState<string | null>(null);
+
+    const [isReconciling, setIsReconciling] = useState(false);
+    const [reconcileResult, setReconcileResult] = useState<any>(null);
+
 
     const handleCreate = async () => {
         setError(null);
@@ -86,6 +89,24 @@ export function AdminDashboard() {
         setError(null);
     };
 
+
+    const handleEmergencyUpdate = async () => {
+        setIsReconciling(true);
+        try {
+            const response = await apiClient.post('/lockers/admin/cache/reconcile');
+            setReconcileResult(response.data);
+        } catch (e: any) {
+            console.error("Reconciliation error:", e);
+                setReconcileResult({
+                success: false,
+                error: e.response?.data || e.message
+            });
+        } finally {
+            setIsReconciling(false);
+            refresh();
+        }
+    };
+
     return (
         <Box sx={{ maxWidth: '1100px', mx: 'auto', mt: 4 }}>
             <Typography variant="h4" fontWeight={900} textAlign="center" mb={4}>System Overview</Typography>
@@ -104,10 +125,27 @@ export function AdminDashboard() {
                             REFRESH
                         </Button>
 
-                        {user?.role === ROLES.ADMIN && (
-                            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setOpen(true)} sx={{ bgcolor: '#6baf5c', borderRadius: 2, fontWeight: 700 }}>
-                                ADD NEW STATION
-                            </Button>
+                       {user?.role === ROLES.ADMIN && (
+                            <>
+                                <Button
+                                    variant="contained"
+                                    startIcon={isReconciling ? <RefreshIcon sx={{ animation: 'spin 1s linear infinite' }} /> : <WarningAmberIcon />}
+                                    onClick={handleEmergencyUpdate}
+                                    disabled={isReconciling}
+                                    sx={{
+                                        bgcolor: '#e53935',
+                                        borderRadius: 2,
+                                        fontWeight: 700,
+                                        '&:hover': { bgcolor: '#c62828' }
+                                    }}
+                                >
+                                    {isReconciling ? 'SYNCING...' : 'EMERGENCY DB UPDATE'}
+                                </Button>
+
+                                <Button variant="contained" startIcon={<AddIcon />} onClick={() => setOpen(true)} sx={{ bgcolor: '#6baf5c', borderRadius: 2, fontWeight: 700 }}>
+                                    ADD NEW STATION
+                                </Button>
+                            </>
                         )}
                     </Stack>
                 </Box>
@@ -146,15 +184,13 @@ export function AdminDashboard() {
                 </TableContainer>
             </Paper>
 
+
             <Dialog open={open} onClose={handleClose} fullWidth maxWidth="xs">
                 <DialogTitle sx={{ fontWeight: 800 }}>Create New Station</DialogTitle>
                 <DialogContent>
                     <Stack spacing={2} sx={{ mt: 1 }}>
-
                         {error && (
-                            <Alert severity="error" sx={{ borderRadius: 2 }}>
-                                {error}
-                            </Alert>
+                            <Alert severity="error" sx={{ borderRadius: 2 }}>{error}</Alert>
                         )}
 
                         <TextField
@@ -201,6 +237,34 @@ export function AdminDashboard() {
                 <DialogActions sx={{ p: 3 }}>
                     <Button onClick={handleClose} sx={{ color: '#64748b', fontWeight: 700 }}>CANCEL</Button>
                     <Button onClick={handleCreate} variant="contained" sx={{ bgcolor: '#6baf5c', fontWeight: 700 }}>CREATE</Button>
+                </DialogActions>
+            </Dialog>
+
+
+            <Dialog open={!!reconcileResult} onClose={() => setReconcileResult(null)} maxWidth="sm" fullWidth>
+                <DialogTitle sx={{ fontWeight: 800, color: reconcileResult?.success === false ? '#e53935' : '#1e293b' }}>
+                    Reconciliation Result
+                </DialogTitle>
+                <DialogContent>
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            bgcolor: '#1e293b',
+                            color: reconcileResult?.success === false ? '#ef4444' : '#10b981',
+                            p: 2,
+                            borderRadius: 2,
+                            overflowX: 'auto'
+                        }}
+                    >
+                        <pre style={{ margin: 0, fontFamily: 'monospace', fontSize: '14px' }}>
+                            {JSON.stringify(reconcileResult, null, 2)}
+                        </pre>
+                    </Paper>
+                </DialogContent>
+                <DialogActions sx={{ p: 3 }}>
+                    <Button onClick={() => setReconcileResult(null)} variant="contained" sx={{ bgcolor: '#6baf5c', fontWeight: 700 }}>
+                        CLOSE
+                    </Button>
                 </DialogActions>
             </Dialog>
         </Box>

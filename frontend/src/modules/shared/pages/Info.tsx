@@ -1,127 +1,143 @@
-import { useState } from "react";
+import { Box, Typography, Paper, Stack } from "@mui/material";
+import Grid from '@mui/material/Grid';
+import HubOutlinedIcon from '@mui/icons-material/HubOutlined';
+import SecurityOutlinedIcon from '@mui/icons-material/SecurityOutlined';
+import TouchAppOutlinedIcon from '@mui/icons-material/TouchAppOutlined';
 
 export function Info() {
-    const [hovered, setHovered] = useState<number | null>(null);
-
     return (
-        <div style={wrapperStyle}>
-            <div style={containerStyle}>
+        <Box sx={{ minHeight: '92vh', bgcolor: '#f8fafc', py: 10, px: { xs: 2, md: 4 }, display: 'flex', alignItems: 'center' }}>
+            <Box sx={{ maxWidth: '1000px', mx: 'auto', width: '100%' }}>
 
-                <h1 style={titleStyle}>
+                <Typography variant="h3" fontWeight={900} textAlign="center" mb={2} color="#1e293b">
                     Smart Locker Network System
-                </h1>
+                </Typography>
 
-                <p style={leadStyle}>
+                <Typography variant="h6" textAlign="center" color="text.secondary" mb={8}>
                     A digital platform for booking and managing smart lockers across locations.
-                </p>
+                </Typography>
 
-                <div style={gridStyle}>
+                <Grid container spacing={4}>
 
-                    <div
-                        style={{
-                            ...cardStyle,
-                            ...(hovered === 1 ? cardHover : {})
-                        }}
-                        onMouseEnter={() => setHovered(1)}
-                        onMouseLeave={() => setHovered(null)}
-                    >
-                        <h3 style={{color:"#4CAF50"}}>About</h3>
-                        <p>
-                            Centralized system connecting multiple locker locations into a single network.
-                        </p>
-                    </div>
+                    {/* Карточка 1: About */}
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <Paper
+                            elevation={0}
+                            sx={{
+                                p: 4,
+                                height: '100%',
+                                borderRadius: 4,
+                                border: '1px solid #e2e8f0',
+                                transition: 'all 0.3s ease',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'flex-start',
+                                bgcolor: 'white',
+                                '&:hover': {
+                                    transform: 'translateY(-8px)',
+                                    boxShadow: '0 20px 40px rgba(0,0,0,0.08)',
+                                    borderColor: '#6baf5c',
+                                }
+                            }}
+                        >
+                            <HubOutlinedIcon sx={{ fontSize: 40, color: '#6baf5c', mb: 2 }} />
+                            <Typography variant="h5" fontWeight={800} mb={2} color="#1e293b">
+                                About
+                            </Typography>
+                            <Typography color="text.secondary" sx={{ lineHeight: 1.6, fontWeight: 500 }}>
+                                Centralized system connecting multiple locker locations into a single, unified network.
+                            </Typography>
+                        </Paper>
+                    </Grid>
 
-                    <div
-                        style={{
-                            ...cardStyle,
-                            ...(hovered === 2 ? cardHover : {})
-                        }}
-                        onMouseEnter={() => setHovered(2)}
-                        onMouseLeave={() => setHovered(null)}
-                    >
-                        <h3 style={{color:"#4CAF50"}}>Why it exists</h3>
-                        <p>
-                            Provides real-time availability, remote booking and controlled access.
-                        </p>
-                    </div>
+                    {/* Карточка 2: Why it exists */}
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <Paper
+                            elevation={0}
+                            sx={{
+                                p: 4,
+                                height: '100%',
+                                borderRadius: 4,
+                                border: '1px solid #e2e8f0',
+                                transition: 'all 0.3s ease',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'flex-start',
+                                bgcolor: 'white',
+                                '&:hover': {
+                                    transform: 'translateY(-8px)',
+                                    boxShadow: '0 20px 40px rgba(0,0,0,0.08)',
+                                    borderColor: '#6baf5c',
+                                }
+                            }}
+                        >
+                            <SecurityOutlinedIcon sx={{ fontSize: 40, color: '#6baf5c', mb: 2 }} />
+                            <Typography variant="h5" fontWeight={800} mb={2} color="#1e293b">
+                                Why it exists
+                            </Typography>
+                            <Typography color="text.secondary" sx={{ lineHeight: 1.6, fontWeight: 500 }}>
+                                Provides real-time availability, secure remote booking, and strictly controlled access for users.
+                            </Typography>
+                        </Paper>
+                    </Grid>
 
-                    <div
-                        style={{
-                            ...cardStyle,
-                            ...(hovered === 3 ? cardHover : {})
-                        }}
-                        onMouseEnter={() => setHovered(3)}
-                        onMouseLeave={() => setHovered(null)}
-                    >
-                        <h3 style={cardGreenText}>How it works</h3>
-                        <ul style={listStyle}>
-                            <li>Create account</li>
-                            <li>Select locker</li>
-                            <li>Book instantly</li>
-                        </ul>
-                    </div>
-                </div>
+                    {/* Карточка 3: How it works */}
+                    <Grid size={{ xs: 12, md: 4 }}>
+                        <Paper
+                            elevation={0}
+                            sx={{
+                                p: 4,
+                                height: '100%',
+                                borderRadius: 4,
+                                border: '1px solid #e2e8f0',
+                                transition: 'all 0.3s ease',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'flex-start',
+                                bgcolor: 'white',
+                                '&:hover': {
+                                    transform: 'translateY(-8px)',
+                                    boxShadow: '0 20px 40px rgba(0,0,0,0.08)',
+                                    borderColor: '#6baf5c',
+                                }
+                            }}
+                        >
+                            <TouchAppOutlinedIcon sx={{ fontSize: 40, color: '#6baf5c', mb: 2 }} />
+                            <Typography variant="h5" fontWeight={800} mb={2} color="#1e293b">
+                                How it works
+                            </Typography>
 
+                            <Stack component="ul" spacing={2} sx={{ pl: 0, m: 0, listStyle: 'none', width: '100%' }}>
+                                {['Create account', 'Select locker location', 'Book instantly'].map((step, index) => (
+                                    <Box component="li" key={index} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                        <Box
+                                            sx={{
+                                                width: 24,
+                                                height: 24,
+                                                borderRadius: '50%',
+                                                bgcolor: '#eaf4e8',
+                                                color: '#6baf5c',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                flexShrink: 0,
+                                                fontWeight: 800,
+                                                fontSize: '12px'
+                                            }}
+                                        >
+                                            {index + 1}
+                                        </Box>
+                                        <Typography variant="body2" fontWeight={700} color="#334155">
+                                            {step}
+                                        </Typography>
+                                    </Box>
+                                ))}
+                            </Stack>
+                        </Paper>
+                    </Grid>
 
-            </div>
-        </div>
+                </Grid>
+            </Box>
+        </Box>
     );
 }
-
-const cardGreenText = {
-    color:"#4CAF50"
-};
-const wrapperStyle = {
-    height: "100vh",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f5f6fa",
-};
-
-const containerStyle = {
-    width: "100%",
-    maxWidth: "900px",
-};
-
-/* HEADER */
-const titleStyle = {
-    textAlign: "center" as const,
-    marginBottom: "100px",
-};
-
-const leadStyle = {
-    textAlign: "center" as const,
-    color: "#555",
-    marginBottom: "30px",
-};
-
-/* GRID */
-const gridStyle = {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
-    gap: "20px",
-    marginBottom: "25px",
-};
-
-/* CARDS */
-const cardStyle = {
-    background: "white",
-    padding: "20px",
-    borderRadius: "12px",
-    boxShadow: "0 8px 20px rgba(0,0,0,0.05)",
-    transition: "all 0.2s ease",
-};
-
-const cardHover = {
-    transform: "translateY(-4px)",
-    boxShadow: "0 12px 25px rgba(0,0,0,0.1)",
-    border: "1px solid #4CAF50",
-};
-
-/* LIST */
-const listStyle = {
-    paddingLeft: "18px",
-    marginTop: "10px",
-    fontSize: "14px",
-};
