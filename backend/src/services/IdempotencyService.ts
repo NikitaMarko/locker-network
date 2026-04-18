@@ -5,10 +5,28 @@ import { Request, Response } from "express";
 import { IdempotencyStatus } from "../contracts/idempotency.dto";
 import { HttpError } from "../errorHandler/HttpError";
 import { idempotencyRepository } from "../repositories/rds/IdempotencyRepository";
-import { sendSuccess } from "../utils/response";
+import { buildErrorPayload, buildSuccessPayload, sendSuccess } from "../utils/response";
+
+function normalizePayload(value: unknown): unknown {
+    if (Array.isArray(value)) {
+        return value.map((item) => normalizePayload(item));
+    }
+
+    if (value && typeof value === "object") {
+        return Object.keys(value as Record<string, unknown>)
+            .sort()
+            .reduce<Record<string, unknown>>((acc, key) => {
+                acc[key] = normalizePayload((value as Record<string, unknown>)[key]);
+                return acc;
+            }, {});
+    }
+
+    return value;
+}
 
 function hashPayload(payload: unknown) {
-    return crypto.createHash("sha256").update(JSON.stringify(payload ?? {})).digest("hex");
+    const normalizedPayload = normalizePayload(payload ?? {});
+    return crypto.createHash("sha256").update(JSON.stringify(normalizedPayload)).digest("hex");
 }
 
 function extractIdempotencyKey(req: Request) {
@@ -57,20 +75,39 @@ class IdempotencyService {
             return res.status(existing.responseStatusCode).json(existing.responseBody);
         }
 
-        const result = await handler();
-        const responseBody = {
-            success: true,
-            correlationId: res.getHeader("x-correlation-id") as string | undefined,
-            data: result.body,
-            ...(result.meta && { meta: result.meta }),
-        };
+        try {
+            const result = await handler();
+            const responseStatusCode = result.statusCode ?? 200;
+            const responseBody = buildSuccessPayload(
+                res.getHeader("x-correlation-id") as string | undefined,
+                result.body,
+                result.meta
+            );
 
-        await idempotencyRepository.complete(recordId, {
-            statusCode: result.statusCode ?? 200,
-            body: responseBody,
-        });
+            await idempotencyRepository.complete(recordId, {
+                statusCode: responseStatusCode,
+                body: responseBody,
+            });
 
-        return res.status(result.statusCode ?? 200).json(responseBody);
+            return res.status(responseStatusCode).json(responseBody);
+        } catch (error) {
+            if (error instanceof HttpError) {
+                const errorResponseBody = buildErrorPayload(
+                    res.getHeader("x-correlation-id") as string | undefined,
+                    error.code,
+                    error.message
+                );
+
+                await idempotencyRepository.fail(recordId, {
+                    statusCode: error.status,
+                    body: errorResponseBody,
+                });
+            } else {
+                await idempotencyRepository.release(recordId, requestHash);
+            }
+
+            throw error;
+        }
     }
 }
 

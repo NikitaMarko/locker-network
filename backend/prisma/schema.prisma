@@ -60,6 +60,7 @@ enum ErrorSeverity {
 enum IdempotencyRecordStatus {
   IN_PROGRESS
   COMPLETED
+  FAILED
 }
 
 model User {

@@ -61,6 +61,27 @@ class IdempotencyRepository {
             WHERE "recordId" = ${recordId}
         `;
     }
+
+    async fail(recordId: string, response: StoredIdempotencyResponse) {
+        await prismaService.$executeRaw`
+            UPDATE "IdempotencyRecord"
+            SET
+                "status" = CAST(${IdempotencyStatus.FAILED} AS "IdempotencyRecordStatus"),
+                "responseStatusCode" = ${response.statusCode},
+                "responseBody" = ${JSON.parse(JSON.stringify(response.body))}::jsonb,
+                "updatedAt" = NOW()
+            WHERE "recordId" = ${recordId}
+        `;
+    }
+
+    async release(recordId: string, requestHash: string) {
+        await prismaService.$executeRaw`
+            DELETE FROM "IdempotencyRecord"
+            WHERE "recordId" = ${recordId}
+              AND "requestHash" = ${requestHash}
+              AND "status" = CAST(${IdempotencyStatus.IN_PROGRESS} AS "IdempotencyRecordStatus")
+        `;
+    }
 }
 
 export const idempotencyRepository = new IdempotencyRepository();
