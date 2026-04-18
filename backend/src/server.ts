@@ -87,7 +87,14 @@ export const createApp = () => {
                 env.CLOUDFRONT_URL
             ].filter(Boolean) as string[],
             methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-            allowedHeaders: ["Content-Type", "Authorization", "Accept"],
+            allowedHeaders: [
+                "Content-Type",
+                "Authorization",
+                "Accept",
+                "Idempotency-Key",
+                "X-Correlation-Id",
+            ],
+            exposedHeaders: ["x-correlation-id"],
             credentials: true
         })
     );
