@@ -1,11 +1,12 @@
-import { LockerSize, LockerStatus, StationStatus } from "@prisma/client";
+import { LockerSize, LockerStatus, StationStatus, TechnicalStatus } from "@prisma/client";
 
 export interface StationCacheLockerDto {
     lockerBoxId: string;
     stationId: string;
     code: string;
     size: LockerSize;
-    status: LockerStatus;
+    status: LockerStatus | null;
+    techStatus: TechnicalStatus;
     version: number;
     lastStatusChangedAt: string;
     pricePerHour: string | null;
@@ -43,7 +44,8 @@ export interface LockerCacheDto {
     stationId: string;
     code: string;
     size: LockerSize;
-    status: LockerStatus;
+    status: LockerStatus | null;
+    techStatus: TechnicalStatus;
     version: number;
     lastStatusChangedAt: string;
     pricePerHour: string | null;
@@ -73,7 +75,8 @@ export interface LockerResponseDto {
     stationId: string;
     code: string;
     size: LockerSize;
-    status: LockerStatus;
+    status: LockerStatus | null;
+    techStatus: TechnicalStatus;
     version: number;
     lastStatusChangedAt: string;
     pricePerHour: string | null;

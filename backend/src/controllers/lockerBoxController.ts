@@ -52,6 +52,14 @@ export const changeBoxStatus = async (req: Request, res: Response, next: NextFun
     }
 };
 
+export const changeBoxTechStatus = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await boxService.changeBoxTechStatus(req, res);
+    } catch (e) {
+        next(e);
+    }
+};
+
 export const deleteBox = async (req: Request, res: Response, next: NextFunction) => {
     try {
         return await boxService.deleteBox(req,res);

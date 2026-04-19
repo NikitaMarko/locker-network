@@ -1,4 +1,4 @@
-import { LockerStatus, Prisma } from "@prisma/client";
+import { LockerStatus, Prisma, TechnicalStatus } from "@prisma/client";
 
 import {
     LockerCacheDto,
@@ -29,14 +29,62 @@ function stationProjectionVersion(updatedAt: Date, version: number) {
 }
 
 function fallbackLockerState(locker: {
-    status: LockerStatus;
+    status: LockerStatus | null;
+    techStatus: TechnicalStatus;
     version: number;
     lastStatusChangedAt: Date;
 }) {
     return {
         status: locker.status,
+        techStatus: locker.techStatus,
         version: locker.version,
         lastStatusChangedAt: locker.lastStatusChangedAt.toISOString(),
+    };
+}
+
+function buildLockerProjectionFromRds(locker: {
+    lockerBoxId: string;
+    stationId: string;
+    code: string;
+    size: "S" | "M" | "L";
+    status: LockerStatus | null;
+    techStatus: TechnicalStatus;
+    version: number;
+    lastStatusChangedAt: Date;
+    station: {
+        address: string | null;
+        latitude: number;
+        longitude: number;
+        status: "READY" | "ACTIVE" | "INACTIVE" | "MAINTENANCE";
+        city: {
+            code: string;
+            name: string;
+            Pricing: Array<{ size: "S" | "M" | "L"; pricePerHour: Prisma.Decimal }>;
+        };
+    };
+}): LockerCacheDto {
+    const priceItem = locker.station.city.Pricing.find((item) => item.size === locker.size);
+
+    return {
+        lockerBoxId: locker.lockerBoxId,
+        stationId: locker.stationId,
+        code: locker.code,
+        size: locker.size,
+        status: locker.status,
+        techStatus: locker.techStatus,
+        version: locker.version,
+        lastStatusChangedAt: locker.lastStatusChangedAt.toISOString(),
+        pricePerHour: decimalToString(priceItem?.pricePerHour),
+        station: {
+            address: locker.station.address ?? null,
+            latitude: locker.station.latitude,
+            longitude: locker.station.longitude,
+            status: locker.station.status,
+            city: {
+                code: locker.station.city.code,
+                name: locker.station.city.name,
+            },
+        },
     };
 }
 
@@ -106,6 +154,8 @@ async function loadAllCachedLockers() {
 interface ILockerCatalogProjectionService {
     getStationCacheProjection(stationId: string): Promise<StationCacheDto | null>;
     getLockerCacheProjection(lockerBoxId: string): Promise<LockerCacheDto | null>;
+    getStationAdminProjection(stationId: string): Promise<StationCacheDto | null>;
+    getLockerAdminProjection(lockerBoxId: string): Promise<LockerCacheDto | null>;
     getLockerCacheProjectionsByStationId(stationId: string): Promise<LockerCacheDto[]>;
     getAllStationCacheProjections(): Promise<StationCacheDto[]>;
     getAllLockerCacheProjections(): Promise<LockerCacheDto[]>;
@@ -156,6 +206,7 @@ class LockerCatalogProjectionService implements ILockerCatalogProjectionService 
             ...(cachedLockersMap.get(locker.lockerBoxId)
                 ? {
                     status: cachedLockersMap.get(locker.lockerBoxId)!.status,
+                    techStatus: locker.techStatus,
                     version: cachedLockersMap.get(locker.lockerBoxId)!.version,
                     lastStatusChangedAt: cachedLockersMap.get(locker.lockerBoxId)!.lastStatusChangedAt,
                 }
@@ -175,7 +226,7 @@ class LockerCatalogProjectionService implements ILockerCatalogProjectionService 
             longitude: station.longitude,
             status: station.status,
             version: stationProjectionVersion(station.updatedAt, station.version),
-            availableLockers: lockers.filter((locker) => locker.status === "AVAILABLE").length,
+            availableLockers: lockers.filter((locker) => locker.status === "AVAILABLE" && locker.techStatus === "ACTIVE").length,
             city: {
                 code: station.city.code,
                 name: station.city.name,
@@ -220,6 +271,7 @@ class LockerCatalogProjectionService implements ILockerCatalogProjectionService 
             code: locker.code,
             size: locker.size,
             status: runtimeState.status,
+            techStatus: runtimeState.techStatus,
             version: runtimeState.version,
             lastStatusChangedAt: runtimeState.lastStatusChangedAt,
             pricePerHour: decimalToString(priceItem?.pricePerHour),
@@ -250,6 +302,90 @@ class LockerCatalogProjectionService implements ILockerCatalogProjectionService 
 
         const projections = await Promise.all(lockers.map(({ lockerBoxId }) => this.getLockerCacheProjection(lockerBoxId, tx)));
         return projections.filter((item): item is LockerCacheDto => item !== null);
+    }
+
+    async getStationAdminProjection(stationId: string, tx: TransactionClient | typeof prismaService = prismaService): Promise<StationCacheDto | null> {
+        const station = await tx.lockerStation.findUnique({
+            where: { stationId },
+            include: {
+                city: {
+                    select: {
+                        code: true,
+                        name: true,
+                        Pricing: true,
+                    }
+                },
+                lockers: {
+                    where: { isDeleted: false },
+                    orderBy: { createdAt: "asc" },
+                },
+            },
+        });
+
+        if (!station || station.isDeleted) {
+            return null;
+        }
+
+        const pricingMap = buildPricingMap(
+            station.city.Pricing.map((item) => ({
+                cityId: station.cityId,
+                size: item.size,
+                pricePerHour: item.pricePerHour,
+            }))
+        );
+
+        const lockers: StationCacheLockerDto[] = station.lockers.map((locker) => ({
+            lockerBoxId: locker.lockerBoxId,
+            stationId: locker.stationId,
+            code: locker.code,
+            size: locker.size,
+            status: locker.status,
+            techStatus: locker.techStatus,
+            version: locker.version,
+            lastStatusChangedAt: locker.lastStatusChangedAt.toISOString(),
+            pricePerHour: pricingMap.get(`${station.cityId}-${locker.size}`) ?? null,
+        }));
+
+        return {
+            stationId: station.stationId,
+            cityId: station.cityId,
+            address: station.address ?? null,
+            latitude: station.latitude,
+            longitude: station.longitude,
+            status: station.status,
+            version: stationProjectionVersion(station.updatedAt, station.version),
+            availableLockers: station.lockers.length,
+            city: {
+                code: station.city.code,
+                name: station.city.name,
+            },
+            lockers,
+        };
+    }
+
+    async getLockerAdminProjection(lockerBoxId: string, tx: TransactionClient | typeof prismaService = prismaService): Promise<LockerCacheDto | null> {
+        const locker = await tx.lockerBox.findUnique({
+            where: { lockerBoxId },
+            include: {
+                station: {
+                    include: {
+                        city: {
+                            select: {
+                                code: true,
+                                name: true,
+                                Pricing: true,
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        if (!locker || locker.isDeleted || locker.station.isDeleted) {
+            return null;
+        }
+
+        return buildLockerProjectionFromRds(locker);
     }
 
     async getAllStationCacheProjections(tx: TransactionClient | typeof prismaService = prismaService): Promise<StationCacheDto[]> {
@@ -289,6 +425,7 @@ class LockerCatalogProjectionService implements ILockerCatalogProjectionService 
                 ...(cachedLockersMap.get(locker.lockerBoxId)
                     ? {
                         status: cachedLockersMap.get(locker.lockerBoxId)!.status,
+                        techStatus: locker.techStatus,
                         version: cachedLockersMap.get(locker.lockerBoxId)!.version,
                         lastStatusChangedAt: cachedLockersMap.get(locker.lockerBoxId)!.lastStatusChangedAt,
                     }
@@ -308,7 +445,7 @@ class LockerCatalogProjectionService implements ILockerCatalogProjectionService 
                 longitude: station.longitude,
                 status: station.status,
                 version: stationProjectionVersion(station.updatedAt, station.version),
-                availableLockers: lockers.filter((locker) => locker.status === "AVAILABLE").length,
+                availableLockers: lockers.filter((locker) => locker.status === "AVAILABLE" && locker.techStatus === "ACTIVE").length,
                 city: {
                     code: station.city.code,
                     name: station.city.name,
@@ -354,6 +491,7 @@ class LockerCatalogProjectionService implements ILockerCatalogProjectionService 
                 code: locker.code,
                 size: locker.size,
                 status: runtimeState.status,
+                techStatus: locker.techStatus,
                 version: runtimeState.version,
                 lastStatusChangedAt: runtimeState.lastStatusChangedAt,
                 pricePerHour: decimalToString(priceItem?.pricePerHour),
@@ -372,7 +510,25 @@ class LockerCatalogProjectionService implements ILockerCatalogProjectionService 
     }
 
     async getAllStationsAdminView(tx: TransactionClient | typeof prismaService = prismaService): Promise<StationListItemDto[]> {
-        const stations = await this.getAllStationCacheProjections(tx);
+        const stations = await tx.lockerStation.findMany({
+            where: { isDeleted: false },
+            include: {
+                city: {
+                    select: {
+                        code: true,
+                        name: true,
+                    }
+                },
+                _count: {
+                    select: {
+                        lockers: {
+                            where: { isDeleted: false },
+                        },
+                    },
+                },
+            },
+        });
+
         return stations.map((station) => ({
             stationId: station.stationId,
             cityId: station.cityId,
@@ -380,33 +536,59 @@ class LockerCatalogProjectionService implements ILockerCatalogProjectionService 
             latitude: station.latitude,
             longitude: station.longitude,
             status: station.status,
-            version: station.version,
+            version: stationProjectionVersion(station.updatedAt, station.version),
             distance: null,
             city: station.city,
             _count: {
-                lockers: station.availableLockers,
+                lockers: station._count.lockers,
             },
         }));
     }
 
     async getAllLockersAdminView(tx: TransactionClient | typeof prismaService = prismaService): Promise<LockerResponseDto[]> {
-        const lockers = await this.getAllLockerCacheProjections(tx);
-        return lockers.map((locker) => ({
-            lockerBoxId: locker.lockerBoxId,
-            stationId: locker.stationId,
-            code: locker.code,
-            size: locker.size,
-            status: locker.status,
-            version: locker.version,
-            lastStatusChangedAt: locker.lastStatusChangedAt,
-            pricePerHour: locker.pricePerHour,
-            station: {
-                address: locker.station.address,
-                city: locker.station.city.name,
-                latitude: locker.station.latitude,
-                longitude: locker.station.longitude,
+        const lockers = await tx.lockerBox.findMany({
+            where: {
+                isDeleted: false,
+                station: {
+                    isDeleted: false,
+                },
             },
-        }));
+            include: {
+                station: {
+                    include: {
+                        city: {
+                            select: {
+                                code: true,
+                                name: true,
+                                Pricing: true,
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        return lockers.map((locker) => {
+            const projection = buildLockerProjectionFromRds(locker);
+
+            return {
+                lockerBoxId: projection.lockerBoxId,
+                stationId: projection.stationId,
+                code: projection.code,
+                size: projection.size,
+                status: projection.status,
+                techStatus: projection.techStatus,
+                version: projection.version,
+                lastStatusChangedAt: projection.lastStatusChangedAt,
+                pricePerHour: projection.pricePerHour,
+                station: {
+                    address: projection.station.address,
+                    city: projection.station.city.name,
+                    latitude: projection.station.latitude,
+                    longitude: projection.station.longitude,
+                },
+            };
+        });
     }
 
     async getLockerIdsByStationId(stationId: string, tx: TransactionClient | typeof prismaService = prismaService): Promise<string[]> {

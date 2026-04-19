@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { LockerStatus } from "@prisma/client";
+import { LockerStatus, TechnicalStatus } from "@prisma/client";
 
 import { HttpError } from "../errorHandler/HttpError";
 import { lockerCatalogProjectionService } from "../repositories/prisma/LockerCatalogProjectionService";
@@ -9,11 +9,13 @@ import { sendSuccess } from "../utils/response";
 import { ActionType } from "./dto/operationDto";
 import { idempotencyService } from "./IdempotencyService";
 import {
+    assertValidLockerStatusTransition,
     deleteLockerProjection,
     loadLockers,
     loadOneLocker,
     LockerQuery,
     lockerMeta,
+    resolveLockerStateForTechStatus,
     syncLockerProjection,
     toLockerResponse,
 } from "./lockerBox/lockerBoxService.helpers";
@@ -47,6 +49,7 @@ export class LockerBoxServiceImplPostgres {
                                 stationId,
                                 code,
                                 size,
+                                status: null,
                             },
                             select: {
                                 lockerBoxId: true,
@@ -113,6 +116,7 @@ export class LockerBoxServiceImplPostgres {
             .filter((locker) => !size || locker.size === size)
             .filter((locker) => !status || locker.status === status)
             .filter((locker) => locker.station.status === "ACTIVE")
+            .filter((locker) => locker.techStatus === "ACTIVE")
             .map(toLockerResponse);
 
         return sendSuccess(res, result);
@@ -126,12 +130,16 @@ export class LockerBoxServiceImplPostgres {
             throw new HttpError(404, "Locker doesn't exist");
         }
 
+        if (locker.station.status !== "ACTIVE" || locker.techStatus !== "ACTIVE") {
+            throw new HttpError(404, "Locker doesn't exist");
+        }
+
         return sendSuccess(res, toLockerResponse(locker));
     }
 
     async getOneBoxAdmin(req: Request, res: Response) {
         const lockerBoxId = req.params.id as string;
-        const locker = await lockerCatalogProjectionService.getLockerCacheProjection(lockerBoxId);
+        const locker = await lockerCatalogProjectionService.getLockerAdminProjection(lockerBoxId);
 
         if (!locker) {
             throw new HttpError(404, "Locker doesn't exist");
@@ -152,10 +160,24 @@ export class LockerBoxServiceImplPostgres {
             async () => {
                 try {
                     const result = await prismaService.$transaction(async (tx) => {
-                        const locker = await tx.lockerBox.findUnique({ where: { lockerBoxId } });
+                        const locker = await tx.lockerBox.findUnique({
+                            where: { lockerBoxId },
+                            include: {
+                                station: {
+                                    select: {
+                                        status: true,
+                                    },
+                                },
+                            },
+                        });
                         if (!locker) throw new HttpError(404, "Locker doesn't exist");
                         if (locker.isDeleted) throw new HttpError(400, "Locker deleted");
-                        if (locker.status === status) throw new HttpError(400, "Locker is already " + status);
+                        assertValidLockerStatusTransition({
+                            nextStatus: status as LockerStatus,
+                            currentStatus: locker.status,
+                            techStatus: locker.techStatus,
+                            stationStatus: locker.station.status,
+                        });
 
                         const updatedLocker = await tx.lockerBox.update({
                             where: { lockerBoxId, isDeleted: false },
@@ -213,6 +235,126 @@ export class LockerBoxServiceImplPostgres {
                     }
 
                     throw new HttpError(500, "Failed to update locker status");
+                }
+            }
+        );
+    }
+
+    async changeBoxTechStatus(req: Request, res: Response) {
+        const lockerBoxId = req.params.id as string;
+        const techStatus = req.body.techStatus as TechnicalStatus;
+
+        return idempotencyService.execute(
+            req,
+            res,
+            `locker:tech-status:${lockerBoxId}`,
+            req.body,
+            async () => {
+                try {
+                    const result = await prismaService.$transaction(async (tx) => {
+                        const locker = await tx.lockerBox.findUnique({
+                            where: { lockerBoxId },
+                            include: {
+                                station: {
+                                    select: {
+                                        status: true,
+                                    },
+                                },
+                            },
+                        });
+                        if (!locker) throw new HttpError(404, "Locker doesn't exist");
+                        if (locker.isDeleted) throw new HttpError(400, "Locker deleted");
+                        if (locker.techStatus === techStatus) throw new HttpError(400, "Locker tech status is already " + techStatus);
+
+                        const runtimeState = resolveLockerStateForTechStatus({
+                            currentStatus: locker.status,
+                            nextTechStatus: techStatus,
+                            stationStatus: locker.station.status,
+                        });
+
+                        const updatedLocker = await tx.lockerBox.update({
+                            where: { lockerBoxId, isDeleted: false },
+                            data: {
+                                techStatus,
+                                status: runtimeState.nextStatus === null
+                                    ? { set: null }
+                                    : runtimeState.nextStatus,
+                                ...(runtimeState.statusChanged
+                                    ? { lastStatusChangedAt: new Date() }
+                                    : {}),
+                            },
+                            select: {
+                                lockerBoxId: true,
+                                stationId: true,
+                                status: true,
+                                techStatus: true,
+                            },
+                        });
+
+                        return updatedLocker;
+                    });
+
+                    const currentProjection = await lockerCatalogProjectionService.getLockerCacheProjection(lockerBoxId);
+                    if (!currentProjection) throw new HttpError(500, "Failed to build locker cache projection after tech status change");
+
+                    const nextProjection = {
+                        ...currentProjection,
+                        status: result.status,
+                        techStatus,
+                        ...(result.status !== currentProjection.status
+                            ? {
+                                version: currentProjection.version + 1,
+                                lastStatusChangedAt: new Date().toISOString(),
+                            }
+                            : {}),
+                    };
+
+                    const lockerCacheStatus = await syncLockerProjection(
+                        nextProjection,
+                        req.correlationId,
+                        req.user?.userId
+                    );
+                    const stationCacheStatus = "DEFERRED" as const;
+
+                    await logAudit({
+                        req,
+                        action: ActionType.LOCKER_UPDATE_TECH_STATUS,
+                        actorId: req.user?.userId,
+                        entityId: lockerBoxId,
+                        entityType: "LockerBox",
+                        details: {
+                            techStatus,
+                            status: result.status,
+                        },
+                    });
+
+                    return {
+                        body: {
+                            lockerBoxId,
+                            stationId: result.stationId,
+                            status: result.status,
+                            techStatus: result.techStatus
+                        },
+                        meta: lockerMeta(stationCacheStatus, lockerCacheStatus),
+                    };
+                } catch (e: unknown) {
+                    await logAudit({
+                        req,
+                        action: ActionType.LOCKER_UPDATE_TECH_STATUS_FAILED,
+                        actorId: req.user?.userId,
+                        entityId: lockerBoxId,
+                        entityType: "LockerBox",
+                        details: {
+                            techStatus,
+                            reason: e instanceof Error ? e.message : "Unknown error"
+                        }
+                    });
+
+                    if (e instanceof HttpError) {
+                        throw e;
+                    }
+
+                    throw new HttpError(500, "Failed to update locker tech status");
                 }
             }
         );

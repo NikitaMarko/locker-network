@@ -12,6 +12,7 @@ import {
 } from "../validation/stationSchemas";
 import {
     changeStatusLockerSchema,
+    changeTechStatusLockerSchema,
     createLockerSchema,
     getLockersWithParamsSchema,
     oneLockerSchema
@@ -37,6 +38,7 @@ lockersRoutes.get('/admin/boxes', authorize(Role.OPERATOR, Role.ADMIN), lockerBo
 lockersRoutes.get('/admin/boxes/:id', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(oneLockerSchema), lockerBoxController.getOneBoxAdmin);
 lockersRoutes.post('/admin/boxes', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(createLockerSchema), lockerBoxController.createBox);
 lockersRoutes.patch('/admin/boxes/:id/status', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(changeStatusLockerSchema), lockerBoxController.changeBoxStatus);
+lockersRoutes.patch('/admin/boxes/:id/tech-status', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(changeTechStatusLockerSchema), lockerBoxController.changeBoxTechStatus);
 lockersRoutes.post('/admin/boxes/:id/resync-cache', authorize(Role.ADMIN), validateRequest(oneLockerSchema), lockerBoxController.resyncLockerCache);
 
 lockersRoutes.get('/admin/stations', authorize(Role.OPERATOR, Role.ADMIN), lockerStationController.getAllStation);

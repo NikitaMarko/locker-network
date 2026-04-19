@@ -8,6 +8,14 @@ export const LockerStatusEnum = z.enum([
     "EXPIRED"
 ]);
 
+export const TechnicalStatusEnum = z.enum([
+    "READY",
+    "ACTIVE",
+    "INACTIVE",
+    "MAINTENANCE",
+    "FAULTY"
+]);
+
 export const LockerSizeEnum = z.enum([
     "S",
     "M",
@@ -39,6 +47,15 @@ export const oneLockerSchema = z.object({
 export const changeStatusLockerSchema = z.object({
     body: z.object({
         status: LockerStatusEnum,
+    }),
+    params: z.object({
+        id: z.string().uuid(),
+    })
+});
+
+export const changeTechStatusLockerSchema = z.object({
+    body: z.object({
+        techStatus: TechnicalStatusEnum,
     }),
     params: z.object({
         id: z.string().uuid(),

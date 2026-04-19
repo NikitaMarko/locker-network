@@ -34,6 +34,14 @@ enum LockerStatus {
   EXPIRED
 }
 
+enum TechnicalStatus {
+  READY
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+  FAULTY
+}
+
 enum BookingStatus {
   PENDING
   ACTIVE
@@ -149,8 +157,9 @@ model LockerBox {
   code String // "A-01"
   size LockerSize
 
-  status  LockerStatus @default(AVAILABLE)
-  version Int          @default(0)
+  status     LockerStatus?
+  techStatus TechnicalStatus @default(INACTIVE)
+  version    Int             @default(0)
 
   lastStatusChangedAt DateTime @default(now())
 

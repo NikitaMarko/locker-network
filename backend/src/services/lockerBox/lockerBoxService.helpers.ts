@@ -1,4 +1,7 @@
+import { LockerStatus, StationStatus, TechnicalStatus } from "@prisma/client";
+
 import { LockerCacheDto, LockerResponseDto } from "../../contracts/cache.dto";
+import { HttpError } from "../../errorHandler/HttpError";
 import { logger } from "../../Logger/winston";
 import { lockerCacheRepository } from "../../repositories/cache/LockerCacheRepository";
 import { lockerCatalogProjectionService } from "../../repositories/prisma/LockerCatalogProjectionService";
@@ -14,6 +17,13 @@ export type LockerQuery = {
 export type StationCacheStatus = "SYNCED" | "FAILED" | "DEFERRED";
 export type LockerCacheStatus = "DEFERRED" | "FAILED";
 
+const ACTIVE_RUNTIME_STATUSES = new Set<LockerStatus>([
+    "AVAILABLE",
+    "RESERVED",
+    "OCCUPIED",
+    "EXPIRED",
+]);
+
 export function toLockerResponse(locker: LockerCacheDto): LockerResponseDto {
     return {
         lockerBoxId: locker.lockerBoxId,
@@ -21,6 +31,7 @@ export function toLockerResponse(locker: LockerCacheDto): LockerResponseDto {
         code: locker.code,
         size: locker.size,
         status: locker.status,
+        techStatus: locker.techStatus,
         version: locker.version,
         lastStatusChangedAt: locker.lastStatusChangedAt,
         pricePerHour: locker.pricePerHour,
@@ -30,6 +41,59 @@ export function toLockerResponse(locker: LockerCacheDto): LockerResponseDto {
             latitude: locker.station.latitude,
             longitude: locker.station.longitude,
         },
+    };
+}
+
+export function assertValidLockerStatusTransition(input: {
+    nextStatus: LockerStatus;
+    currentStatus: LockerStatus | null;
+    techStatus: TechnicalStatus;
+    stationStatus: StationStatus;
+}) {
+    const { nextStatus, currentStatus, techStatus, stationStatus } = input;
+
+    if (currentStatus === nextStatus) {
+        throw new HttpError(400, "Locker is already " + nextStatus);
+    }
+
+    if (nextStatus === "FAULTY") {
+        throw new HttpError(400, "Use tech status endpoint to set locker FAULTY");
+    }
+
+    if (stationStatus !== "ACTIVE") {
+        throw new HttpError(400, "Locker runtime status can be changed only when station is ACTIVE");
+    }
+
+    if (techStatus !== "ACTIVE") {
+        throw new HttpError(400, "Locker runtime status can be changed only when tech status is ACTIVE");
+    }
+
+    if (!ACTIVE_RUNTIME_STATUSES.has(nextStatus)) {
+        throw new HttpError(400, "Unsupported locker runtime status transition");
+    }
+}
+
+export function resolveLockerStateForTechStatus(input: {
+    currentStatus: LockerStatus | null;
+    nextTechStatus: TechnicalStatus;
+    stationStatus: StationStatus;
+}) {
+    const { currentStatus, nextTechStatus, stationStatus } = input;
+
+    if (nextTechStatus === "ACTIVE") {
+        if (stationStatus !== "ACTIVE") {
+            throw new HttpError(400, "Locker tech status can be ACTIVE only when station is ACTIVE");
+        }
+
+        return {
+            nextStatus: currentStatus ?? "AVAILABLE",
+            statusChanged: currentStatus === null,
+        };
+    }
+
+    return {
+        nextStatus: null,
+        statusChanged: currentStatus !== null,
     };
 }
 

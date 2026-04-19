@@ -162,7 +162,7 @@ export class LockerStationServiceImplPostgres {
 
     async getOneStationAdmin(req: Request, res: Response) {
         const stationId = req.params.id as string;
-        const station = await lockerCatalogProjectionService.getStationCacheProjection(stationId);
+        const station = await lockerCatalogProjectionService.getStationAdminProjection(stationId);
 
         if (!station) {
             throw new HttpError(404, "Station doesn't exist");
