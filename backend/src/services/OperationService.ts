@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { Role } from "@prisma/client";
 import { v4 as uuidv4 } from "uuid";
 
 import { HttpError } from "../errorHandler/HttpError";
@@ -26,6 +27,7 @@ export class OperationCommandService {
                 const operationId = uuidv4();
                 const operation: Operation = {
                     operationId,
+                    userId: req.user?.userId,
                     timestamp: new Date().toISOString(),
                     status: OperationStatus.PENDING,
                     type: OperationType.HEALTH_CHECK
@@ -73,6 +75,7 @@ export class OperationCommandService {
             }
         );
     }
+
 }
 
 export class OperationReadService {
@@ -108,6 +111,10 @@ export class OperationReadService {
             throw new HttpError(404, "Operation not found");
         }
 
+        if (req.user?.role === Role.USER && (operation as Operation).userId && (operation as Operation).userId !== req.user.userId) {
+            throw new HttpError(403, "Access denied");
+        }
+
         await logAudit({
             req,
             action: ActionType.OPERATION_INFO,
@@ -116,7 +123,16 @@ export class OperationReadService {
             entityType: "Operation"
         });
 
-        return sendSuccess(res, operation);
+        const result = operation as Operation & { result?: Record<string, unknown> };
+
+        return sendSuccess(res, {
+            operationId: result.operationId,
+            status: result.status,
+            type: result.type,
+            timestamp: result.timestamp,
+            ...(result.errorMessage ? { errorMessage: result.errorMessage } : {}),
+            ...(result.result ? { data: result.result } : {}),
+        });
     }
 }
 

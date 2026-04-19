@@ -330,6 +330,8 @@ Primary route groups:
 - `GET /api/v1/cities`
 - `GET /api/v1/lockers/boxes`
 - `GET /api/v1/lockers/stations`
+- `POST /api/v1/bookings/init`
+- `GET /api/v1/bookings/:id`
 - admin/operator locker and station routes under `/api/v1/lockers/admin/*` and `/api/v1/lockers/oper/*`
 
 Then start infrastructure:
@@ -357,10 +359,13 @@ What LocalStack bootstraps automatically:
 - DynamoDB tables:
   - `locker-dev-operations-dynamodb`
   - `locker-dev-locker-cache`
+  - `locker-dev-bookings-dynamodb`
 - Local operations Lambda:
   - `locker-command-handler`
 - Local cache projection Lambda:
   - `locker-cache-projection-handler`
+ - Local payment webhook Lambda:
+   - `locker-payment-webhook`
 
 Current locker cache write path:
 
@@ -374,6 +379,7 @@ Bootstrap files:
 - TS Lambda source module: [lambda/package.json](/Users/dmitrii/Desktop/BackEnd/locker-network-repository/locker-network-repository/lambda/package.json:1)
 - operations handler: [commandHandler.ts](/Users/dmitrii/Desktop/BackEnd/locker-network-repository/locker-network-repository/lambda/src/functions/operations/commandHandler.ts:1)
 - cache projection handler: [cacheProjectionHandler.ts](/Users/dmitrii/Desktop/BackEnd/locker-network-repository/locker-network-repository/lambda/src/functions/cache/cacheProjectionHandler.ts:1)
+- payment webhook handler: [paymentWebhook.ts](/Users/dmitrii/Desktop/BackEnd/locker-network-repository/locker-network-repository/lambda/src/functions/bookings/paymentWebhook.ts:1)
 
 Before starting LocalStack-backed Docker flow, make sure Lambda TS artifacts exist:
 
@@ -742,6 +748,24 @@ Behaviour:
   - `GET /api/v1/lockers/stations/:id` returns `lockers: []`
   - `GET /api/v1/lockers/boxes` still returns locker rows from DynamoDB
 - Running `POST /api/v1/lockers/admin/cache/reconcile` rewrites drifted cache records immediately.
+
+## Booking Flow
+
+Booking initialization is async and split into staging plus payment confirmation:
+
+- `POST /api/v1/bookings/init` creates an operation in DynamoDB and sends `BOOKING_INIT` to SQS
+- `GET /api/v1/operations/:id` returns processing state and, on success, the staged payment payload including `paymentUrl`
+- frontend redirects directly to `paymentUrl`; there is no separate `POST /payments/create-session`
+- payment provider calls Lambda webhook `POST /payments/webhook`
+- webhook confirms the staged booking, writes final `Booking` and `Payment` rows to PostgreSQL, updates Dynamo booking state, and moves locker cache status to `OCCUPIED`
+- `GET /api/v1/bookings/:id` returns the final booking state for post-payment polling
+
+Required infra for this flow:
+
+- operations table in DynamoDB
+- locker cache table in DynamoDB
+- bookings table in DynamoDB for staged pending-payment records
+- payment webhook Lambda with access to PostgreSQL and both Dynamo tables
 
 ## 🏥 Health Check Async
 

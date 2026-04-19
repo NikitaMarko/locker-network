@@ -15,6 +15,7 @@ import {env} from "./config/env";
 import {errorHandler} from "./errorHandler/errorHandler";
 import {logger} from "./Logger/winston";
 import {authRouter} from "./routes/authRoutes";
+import { bookingsRoutes } from "./routes/bookingsRoutes";
 import {healthRouter} from "./routes/healthRoutes";
 import {HttpError} from './errorHandler/HttpError';
 import {lockersRoutes} from "./routes/lockersRoutes";
@@ -136,8 +137,10 @@ export const createApp = () => {
     const API_PREFIX = '/api/v1';
     app.get('/', (_, res) => res.send('API is running'));
     app.use(`${API_PREFIX}/auth`, authRouter)
+    app.use(`${API_PREFIX}/operations`, operationsRouter)
     app.use(`/operations`, operationsRouter)
     app.use(`/health`, healthRouter)
+    app.use(`${API_PREFIX}/bookings`, bookingsRoutes)
     app.use(`${API_PREFIX}/lockers`, lockersRoutes)
     app.use(`${API_PREFIX}/cities`, citiesRoutes)
 

@@ -35,6 +35,7 @@ const envSchema = z.object({
     DYNAMO_ROLE_ARN: z.string().optional(),
     DYNAMO_ROLE_SESSION_NAME: z.string().optional(),
     DYNAMO_TABLE_NAME: z.string().optional(),
+    DYNAMO_BOOKINGS_TABLE_NAME: z.string().optional(),
     DYNAMO_LOCKER_CACHE_TABLE_NAME: z.string().optional(),
     DYNAMODB_ENDPOINT_URL: optionalUrl,
     REDIS_URL: optionalUrl,

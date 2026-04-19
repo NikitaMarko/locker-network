@@ -1,4 +1,4 @@
-import { GetCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, PutCommand, ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 
 import { dynamoDocClient } from "../utils/awsClient";
 import { env } from "../config/env";
@@ -6,15 +6,19 @@ import { env } from "../config/env";
 import { Operation, OperationStatus } from "./dto/operationDto";
 
 const TABLE_NAME = env.DYNAMO_TABLE_NAME || "locker-dev-operations-dynamodb";
+const BOOKINGS_TABLE_NAME = env.DYNAMO_BOOKINGS_TABLE_NAME || "locker-dev-bookings-dynamodb";
 
 export async function createOperation(operation: Operation) {
     await dynamoDocClient.send(new PutCommand({
         TableName: TABLE_NAME,
         Item: {
             operationId: operation.operationId,
+            ...(operation.userId ? { userId: operation.userId } : {}),
             type: operation.type,
-            status: "PENDING",
-            timestamp: new Date().toISOString(),
+            status: operation.status,
+            timestamp: operation.timestamp,
+            ...(operation.result ? { result: operation.result } : {}),
+            ...(operation.errorMessage ? { errorMessage: operation.errorMessage } : {}),
         }
     }));
 }
@@ -27,17 +31,60 @@ export async function getOperation(operationId: string) {
     return result.Item;
 }
 
-export async function updateOperationStatus(operationId: string, status: OperationStatus, errorMessage?: string) {
+export async function updateOperationStatus(
+    operationId: string,
+    status: OperationStatus,
+    errorMessage?: string,
+    result?: Record<string, unknown>
+) {
+    const expressions = ['SET #s = :status'];
+    const names: Record<string, string> = { "#s": "status" };
+    const values: Record<string, unknown> = {
+        ':status': status,
+    };
+
+    if (errorMessage) {
+        expressions.push('errorMessage = :err');
+        values[':err'] = errorMessage;
+    }
+
+    if (result) {
+        expressions.push('#result = :result');
+        names['#result'] = 'result';
+        values[':result'] = result;
+    }
+
     await dynamoDocClient.send(new UpdateCommand({
         TableName: TABLE_NAME,
         Key: { operationId },
-        UpdateExpression: errorMessage
-            ? 'SET #s = :status, errorMessage = :err'
-            : 'SET #s = :status',
-        ExpressionAttributeNames: { "#s": "status" },
-        ExpressionAttributeValues: {
-            ':status': status,
-            ...(errorMessage && { ':err': errorMessage }),
-        },
+        UpdateExpression: expressions.join(', '),
+        ExpressionAttributeNames: names,
+        ExpressionAttributeValues: values,
     }));
+}
+
+export async function getBooking(bookingId: string) {
+    const result = await dynamoDocClient.send(new GetCommand({
+        TableName: BOOKINGS_TABLE_NAME,
+        Key: { bookingId }
+    }));
+
+    return result.Item;
+}
+
+export async function getAllBookings() {
+    const items: Record<string, unknown>[] = [];
+    let exclusiveStartKey: Record<string, unknown> | undefined;
+
+    do {
+        const result = await dynamoDocClient.send(new ScanCommand({
+            TableName: BOOKINGS_TABLE_NAME,
+            ExclusiveStartKey: exclusiveStartKey,
+        }));
+
+        items.push(...((result.Items ?? []) as Record<string, unknown>[]));
+        exclusiveStartKey = result.LastEvaluatedKey as Record<string, unknown> | undefined;
+    } while (exclusiveStartKey);
+
+    return items;
 }

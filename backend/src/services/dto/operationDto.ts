@@ -1,9 +1,11 @@
 export type Operation = {
     operationId: string,
+    userId?: string,
     timestamp: string,
     type: OperationType,
     status: OperationStatus,
     errorMessage?: string,
+    result?: Record<string, unknown>,
 }
 
 export enum OperationStatus {
@@ -16,6 +18,7 @@ export enum OperationStatus {
 export enum OperationType {
     HEALTH_CHECK = "HEALTH_CHECK",
     SECURITY_EVENT = "SECURITY_EVENT",
+    BOOKING_INIT = "BOOKING_INIT",
 }
 
 export enum ActionType {
@@ -43,5 +46,13 @@ export enum ActionType {
     STATION_DELETE = 'STATION_DELETE',
     STATION_DELETE_FAILED = 'STATION_DELETE_FAILED',
     STATION_UPDATE_STATUS = 'STATION_UPDATE_STATUS',
-    STATION_UPDATE_STATUS_FAILED = 'STATION_UPDATE_STATUS_FAILED'
+    STATION_UPDATE_STATUS_FAILED = 'STATION_UPDATE_STATUS_FAILED',
+    BOOKING_INIT = 'BOOKING_INIT',
+    BOOKING_INIT_FAILED = 'BOOKING_INIT_FAILED',
+    BOOKING_INFO = 'BOOKING_INFO',
+    BOOKING_INFO_FAILED = 'BOOKING_INFO_FAILED',
+    BOOKING_CANCEL = 'BOOKING_CANCEL',
+    BOOKING_CANCEL_FAILED = 'BOOKING_CANCEL_FAILED',
+    BOOKING_UPDATE_STATUS = 'BOOKING_UPDATE_STATUS',
+    BOOKING_UPDATE_STATUS_FAILED = 'BOOKING_UPDATE_STATUS_FAILED',
 }
