@@ -1,14 +1,32 @@
+// --- CORE STATUSES ---
 
-export type StationStatus = 'ACTIVE' | 'INACTIVE'| 'READY'| 'MAINTENANCE';
-export type LockerStatus = 'INACTIVE'|'AVAILABLE' | 'RESERVED'|'READY' | 'OCCUPIED' | 'MAINTENANCE';
+export type LockerTechnicalStatus =
+    | 'INACTIVE'
+    | 'READY'
+    | 'ACTIVE'
+    | 'MAINTENANCE'
+    | 'FAULTY';
+
+// то, что видит пользователь
+export type LockerAvailabilityStatus =
+    | 'AVAILABLE'
+    | 'RESERVED'
+    | 'OCCUPIED';
+
+// итоговый статус (приходит с бэка)
+export type LockerStatus =
+    | LockerTechnicalStatus
+    | LockerAvailabilityStatus;
+
+// --- OTHER TYPES ---
+
+export type StationStatus = 'ACTIVE' | 'INACTIVE' | 'READY' | 'MAINTENANCE';
 export type LockerSize = 'S' | 'M' | 'L';
-
 
 export interface City {
     code: string;
     name: string;
 }
-
 
 export interface Station {
     stationId: string;
@@ -28,13 +46,19 @@ export interface Station {
     isDeleted: boolean;
 }
 
-
 export interface LockerBox {
     lockerBoxId: string;
     stationId: string;
     code: string;
     size: LockerSize;
+
+    // ключевое изменение
+    technicalStatus: LockerTechnicalStatus;
+    availabilityStatus?: LockerAvailabilityStatus;
+
+    // временно оставим для совместимости
     status: LockerStatus;
+
     pricePerHour?: string;
     lastStatusChangedAt: string;
     createdAt: string;
@@ -42,18 +66,15 @@ export interface LockerBox {
     isDeleted: boolean;
 }
 
-
 export interface CreateStationResponse {
     id: string;
     city: string;
 }
 
-
 export interface CreateLockerResponse {
     id: string;
     stationId: string;
 }
-
 
 export interface ApiErrorResponse {
     status: string;

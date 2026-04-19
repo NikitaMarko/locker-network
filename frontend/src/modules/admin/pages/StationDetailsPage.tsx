@@ -1,40 +1,43 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-    Box,
-    Typography,
-    Button,
-    Paper,
-    Chip,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    TextField,
-    MenuItem,
-    Stack
+    Box, Typography, Button, Paper, Chip,
+    Dialog, DialogTitle, DialogContent, DialogActions,
+    TextField, MenuItem, Stack
 } from '@mui/material';
 import Grid from '@mui/material/GridLegacy';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddIcon from '@mui/icons-material/Add';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { stationsApi } from '../../../api/stationsApi';
-import { useStations } from '../../../hooks/useStations';
 import { useAuth } from '../../../hooks/useAuth';
 import { ROLES } from '../../../config/roles/roles';
 import { useLockers } from '../../../hooks/useLockers';
+import type { LockerStation } from '../../../types/index';
 
-import type { LockerStatus, LockerStation } from '../../../types/index';
+const getChipColor = (status: string): "success" | "warning" | "default" | "error" => {
+    switch (status) {
+        case "ACTIVE":      return "success";
+        case "READY":       return "warning";
+        case "MAINTENANCE": return "error";
+        case "FAULTY":      return "error";
+        case "INACTIVE":    return "default";
+        default:            return "default";
+    }
+};
 
 export default function StationDetailsPage() {
     const { stationId } = useParams();
     const navigate = useNavigate();
     const { user } = useAuth();
-    const { addLocker } = useStations();
     const { changeLockerStatus } = useLockers();
+    const queryClient = useQueryClient();
 
     const [open, setOpen] = useState(false);
-    const [lockerData, setLockerData] = useState({ code: '', size: 'M' as 'S' | 'M' | 'L' });
+    const [lockerData, setLockerData] = useState({
+        code: '',
+        size: 'M' as 'S' | 'M' | 'L'
+    });
 
     const { data: station, isLoading } = useQuery<LockerStation>({
         queryKey: ["station-details", stationId],
@@ -42,114 +45,107 @@ export default function StationDetailsPage() {
         enabled: !!stationId
     });
 
-    const handleAdd = async () => {
-        if (!stationId) return;
-        try {
-            await addLocker({
-                stationId: stationId,
-                code: lockerData.code,
-                size: lockerData.size
-            });
-            setOpen(false);
-            setLockerData({ code: '', size: 'M' });
-        } catch (e) {
-            console.error("Ошибка добавления бокса:", e);
-        }
-    };
+    console.log("STATION DATA:", station);
+    console.log("LOCKERS:", station?.lockers);
 
-    const getChipColor = (status: LockerStatus): "success" | "warning" | "default" => {
-        switch (status) {
-            case "AVAILABLE":
-                return "success";
-            case "RESERVED":
-            case "OCCUPIED":
-                return "warning";
-            default:
-                return "default";
-        }
+    const handleAdd = async () => {
+        if (!stationId || !lockerData.code) return;
+        await stationsApi.addLocker({
+            stationId,
+            code: lockerData.code,
+            size: lockerData.size
+        });
+        queryClient.invalidateQueries({ queryKey: ["station-details", stationId] });
+        setOpen(false);
+        setLockerData({ code: '', size: 'M' });
     };
 
     if (isLoading) return <Typography>Loading...</Typography>;
 
     return (
         <Box>
-            <Button
-                startIcon={<ArrowBackIcon />}
-                onClick={() => navigate(-1)}
-                sx={{ mb: 4, color: '#64748b', fontWeight: 700 }}
-            >
+            <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)}>
                 BACK
             </Button>
 
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
-                <Box>
-                    <Typography variant="h4" fontWeight={900}>{station?.address}</Typography>
-                    <Typography color="text.secondary" fontWeight={600}>
-                        {typeof station?.city === 'string'
-                            ? station.city
-                            : (station?.city?.name || 'Unknown')}
-                    </Typography>
-                </Box>
+            <Box display="flex" alignItems="center" justifyContent="space-between" mt={2}>
+                <Typography variant="h4" fontWeight={900}>
+                    {station?.address}
+                </Typography>
 
                 {user?.role === ROLES.ADMIN && (
                     <Button
                         variant="contained"
                         startIcon={<AddIcon />}
                         onClick={() => setOpen(true)}
-                        sx={{ bgcolor: '#6baf5c', fontWeight: 700 }}
                     >
-                        ADD BOX
+                        Add Locker
                     </Button>
                 )}
             </Box>
 
-            <Grid container spacing={2}>
+            <Grid container spacing={2} mt={2}>
                 {station?.lockers?.map((locker) => (
-                    <Grid key={locker.lockerBoxId} xs={12} sm={6} md={3}>
-                        <Paper sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                            <Typography variant="h6" fontWeight={800}>Box #{locker.code}</Typography>
-                            <Typography variant="body2" color="text.secondary" mb={1}>
+                    <Grid item xs={12} sm={6} md={3} key={locker.lockerBoxId}>
+                        <Paper sx={{ p: 2 }}>
+                            <Typography fontWeight={700}>
+                                Box #{locker.code}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
                                 Size: {locker.size}
                             </Typography>
 
                             <Chip
                                 label={locker.status}
-                                size="small"
                                 color={getChipColor(locker.status)}
-                                sx={{ fontWeight: 700, mb: 1 }}
+                                sx={{ mt: 1 }}
+                                size="small"
                             />
 
                             {user?.role === ROLES.ADMIN && (
-                                <Box sx={{ mt: 1, display: 'flex', gap: 1, justifyContent: 'center' }}>
+                                <Box mt={2} display="flex" flexDirection="column" gap={1}>
+                                    {/* READY → ACTIVE */}
                                     {locker.status === "READY" && (
                                         <Button
-                                            size="small"
                                             variant="contained"
-                                            onClick={() =>
-                                                changeLockerStatus({
-                                                    lockerBoxId: locker.lockerBoxId,
-                                                    status: "ACTIVE"
-                                                })
-                                            }
+                                            color="success"
+                                            size="small"
+                                            onClick={() => changeLockerStatus({
+                                                lockerBoxId: locker.lockerBoxId,
+                                                status: "ACTIVE"
+                                            })}
                                         >
                                             Activate
                                         </Button>
                                     )}
 
+                                    {/* ACTIVE → MAINTENANCE */}
                                     {locker.status === "ACTIVE" && (
                                         <Button
-                                            size="small"
                                             variant="contained"
                                             color="error"
-                                            onClick={() =>
-                                                changeLockerStatus({
-                                                    lockerBoxId: locker.lockerBoxId,
-                                                    status: "MAINTENANCE"
-                                                })
-                                            }
+                                            size="small"
+                                            onClick={() => changeLockerStatus({
+                                                lockerBoxId: locker.lockerBoxId,
+                                                status: "MAINTENANCE"
+                                            })}
                                         >
-                                            Maintenance
+                                            → Maintenance
                                         </Button>
+                                    )}
+
+                                    {/* INACTIVE — ждём оператора */}
+                                    {locker.status === "INACTIVE" && (
+                                        <Typography variant="caption" color="text.secondary">
+                                            Awaiting operator activation
+                                        </Typography>
+                                    )}
+
+                                    {/* MAINTENANCE — ждём оператора */}
+                                    {locker.status === "MAINTENANCE" && (
+                                        <Typography variant="caption" color="text.secondary">
+                                            Awaiting operator repair
+                                        </Typography>
                                     )}
                                 </Box>
                             )}
@@ -158,35 +154,38 @@ export default function StationDetailsPage() {
                 ))}
             </Grid>
 
-            <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="xs">
-                <DialogTitle sx={{ fontWeight: 800 }}>Add Locker Box</DialogTitle>
+            <Dialog open={open} onClose={() => setOpen(false)}>
+                <DialogTitle>Add Locker</DialogTitle>
                 <DialogContent>
                     <Stack spacing={2} sx={{ mt: 1 }}>
                         <TextField
-                            label="Box Code (e.g. A007)"
-                            fullWidth
+                            label="Code (e.g. A-101)"
                             value={lockerData.code}
-                            onChange={e => setLockerData({ ...lockerData, code: e.target.value })}
+                            onChange={(e) => setLockerData({ ...lockerData, code: e.target.value })}
+                            fullWidth
+                            required
                         />
                         <TextField
                             select
                             label="Size"
-                            fullWidth
                             value={lockerData.size}
-                            onChange={e => setLockerData({ ...lockerData, size: e.target.value as any })}
+                            onChange={(e) => setLockerData({ ...lockerData, size: e.target.value as 'S' | 'M' | 'L' })}
+                            fullWidth
                         >
-                            <MenuItem value="S">Small</MenuItem>
-                            <MenuItem value="M">Medium</MenuItem>
-                            <MenuItem value="L">Large</MenuItem>
+                            <MenuItem value="S">Small (S)</MenuItem>
+                            <MenuItem value="M">Medium (M)</MenuItem>
+                            <MenuItem value="L">Large (L)</MenuItem>
                         </TextField>
                     </Stack>
                 </DialogContent>
-                <DialogActions sx={{ p: 3 }}>
-                    <Button onClick={() => setOpen(false)} sx={{ color: '#64748b', fontWeight: 700 }}>
-                        CANCEL
-                    </Button>
-                    <Button onClick={handleAdd} variant="contained" sx={{ bgcolor: '#6baf5c', fontWeight: 700 }}>
-                        ADD
+                <DialogActions>
+                    <Button onClick={() => setOpen(false)}>Cancel</Button>
+                    <Button
+                        onClick={handleAdd}
+                        variant="contained"
+                        disabled={!lockerData.code}
+                    >
+                        Add
                     </Button>
                 </DialogActions>
             </Dialog>

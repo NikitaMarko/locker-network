@@ -14,23 +14,23 @@ import DashboardLayout from "../layout/DashboardLayout.tsx";
 // PAGES
 import { Location } from "../modules/shared/pages/Location.tsx";
 import { AdminDashboard } from "../modules/admin/pages/AdminDashboardPage.tsx";
-import StationDetails from "../modules/admin/pages/StationDetailsPage.tsx";
+import StationDetailsPage from "../modules/admin/pages/StationDetailsPage.tsx";   // ← ИСПРАВЛЕНО
 
 // USER PAGES
 import UserDashboardPage from "../modules/user/pages/UserDashboardPage.tsx";
 import MyBookingsPage from "../modules/user/pages/MyBookingsPage.tsx";
-import { StationDetailsPage } from "../modules/user/pages/StationDetailsPage.tsx";
+import { StationDetailsPage as UserStationDetailsPage } from "../modules/user/pages/StationDetailsPage.tsx";
 
 import { Info } from "../modules/shared/pages/Info.tsx";
 import { Price } from "../modules/shared/pages/Price.tsx";
 import { Paths } from "../config/paths/paths.ts";
 
-// OPERATOR PAGES (твои локальные изменения)
+// OPERATOR PAGES
 import OperatorDashboardPage from "../modules/operator/pages/OperatorDashboardPage.tsx";
 import OperatorStationsPage from "../modules/operator/pages/OperatorStationsPage.tsx";
 import OperatorStationDetailsPage from "../modules/operator/pages/OperatorStationDetailsPage.tsx";
 
-// ADMIN USERS PAGE (из удалённой версии)
+// ADMIN USERS PAGE
 import AdminUsersTables from "../modules/admin/pages/AdminUsersTables.tsx";
 
 export function AppRoutes() {
@@ -64,7 +64,8 @@ export function AppRoutes() {
 
                 <Route path="users" element={<AdminUsersTables />} />
 
-                <Route path="stations/:stationId" element={<StationDetails />} />
+                {/* ← ИСПРАВЛЕНО: теперь используется правильная страница */}
+                <Route path="stations/:stationId" element={<StationDetailsPage />} />
             </Route>
 
             {/* ================= OPERATOR ================= */}
@@ -96,7 +97,7 @@ export function AppRoutes() {
             >
                 <Route index element={<UserDashboardPage />} />
                 <Route path="my-bookings" element={<MyBookingsPage />} />
-                <Route path="stations/:id" element={<StationDetailsPage />} />
+                <Route path="stations/:id" element={<UserStationDetailsPage />} />
                 <Route path="*" element={<Navigate to={Paths.USER} />} />
             </Route>
 

@@ -1,43 +1,29 @@
 import React from 'react';
 import Grid from '@mui/material/GridLegacy';
-import { Paper, Typography, Box, Chip, Skeleton } from '@mui/material';
+import { Paper, Typography, Box, Chip, Button } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { lockersApi } from '../../../api/lockersApi';
-import type { LockerBox, LockerStatus } from '../../../types/index';
+import { useLockers } from '../../../hooks/useLockers';
+import { useAuth } from '../../../hooks/useAuth';
+import type { LockerBox } from '../../../types/index';
 
 interface LockersGridProps {
     stationId: string;
 }
 
-const getBorderColor = (status: LockerStatus): string => {
+const getChipColor = (status: string): "success" | "warning" | "default" | "error" => {
     switch (status) {
-        case 'AVAILABLE':
-            return '#4caf50';
-        case 'RESERVED':
-        case 'OCCUPIED':
-            return '#ffa726';
-        case 'FAULTY':
-        case 'INACTIVE':
-            return '#ef4444';
-        default:
-            return '#e0e0e0';
-    }
-};
-
-const getChipColor = (status: LockerStatus): 'success' | 'warning' | 'default' => {
-    switch (status) {
-        case 'AVAILABLE':
-            return 'success';
-        case 'RESERVED':
-        case 'OCCUPIED':
-            return 'warning';
-        default:
-            return 'default';
+        case "ACTIVE":      return "success";
+        case "READY":       return "warning";
+        case "MAINTENANCE": return "error";
+        case "FAULTY":      return "error";
+        case "INACTIVE":    return "default";
+        default:            return "default";
     }
 };
 
 const LockersGrid: React.FC<LockersGridProps> = ({ stationId }) => {
-    const { data: lockers = [], isLoading } = useQuery<LockerBox[]>({
+    const { data: lockers = [] } = useQuery<LockerBox[]>({
         queryKey: ['lockers', stationId],
         queryFn: async () => {
             const all = await lockersApi.getAdminLockers();
@@ -45,62 +31,92 @@ const LockersGrid: React.FC<LockersGridProps> = ({ stationId }) => {
         }
     });
 
-    if (isLoading) {
-        return (
-            <Grid container spacing={2}>
-                {[1, 2, 3, 4].map((i) => (
-                    <Grid item xs={6} sm={4} md={3} key={i}>
-                        <Skeleton variant="rectangular" height={100} sx={{ borderRadius: 2 }} />
-                    </Grid>
-                ))}
-            </Grid>
-        );
-    }
+    const { user } = useAuth();
+    const { setReady, activate, setMaintenance } = useLockers();
 
     return (
         <Grid container spacing={2}>
             {lockers.map((locker) => (
                 <Grid item xs={6} sm={4} md={3} key={locker.lockerBoxId}>
-                    <Paper
-                        elevation={0}
-                        sx={{
-                            p: 2,
-                            textAlign: 'center',
-                            border: '1px solid #e0e0e0',
-                            borderRadius: 2,
-                            borderTop: `4px solid ${getBorderColor(locker.status)}`
-                        }}
-                    >
-                        <Typography variant="h6" fontWeight={700}>#{locker.code}</Typography>
-                        <Typography variant="body2" color="text.secondary">Size: {locker.size}</Typography>
+                    <Paper sx={{ p: 2, borderRadius: 2 }}>
+                        <Typography variant="h6">
+                            Box #{locker.code}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            Size: {locker.size}
+                        </Typography>
 
-                        <Box mt={1}>
-                            <Chip
-                                label={locker.status}
-                                size="small"
-                                variant="outlined"
-                                color={getChipColor(locker.status)}
-                            />
+                        <Chip
+                            label={locker.status}
+                            color={getChipColor(locker.status)}
+                            size="small"
+                            sx={{ mt: 1 }}
+                        />
+
+                        <Box mt={2} display="flex" flexDirection="column" gap={1}>
+                            {/* OPERATOR: INACTIVE → READY */}
+                            {user?.role === "OPERATOR" && locker.status === "INACTIVE" && (
+                                <Button
+                                    variant="contained"
+                                    size="small"
+                                    onClick={() => setReady(locker.lockerBoxId)}
+                                >
+                                    Set READY
+                                </Button>
+                            )}
+
+                            {/* OPERATOR: MAINTENANCE → READY */}
+                            {user?.role === "OPERATOR" && locker.status === "MAINTENANCE" && (
+                                <Button
+                                    variant="contained"
+                                    size="small"
+                                    onClick={() => setReady(locker.lockerBoxId)}
+                                >
+                                    Repair → READY
+                                </Button>
+                            )}
+
+                            {/* ADMIN: READY → ACTIVE */}
+                            {user?.role === "ADMIN" && locker.status === "READY" && (
+                                <Button
+                                    variant="contained"
+                                    color="success"
+                                    size="small"
+                                    onClick={() => activate(locker.lockerBoxId)}
+                                >
+                                    Activate
+                                </Button>
+                            )}
+
+                            {/* ADMIN: ACTIVE → MAINTENANCE */}
+                            {user?.role === "ADMIN" && locker.status === "ACTIVE" && (
+                                <Button
+                                    variant="contained"
+                                    color="error"
+                                    size="small"
+                                    onClick={() => setMaintenance(locker.lockerBoxId)}
+                                >
+                                    → Maintenance
+                                </Button>
+                            )}
+
+                            {/* ADMIN: INACTIVE — ждём оператора */}
+                            {user?.role === "ADMIN" && locker.status === "INACTIVE" && (
+                                <Typography variant="caption" color="text.secondary">
+                                    Awaiting operator activation
+                                </Typography>
+                            )}
+
+                            {/* ADMIN: MAINTENANCE — ждём оператора */}
+                            {user?.role === "ADMIN" && locker.status === "MAINTENANCE" && (
+                                <Typography variant="caption" color="text.secondary">
+                                    Awaiting operator repair
+                                </Typography>
+                            )}
                         </Box>
                     </Paper>
                 </Grid>
             ))}
-
-            {lockers.length === 0 && (
-                <Box
-                    sx={{
-                        p: 4,
-                        width: '100%',
-                        textAlign: 'center',
-                        bgcolor: '#f9f9f9',
-                        borderRadius: 2
-                    }}
-                >
-                    <Typography color="text.secondary">
-                        No boxes configured for this station yet.
-                    </Typography>
-                </Box>
-            )}
         </Grid>
     );
 };

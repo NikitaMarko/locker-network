@@ -13,13 +13,24 @@ import {
 } from "@mui/material";
 import Grid from "@mui/material/GridLegacy";
 
-const getChipColor = (status: LockerStatus): "success" | "warning" | "default" => {
-    switch (status) {
-        case "AVAILABLE":
+import {
+    getTechnicalStatus
+} from "../../../types/index";
+
+const getChipColor = (status: LockerStatus): "default" | "success" | "warning" | "info" | "error" => {
+    // ❗ показываем ТОЛЬКО техническую часть
+    const tech = getTechnicalStatus(status);
+
+    switch (tech) {
+        case "ACTIVE":
             return "success";
-        case "RESERVED":
-        case "OCCUPIED":
-            return "warning";
+        case "READY":
+            return "info";
+        case "INACTIVE":
+            return "default";
+        case "MAINTENANCE":
+        case "FAULTY":
+            return "error";
         default:
             return "default";
     }
@@ -63,14 +74,16 @@ export default function OperatorStationDetailsPage() {
                                     Box #{locker.code}
                                 </Typography>
 
+                                {/* 🔥 ТЕХНИЧЕСКИЙ СТАТУС */}
                                 <Chip
-                                    label={locker.status}
+                                    label={getTechnicalStatus(locker.status)}
                                     size="small"
                                     sx={{ mt: 1 }}
                                     color={getChipColor(locker.status)}
                                 />
 
                                 <Box sx={{ mt: 2, display: "flex", gap: 1 }}>
+                                    {/* OPERATOR FLOW */}
                                     {locker.status === "INACTIVE" && (
                                         <Button
                                             size="small"
@@ -101,6 +114,8 @@ export default function OperatorStationDetailsPage() {
                                             Fix & Ready
                                         </Button>
                                     )}
+
+                                    {/* ❗ USER STATUSES НЕ ПОКАЗЫВАЕМ В ОПЕРАТОРЕ */}
                                 </Box>
                             </Paper>
                         </Grid>
