@@ -139,7 +139,7 @@ export async function loadLockers() {
     try {
         const cachedLockers = await lockerCacheRepository.findAll();
         if (cachedLockers.length > 0) {
-            return cachedLockers;
+            return lockerCatalogProjectionService.getAllLockerCacheProjections();
         }
 
         return lockerCatalogProjectionService.getAllLockerCacheProjections();

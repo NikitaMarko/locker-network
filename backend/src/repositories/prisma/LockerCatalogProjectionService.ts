@@ -271,7 +271,7 @@ class LockerCatalogProjectionService implements ILockerCatalogProjectionService 
             code: locker.code,
             size: locker.size,
             status: runtimeState.status,
-            techStatus: runtimeState.techStatus,
+            techStatus: locker.techStatus,
             version: runtimeState.version,
             lastStatusChangedAt: runtimeState.lastStatusChangedAt,
             pricePerHour: decimalToString(priceItem?.pricePerHour),
