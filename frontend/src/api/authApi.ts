@@ -56,7 +56,7 @@ export async function meApi(): Promise<User | null> {
 }
 
 export async function logoutApi(): Promise<void> {
-    await apiClient.post("/auth/logout")
+    await apiClient.post("/auth/logout", {}, { _skipInterceptor: true } as never);
 }
 
 export async function refreshTokenRequest(): Promise<string> {

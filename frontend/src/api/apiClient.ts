@@ -1,6 +1,6 @@
 import axios, { AxiosError } from "axios";
 import { SERVER_URL } from "../config/env/env.ts";
-import { refreshTokenRequest } from "./authApi.ts";
+import {logoutApi, refreshTokenRequest} from "./authApi.ts";
 
 let isRefreshing = false;
 let failedQueue: Array<{
@@ -43,6 +43,10 @@ apiClient.interceptors.response.use(
     async (error: AxiosError<any>) => {
         const originalRequest = error.config as any;
 
+        if (originalRequest._skipInterceptor) {
+            return Promise.reject(error);
+            }
+
 
         const backendMessage = error.response?.data?.error?.message;
         const legacyMessage = error.response?.data?.message;
@@ -54,7 +58,17 @@ apiClient.interceptors.response.use(
         // ==========================================
 
         if (originalRequest.url?.includes('/auth/refresh')) {
+            localStorage.removeItem('access_token');
+
+            try{
+                await logoutApi();
+            }catch(e){
+                // логируем
+            }finally {
+                window.location.href = '/login?expired=true';
+            }
             return Promise.reject(error);
+
         }
 
         if (error.response?.status === 401 && !originalRequest._retry) {
@@ -83,8 +97,6 @@ apiClient.interceptors.response.use(
                 return apiClient(originalRequest);
             } catch (err) {
                 processQueue(err, null);
-                localStorage.removeItem('access_token');
-                window.location.href = '/login?expired=true';
                 return Promise.reject(err);
             } finally {
                 isRefreshing = false;

@@ -11,3 +11,4 @@ export enum Paths {
     ADMIN='/admin',
     FORBIDDEN='/403',
 }
+
