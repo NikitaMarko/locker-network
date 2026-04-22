@@ -23,6 +23,7 @@ import {operationsRouter} from "./routes/operationsRoutes";
 import { logSecurityEvent, SecurityEventType } from "./services/securityEventService";
 import { sendError } from "./utils/response";
 import { citiesRoutes } from './routes/citiesRoutes';
+import { adminRouter } from "./routes/adminRoutes";
 
 const PORT = env.PORT;
 const baseUrl = env.SERVER_URL || `http://localhost:${PORT}`;
@@ -143,6 +144,7 @@ export const createApp = () => {
     app.use(`${API_PREFIX}/bookings`, bookingsRoutes)
     app.use(`${API_PREFIX}/lockers`, lockersRoutes)
     app.use(`${API_PREFIX}/cities`, citiesRoutes)
+    app.use(`${API_PREFIX}/admin`, adminRouter) //смена ролей админом
 
 
 
