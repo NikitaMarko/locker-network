@@ -35,6 +35,13 @@ export function useLockers() {
 
     const setFaulty = (id: string) =>
         changeStatus.mutateAsync({lockerBoxId: id, status: "FAULTY"});
+    const cancelBookingMutation = useMutation({
+        mutationFn: (id: string) => lockersApi.cancelBooking(id),
+        onSuccess: invalidateAll
+    });
+
+    const cancelBooking = (id: string) =>
+        cancelBookingMutation.mutateAsync(id);
 
     return {
         changeLockerStatus: changeStatus.mutateAsync,
@@ -43,6 +50,7 @@ export function useLockers() {
         setReady,
         activate,
         setMaintenance,
-        setFaulty
+        setFaulty,
+        cancelBooking
     };
 }

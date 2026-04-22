@@ -1,16 +1,25 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { stationsApi } from "../../../api/stationsApi";
 import { lockersApi } from "../../../api/lockersApi";
 import type { LockerBox, LockerStation } from '../../../types/index';
-import { Box, Typography, Paper, Button, Divider, Stack } from "@mui/material";
-import Grid from "@mui/material/GridLegacy";
+import {
+    Box, Typography, Paper, Button, Divider, Stack,
+    Dialog, DialogContent, IconButton
+} from "@mui/material";
+import Grid from "@mui/material/Grid";
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
+import CloseIcon from '@mui/icons-material/Close';
+
+import { BookingSection } from './../../shared/components/BookingSection';
 
 export function StationDetailsPage() {
     const { id } = useParams();
     const navigate = useNavigate();
+
+    const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
 
     const { data: station } = useQuery<LockerStation>({
         queryKey: ["user-station", id],
@@ -23,9 +32,7 @@ export function StationDetailsPage() {
         queryFn: () => lockersApi.getLockers({ stationId: id })
     });
 
-
     const availableLockers = lockers.filter((l) => l.stationId === id && l.status === "AVAILABLE");
-
 
     const sizes: ("S" | "M" | "L")[] = ["S", "M", "L"];
     const groupedData = sizes.map(size => {
@@ -68,7 +75,7 @@ export function StationDetailsPage() {
             ) : (
                 <Grid container spacing={3}>
                     {groupedData.map((group) => (
-                        <Grid item xs={12} sm={6} md={4} key={group?.size}>
+                        <Grid size={{ xs: 12, sm: 6, md: 4 }} key={group?.size}>
                             <Paper sx={{ p: 3, borderRadius: 4, border: '1px solid #e2e8f0', textAlign: 'center' }}>
                                 <Inventory2OutlinedIcon sx={{ fontSize: 40, color: '#6baf5c', mb: 1 }} />
 
@@ -96,20 +103,45 @@ export function StationDetailsPage() {
                                     </Typography>
                                 </Stack>
 
-
                                 <Button
                                     variant="contained"
-                                    disabled
                                     fullWidth
-                                    sx={{ mt: 3, borderRadius: 2, fontWeight: 700 }}
+                                    onClick={() => setIsBookingModalOpen(true)}
+                                    sx={{
+                                        mt: 3,
+                                        borderRadius: 2,
+                                        fontWeight: 700,
+                                        bgcolor: '#6baf5c',
+                                        textTransform: 'none',
+                                        boxShadow: 'none',
+                                        '&:hover': { bgcolor: '#5a994c', boxShadow: 'none' }
+                                    }}
                                 >
-                                    Booking Coming Soon
+                                    Book Now
                                 </Button>
                             </Paper>
                         </Grid>
                     ))}
                 </Grid>
             )}
+
+            <Dialog
+                open={isBookingModalOpen}
+                onClose={() => setIsBookingModalOpen(false)}
+                maxWidth="sm"
+                fullWidth
+                PaperProps={{ sx: { borderRadius: 4, overflow: 'hidden' } }}
+            >
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', p: 1, position: 'absolute', right: 0, top: 0, zIndex: 10 }}>
+                    <IconButton onClick={() => setIsBookingModalOpen(false)}>
+                        <CloseIcon />
+                    </IconButton>
+                </Box>
+                <DialogContent sx={{ p: 0 }}>
+                    {id && <BookingSection stationId={id} />}
+                </DialogContent>
+            </Dialog>
+
         </Box>
     );
 }

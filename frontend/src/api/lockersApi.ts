@@ -48,6 +48,10 @@ export const lockersApi = {
         const { data } = await apiClient.get<ApiResponse<LockerBox[]>>("/lockers/admin/boxes");
         return data.data;
     },
+    cancelBooking: async (bookingId: string) => {
+        const response = await apiClient.post(`/bookings/${bookingId}/cancel`);
+        return response.data;
+    },
 
     /**
      * OPERATOR: Мягкое удаление бокса
