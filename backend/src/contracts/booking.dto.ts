@@ -37,7 +37,10 @@ export type BookingRecordDto = {
     paymentProvider?: string;
     paymentSessionId?: string;
     paymentIntentId?: string;
+    providerPaymentId?: string;
     paymentUrl?: string;
+    amount?: number;
+    paymentConfirmedAt?: string;
     startTime?: string;
     createdAt: string;
     updatedAt: string;

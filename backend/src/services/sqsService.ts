@@ -18,6 +18,18 @@ export type QueueCommand = {
     payload?: Record<string, unknown>;
 };
 
+export type PaymentConfirmCommand = {
+    operationId: string;
+    type: OperationType.PAYMENT_CONFIRM;
+    payload: {
+        bookingId: string;
+        paymentSessionId: string;
+        providerPaymentId: string;
+        amount: number;
+        currency: string;
+    };
+};
+
 type LockerCacheProjectionEvent =
     | {
         eventId: string;
@@ -112,6 +124,10 @@ export async function sendOperationToQueue(operation: QueueCommand) {
 
 export async function sendSecurityEventToQueue(event: QueueCommand) {
     await sendCommandToQueue(event);
+}
+
+export async function sendPaymentConfirmToQueue(command: PaymentConfirmCommand) {
+    await sendCommandToQueue(command);
 }
 
 export async function enqueueLockerProjectionUpsert(

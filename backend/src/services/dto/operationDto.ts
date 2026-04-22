@@ -19,6 +19,7 @@ export enum OperationType {
     HEALTH_CHECK = "HEALTH_CHECK",
     SECURITY_EVENT = "SECURITY_EVENT",
     BOOKING_INIT = "BOOKING_INIT",
+    PAYMENT_CONFIRM = "PAYMENT_CONFIRM",
 }
 
 export enum ActionType {
