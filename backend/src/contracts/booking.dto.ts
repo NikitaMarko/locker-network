@@ -4,22 +4,6 @@ export type BookingInitRequestDto = {
     expectedEndTime: string;
 };
 
-export type BookingInitOperationResultDto = {
-    bookingId: string;
-    lockerBoxId: string;
-    bookingStatus: string;
-    paymentStatus?: string;
-    expiresAt: string;
-    price: number;
-    currency: string;
-    payment: {
-        provider: string;
-        paymentSessionId: string;
-        paymentIntentId: string;
-        paymentUrl: string;
-    };
-};
-
 export type BookingRecordDto = {
     bookingId: string;
     operationId?: string;
@@ -28,6 +12,7 @@ export type BookingRecordDto = {
     lockerBoxId: string;
     size: "S" | "M" | "L";
     status: string;
+    lockerStatus?: string;
     paymentStatus?: string;
     expectedEndTime: string;
     expiresAt?: string;
@@ -41,6 +26,16 @@ export type BookingRecordDto = {
     paymentUrl?: string;
     amount?: number;
     paymentConfirmedAt?: string;
+    extendOperationId?: string;
+    pendingExtendExpectedEndTime?: string;
+    extendPaymentStatus?: string;
+    extendPaymentSessionId?: string;
+    extendPaymentIntentId?: string;
+    extendProviderPaymentId?: string;
+    extendPaymentUrl?: string;
+    extendAmount?: number;
+    extendCurrency?: string;
+    extendPaymentConfirmedAt?: string;
     startTime?: string;
     createdAt: string;
     updatedAt: string;

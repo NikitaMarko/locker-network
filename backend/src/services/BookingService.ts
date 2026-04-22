@@ -1,17 +1,98 @@
-import {Request, Response} from "express";
-import {v4 as uuidv4} from "uuid";
+import { Request, Response } from "express";
+import { BookingStatus, Role } from "@prisma/client";
+import { v4 as uuidv4 } from "uuid";
 
-import {HttpError} from "../errorHandler/HttpError";
-import {sendSuccess} from "../utils/response";
-import {operationRepository} from "../repositories/operation/OperationRepository";
-import {logAudit} from "../utils/audit";
+import { BookingInitRequestDto, BookingRecordDto } from "../contracts/booking.dto";
+import { HttpError } from "../errorHandler/HttpError";
+import { operationRepository } from "../repositories/operation/OperationRepository";
+import { logAudit } from "../utils/audit";
+import { sendSuccess } from "../utils/response";
 
-import {getBooking} from "./dynamoService";
+import {ActionType, OperationStatus, OperationType} from "./dto/operationDto";
+import {
+    sendBookingCancelToQueue,
+    sendBookingExtendToQueue,
+    sendBookingInitToQueue,
+    sendBookingStatusUpdateToQueue
+} from "./sqsService";
+import { getAllBookings, getBooking, getLockerCache } from "./dynamoService";
 import {idempotencyService} from "./IdempotencyService";
-import {ActionType, Operation, OperationStatus, OperationType} from "./dto/operationDto";
-import {sendOperationToQueue} from "./sqsService";
-import {prismaService} from "./prismaService";
+import { prismaService } from "./prismaService";
 
+function toPublicBookingResponse(input: {
+    bookingId: string;
+    paymentStatus: string;
+    bookingStatus: string;
+    lockerStatus?: string | null;
+    lockerBoxId: string;
+    stationId: string;
+    startTime: Date | string | null;
+    expectedEndTime: Date | string | null;
+}) {
+    return {
+        bookingId: input.bookingId,
+        paymentStatus: input.paymentStatus,
+        bookingStatus: input.bookingStatus,
+        ...(input.lockerStatus ? { lockerStatus: input.lockerStatus } : {}),
+        lockerBoxId: input.lockerBoxId,
+        stationId: input.stationId,
+        startTime: input.startTime instanceof Date
+            ? input.startTime.toISOString()
+            : input.startTime ?? null,
+        expectedEndTime: input.expectedEndTime instanceof Date
+            ? input.expectedEndTime.toISOString()
+            : input.expectedEndTime ?? null,
+    };
+}
+
+function toQueuedBookingOperationResponse<T extends Record<string, unknown>>(
+    operationId: string,
+    type: OperationType,
+    payload?: T,
+    message?: string
+) {
+    return {
+        operationId,
+        status: OperationStatus.PENDING,
+        type,
+        ...(payload ?? {}),
+        ...(message ? { message } : {}),
+    };
+}
+
+function resolveRequestedExpectedEndTime(req: Request) {
+    const rawValue = typeof req.body?.expectedEndTime === "string"
+        ? req.body.expectedEndTime
+        : undefined;
+
+    if (!rawValue) {
+        throw new HttpError(400, "expectedEndTime is required", "VALIDATION_ERROR");
+    }
+
+    const nextExpectedEndTime = new Date(rawValue);
+
+    if (Number.isNaN(nextExpectedEndTime.getTime())) {
+        throw new HttpError(400, "expectedEndTime must be a valid ISO datetime", "VALIDATION_ERROR");
+    }
+
+    return nextExpectedEndTime;
+}
+
+async function loadBookingWithLockerStatus(bookingId: string) {
+    const booking = await getBooking(bookingId) as BookingRecordDto | undefined;
+
+    if (!booking) {
+        return undefined;
+    }
+
+    const locker = await getLockerCache(booking.lockerBoxId);
+    const lockerStatus = booking.lockerStatus ?? locker?.status ?? null;
+
+    return {
+        booking,
+        lockerStatus,
+    };
+}
 
 export class BookingService {
     async initBooking(req: Request, res: Response) {
@@ -21,53 +102,71 @@ export class BookingService {
             "booking-init",
             req.body,
             async () => {
-                const {stationId, size, expectedEndTime} = req.body;
+                const userId = req.user?.userId;
+
+                if (!userId) {
+                    throw new HttpError(401, "Unauthorized");
+                }
+
                 const operationId = uuidv4();
-                const operation: Operation = {
-                    operationId,
-                    userId: req.user?.userId,
-                    timestamp: new Date().toISOString(),
-                    status: OperationStatus.PENDING,
-                    type: OperationType.BOOKING_INIT
-                };
+                const body = req.body as BookingInitRequestDto;
 
                 try {
-                    await operationRepository.create(operation);
-                    await sendOperationToQueue({
+                    await operationRepository.create({
                         operationId,
-                        type: operation.type,
+                        userId,
+                        timestamp: new Date().toISOString(),
+                        status: OperationStatus.PENDING,
+                        type: OperationType.BOOKING_INIT,
+                    });
+
+                    await sendBookingInitToQueue({
+                        operationId,
+                        type: OperationType.BOOKING_INIT,
                         payload: {
-                            timestamp: operation.timestamp,
-                            userId: operation.userId,
-                            stationId, size, expectedEndTime
-                        }
+                            userId,
+                            stationId: body.stationId,
+                            size: body.size,
+                            expectedEndTime: body.expectedEndTime,
+                        },
                     });
 
                     await logAudit({
                         req,
-                        action: ActionType.OPERATION_CREATE,
-                        actorId: req.user?.userId,
+                        action: ActionType.BOOKING_INIT,
+                        actorId: userId,
                         entityId: operationId,
-                        entityType: "Operation"
+                        entityType: "Operation",
+                        details: {
+                            sourceOfTruth: "lambda-dynamodb",
+                            stationId: body.stationId,
+                            size: body.size,
+                            expectedEndTime: body.expectedEndTime,
+                        },
                     });
 
                     return {
-                        body: {
+                        statusCode: 202,
+                        body: toQueuedBookingOperationResponse(
                             operationId,
-                            status: OperationStatus.PENDING,
-                        }
+                            OperationType.BOOKING_INIT,
+                            undefined,
+                            "Booking initialization started"
+                        ),
                     };
-                } catch (e) {
-                    const errorMessage = e instanceof Error ? e.message : "Failed to create booking operation";
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : "Failed to create booking operation";
 
                     await operationRepository.updateStatus(operationId, OperationStatus.FAILED, errorMessage);
                     await logAudit({
                         req,
-                        action: ActionType.OPERATION_CREATE_FAILED,
-                        actorId: req.user?.userId,
+                        action: ActionType.BOOKING_INIT_FAILED,
+                        actorId: userId,
                         entityId: operationId,
                         entityType: "Operation",
-                        details: {reason: errorMessage}
+                        details: {
+                            reason: errorMessage,
+                        },
                     });
 
                     throw new HttpError(500, errorMessage);
@@ -76,40 +175,482 @@ export class BookingService {
         );
     }
 
-
     async getBooking(req: Request, res: Response) {
-        const booking = await getBooking(req.params.id as string);
+        const bookingWithLocker = await loadBookingWithLockerStatus(req.params.id as string);
 
-        if (!booking) {
+        if (!bookingWithLocker) {
             throw new HttpError(404, "Booking not found");
         }
 
-        return sendSuccess(res, booking);
+        const { booking, lockerStatus } = bookingWithLocker;
+        const role = req.user?.role;
+        const userId = req.user?.userId;
+
+        if (role === Role.USER && booking.userId !== userId) {
+            throw new HttpError(403, "Access denied");
+        }
+
+        await logAudit({
+            req,
+            action: ActionType.BOOKING_INFO,
+            actorId: userId,
+            entityId: booking.bookingId,
+            entityType: "Booking",
+            lockerId: booking.lockerBoxId,
+            details: {
+                sourceOfTruth: "dynamodb",
+            },
+        });
+
+        return sendSuccess(res, toPublicBookingResponse({
+            bookingId: booking.bookingId,
+            paymentStatus: booking.paymentStatus ?? "PENDING",
+            bookingStatus: booking.status,
+            lockerStatus,
+            lockerBoxId: booking.lockerBoxId,
+            stationId: booking.stationId,
+            startTime: booking.startTime ?? null,
+            expectedEndTime: booking.expectedEndTime,
+        }));
     }
 
-    async getAllBookingsAdmin(_req: Request, res: Response) {
-        const result = await prismaService.booking.findMany();
-        return sendSuccess(res, result);
-    }
+    async getAllBookingsAdmin(req: Request, res: Response) {
+        const result = await prismaService.booking.findMany({
+            include: {
+                payments: true,
+            },
+            orderBy: {
+                createdAt: "desc",
+            },
+        });
 
-    async getBookingAdmin(req: Request, res: Response) {
-        const bookingId = req.params.id as string;
-
-        const result = await prismaService.booking.findUnique({
-            where: {bookingId}
+        await logAudit({
+            req,
+            action: ActionType.BOOKING_INFO,
+            actorId: req.user?.userId,
+            entityId: "admin-bookings-list",
+            entityType: "Booking",
+            details: {
+                sourceOfTruth: "postgres",
+                count: result.length,
+                scope: "admin",
+            },
         });
 
         return sendSuccess(res, result);
     }
 
-    async updateBookingStatusAdmin(_req: Request, _res: Response) {
-        throw new HttpError(501, "Booking status update is not implemented yet");
-        //return sendSuccess(res, result);
+    async getBookingAdmin(req: Request, res: Response) {
+        const bookingId = req.params.id as string;
+        const result = await prismaService.booking.findUnique({
+            where: { bookingId },
+            include: {
+                payments: true,
+            },
+        });
+
+        if (!result) {
+            throw new HttpError(404, "Booking not found");
+        }
+
+        await logAudit({
+            req,
+            action: ActionType.BOOKING_INFO,
+            actorId: req.user?.userId,
+            entityId: bookingId,
+            entityType: "Booking",
+            lockerId: result.lockerBoxId,
+            details: {
+                sourceOfTruth: "postgres",
+                scope: "admin",
+            },
+        });
+
+        return sendSuccess(res, result);
     }
 
-    async cancelBooking(_req: Request, _res: Response) {
-        throw new HttpError(501, "Booking cancel is not implemented yet");
-        //return sendSuccess(res, result);
+    async updateBookingStatusAdmin(req: Request, res: Response) {
+        const bookingId = req.params.id as string;
+        const nextStatus = req.body.status as BookingStatus;
+        const actorId = req.user?.userId;
+
+        const existing = await prismaService.booking.findUnique({
+            where: { bookingId },
+        });
+
+        if (!existing) {
+            throw new HttpError(404, "Booking not found");
+        }
+
+        if (!actorId) {
+            throw new HttpError(401, "Unauthorized");
+        }
+
+        return idempotencyService.execute(
+            req,
+            res,
+            `booking-status-update:${bookingId}`,
+            {
+                bookingId,
+                status: nextStatus,
+            },
+            async () => {
+                const operationId = uuidv4();
+
+                try {
+                    const updated = await prismaService.booking.update({
+                        where: { bookingId },
+                        data: {
+                            status: nextStatus,
+                            ...(nextStatus === BookingStatus.CANCELLED || nextStatus === BookingStatus.ENDED
+                                ? { endTime: new Date() }
+                                : {}),
+                        },
+                    });
+
+                    await operationRepository.create({
+                        operationId,
+                        userId: actorId,
+                        timestamp: new Date().toISOString(),
+                        status: OperationStatus.PENDING,
+                        type: OperationType.BOOKING_UPDATE_STATUS,
+                    });
+
+                    await sendBookingStatusUpdateToQueue({
+                        operationId,
+                        type: OperationType.BOOKING_UPDATE_STATUS,
+                        payload: {
+                            bookingId,
+                            actorId,
+                            status: nextStatus,
+                        },
+                    });
+
+                    await logAudit({
+                        req,
+                        action: ActionType.OPERATION_CREATE,
+                        actorId,
+                        entityId: operationId,
+                        entityType: "Operation",
+                        lockerId: existing.lockerBoxId,
+                        details: {
+                            operationType: OperationType.BOOKING_UPDATE_STATUS,
+                            bookingId,
+                            previousStatus: existing.status,
+                            nextStatus,
+                            scope: "admin",
+                            sourceOfTruth: "postgres-localstack-sync",
+                        },
+                    });
+
+                    return {
+                        statusCode: 202,
+                        body: toQueuedBookingOperationResponse(
+                            operationId,
+                            OperationType.BOOKING_UPDATE_STATUS,
+                            {
+                                bookingId,
+                                requestedStatus: nextStatus,
+                                persistedStatus: updated.status,
+                            },
+                            "Booking status update queued"
+                        ),
+                    };
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : "Failed to queue booking status update";
+
+                    await operationRepository.updateStatus(operationId, OperationStatus.FAILED, errorMessage);
+                    await logAudit({
+                        req,
+                        action: ActionType.BOOKING_UPDATE_STATUS_FAILED,
+                        actorId,
+                        entityId: bookingId,
+                        entityType: "Booking",
+                        lockerId: existing.lockerBoxId,
+                        details: {
+                            previousStatus: existing.status,
+                            nextStatus,
+                            reason: errorMessage,
+                            sourceOfTruth: "postgres",
+                        },
+                    });
+
+                    throw new HttpError(500, errorMessage);
+                }
+            }
+        );
+    }
+
+    async cancelBooking(req: Request, res: Response) {
+        const bookingId = req.params.id as string;
+        const bookingWithLocker = await loadBookingWithLockerStatus(bookingId);
+
+        if (!bookingWithLocker) {
+            throw new HttpError(404, "Booking not found");
+        }
+
+        const { booking, lockerStatus } = bookingWithLocker;
+        const userId = req.user?.userId;
+        const role = req.user?.role;
+
+        if (role === Role.USER && booking.userId !== userId) {
+            throw new HttpError(403, "Access denied");
+        }
+
+        if (booking.status === "CANCELLED") {
+            return sendSuccess(res, {
+                bookingId: booking.bookingId,
+                bookingStatus: booking.status,
+                lockerStatus,
+                message: "Booking already cancelled",
+            });
+        }
+
+        if (!userId) {
+            throw new HttpError(401, "Unauthorized");
+        }
+
+        return idempotencyService.execute(
+            req,
+            res,
+            `booking-cancel:${bookingId}`,
+            { bookingId },
+            async () => {
+                const operationId = uuidv4();
+
+                try {
+                    const updated = await prismaService.booking.update({
+                        where: { bookingId },
+                        data: {
+                            status: BookingStatus.CANCELLED,
+                            endTime: new Date(),
+                        },
+                    });
+
+                    await operationRepository.create({
+                        operationId,
+                        userId,
+                        timestamp: new Date().toISOString(),
+                        status: OperationStatus.PENDING,
+                        type: OperationType.BOOKING_CANCEL,
+                    });
+
+                    await sendBookingCancelToQueue({
+                        operationId,
+                        type: OperationType.BOOKING_CANCEL,
+                        payload: {
+                            bookingId,
+                            actorId: userId,
+                        },
+                    });
+
+                    await logAudit({
+                        req,
+                        action: ActionType.OPERATION_CREATE,
+                        actorId: userId,
+                        entityId: operationId,
+                        entityType: "Operation",
+                        lockerId: booking.lockerBoxId,
+                        details: {
+                            operationType: OperationType.BOOKING_CANCEL,
+                            bookingId,
+                            previousStatus: booking.status,
+                            previousLockerStatus: lockerStatus,
+                            sourceOfTruth: "postgres-localstack-sync",
+                        },
+                    });
+
+                    return {
+                        statusCode: 202,
+                        body: toQueuedBookingOperationResponse(
+                            operationId,
+                            OperationType.BOOKING_CANCEL,
+                            {
+                                bookingId,
+                                persistedStatus: updated.status,
+                            },
+                            "Booking cancellation queued"
+                        ),
+                    };
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : "Failed to queue booking cancel";
+
+                    await operationRepository.updateStatus(operationId, OperationStatus.FAILED, errorMessage);
+                    await logAudit({
+                        req,
+                        action: ActionType.BOOKING_CANCEL_FAILED,
+                        actorId: userId,
+                        entityId: bookingId,
+                        entityType: "Booking",
+                        lockerId: booking.lockerBoxId,
+                        details: {
+                            previousStatus: booking.status,
+                            previousLockerStatus: lockerStatus,
+                            reason: errorMessage,
+                            sourceOfTruth: "postgres",
+                        },
+                    });
+
+                    throw new HttpError(500, errorMessage);
+                }
+            }
+        );
+    }
+
+    async getAllBookings(req: Request, res: Response) {
+        const userId = req.user?.userId;
+
+        if (!userId) {
+            throw new HttpError(401, "Unauthorized");
+        }
+
+        const allBookings = await getAllBookings() as BookingRecordDto[];
+        const ownBookings = allBookings.filter((booking) => booking.userId === userId);
+        const result = await Promise.all(
+            ownBookings.map(async (booking) => {
+                const locker = await getLockerCache(booking.lockerBoxId);
+                return toPublicBookingResponse({
+                    bookingId: booking.bookingId,
+                    paymentStatus: booking.paymentStatus ?? "PENDING",
+                    bookingStatus: booking.status,
+                    lockerStatus: booking.lockerStatus ?? locker?.status ?? null,
+                    lockerBoxId: booking.lockerBoxId,
+                    stationId: booking.stationId,
+                    startTime: booking.startTime ?? null,
+                    expectedEndTime: booking.expectedEndTime ?? null,
+                });
+            })
+        );
+
+        await logAudit({
+            req,
+            action: ActionType.BOOKING_INFO,
+            actorId: userId,
+            entityId: "my-bookings",
+            entityType: "Booking",
+            details: {
+                sourceOfTruth: "dynamodb",
+                count: result.length,
+                scope: "self",
+            },
+        });
+
+        return sendSuccess(res, result);
+    }
+
+    async extendBooking(req: Request, res: Response) {
+        const bookingId = req.params.id as string;
+        const userId = req.user?.userId;
+
+        if (!userId) {
+            throw new HttpError(401, "Unauthorized");
+        }
+
+        const nextExpectedEndTime = resolveRequestedExpectedEndTime(req);
+
+        try {
+            const bookingWithLocker = await loadBookingWithLockerStatus(bookingId);
+
+            if (!bookingWithLocker) {
+                throw new HttpError(404, "Booking not found");
+            }
+
+            const { booking, lockerStatus } = bookingWithLocker;
+
+            if (booking.userId !== userId) {
+                throw new HttpError(403, "Access denied");
+            }
+
+            if (!booking.expectedEndTime) {
+                throw new HttpError(409, "Booking does not have expectedEndTime");
+            }
+
+            const currentExpectedEndTime = new Date(booking.expectedEndTime);
+
+            if (Number.isNaN(currentExpectedEndTime.getTime())) {
+                throw new HttpError(409, "Booking has invalid expectedEndTime");
+            }
+
+            if (nextExpectedEndTime <= currentExpectedEndTime) {
+                throw new HttpError(400, "expectedEndTime must be later than current expectedEndTime", "VALIDATION_ERROR");
+            }
+
+            if (!lockerStatus) {
+                throw new HttpError(409, "Locker status not found in DynamoDB");
+            }
+
+            const isRegularExtension = booking.status === "ACTIVE" && lockerStatus === "OCCUPIED";
+            const isExpiredReactivation = booking.status === "EXPIRED" && lockerStatus === "EXPIRED";
+
+            if (!isRegularExtension && !isExpiredReactivation) {
+                throw new HttpError(
+                    409,
+                    "Booking can be extended only for ACTIVE/OCCUPIED or EXPIRED/EXPIRED states"
+                );
+            }
+
+            const operationId = uuidv4();
+            const nextBookingStatus = isExpiredReactivation ? "ACTIVE" : booking.status;
+            const nextLockerStatus = isExpiredReactivation ? "OCCUPIED" : lockerStatus;
+
+            await sendBookingExtendToQueue({
+                operationId,
+                type: OperationType.BOOKING_EXTEND,
+                payload: {
+                    bookingId,
+                    userId,
+                    expectedEndTime: nextExpectedEndTime.toISOString(),
+                },
+            });
+
+            await logAudit({
+                req,
+                action: ActionType.BOOKING_UPDATE_STATUS,
+                actorId: userId,
+                entityId: bookingId,
+                entityType: "Booking",
+                lockerId: booking.lockerBoxId,
+                details: {
+                    operationId,
+                    currentBookingStatus: booking.status,
+                    currentLockerStatus: lockerStatus,
+                    nextExpectedEndTime: nextExpectedEndTime.toISOString(),
+                    expectedBookingStatus: nextBookingStatus,
+                    expectedLockerStatus: nextLockerStatus,
+                    sourceOfTruth: "lambda-dynamodb",
+                },
+            });
+
+            return sendSuccess(
+                res,
+                toQueuedBookingOperationResponse(
+                    operationId,
+                    OperationType.BOOKING_EXTEND,
+                    {
+                        bookingId: booking.bookingId,
+                        lockerBoxId: booking.lockerBoxId,
+                        currentBookingStatus: booking.status,
+                        currentLockerStatus: lockerStatus,
+                        requestedExpectedEndTime: nextExpectedEndTime.toISOString(),
+                    }
+                ),
+                202
+            );
+        } catch (error) {
+            await logAudit({
+                req,
+                action: ActionType.BOOKING_UPDATE_STATUS_FAILED,
+                actorId: userId,
+                entityId: bookingId,
+                entityType: "Booking",
+                details: {
+                    reason: error instanceof Error ? error.message : "Unknown error",
+                    sourceOfTruth: "dynamodb",
+                },
+            });
+
+            throw error;
+        }
     }
 }
 

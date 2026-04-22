@@ -2,11 +2,13 @@ import { GetCommand, PutCommand, ScanCommand, UpdateCommand } from "@aws-sdk/lib
 
 import { dynamoDocClient } from "../utils/awsClient";
 import { env } from "../config/env";
+import { LockerCacheDto } from "../contracts/cache.dto";
 
 import { Operation, OperationStatus } from "./dto/operationDto";
 
 const TABLE_NAME = env.DYNAMO_TABLE_NAME || "locker-dev-operations-dynamodb";
 const BOOKINGS_TABLE_NAME = env.DYNAMO_BOOKINGS_TABLE_NAME || "locker-dev-bookings-dynamodb";
+const LOCKER_CACHE_TABLE_NAME = env.DYNAMO_LOCKER_CACHE_TABLE_NAME || "locker-dev-locker-cache";
 
 export async function createOperation(operation: Operation) {
     await dynamoDocClient.send(new PutCommand({
@@ -70,6 +72,15 @@ export async function getBooking(bookingId: string) {
     }));
 
     return result.Item;
+}
+
+export async function getLockerCache(lockerBoxId: string) {
+    const result = await dynamoDocClient.send(new GetCommand({
+        TableName: LOCKER_CACHE_TABLE_NAME,
+        Key: { lockerBoxId }
+    }));
+
+    return result.Item as LockerCacheDto | undefined;
 }
 
 export async function getAllBookings() {
