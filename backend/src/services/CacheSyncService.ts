@@ -4,11 +4,12 @@ import { LockerCacheDto, StationCacheDto } from "../contracts/cache.dto";
 import { lockerCacheRepository } from "../repositories/cache/LockerCacheRepository";
 import { stationCacheRepository } from "../repositories/cache/StationCacheRepository";
 import { lockerCatalogProjectionService } from "../repositories/prisma/LockerCatalogProjectionService";
-import { enqueueLockerProjectionDelete, enqueueLockerProjectionUpsert } from "./sqsService";
 import { sendSuccess } from "../utils/response";
 import { isDynamoAccessError } from "../utils/awsErrors";
 import { isRedisAccessError } from "../utils/redisErrors";
 import { logger } from "../Logger/winston";
+
+import { enqueueLockerProjectionDelete, enqueueLockerProjectionUpsert } from "./sqsService";
 
 type EntitySyncMode = "compare-and-fill" | "rds-fallback-full-resync";
 
