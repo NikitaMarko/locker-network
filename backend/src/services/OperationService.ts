@@ -131,7 +131,7 @@ export class OperationReadService {
             type: result.type,
             timestamp: result.timestamp,
             ...(result.errorMessage ? { errorMessage: result.errorMessage } : {}),
-            ...(result.result ? { data: result.result } : {}),
+            ...(result.result ?? {}),
         });
     }
 }

@@ -20,6 +20,7 @@ import {healthRouter} from "./routes/healthRoutes";
 import {HttpError} from './errorHandler/HttpError';
 import {lockersRoutes} from "./routes/lockersRoutes";
 import {operationsRouter} from "./routes/operationsRoutes";
+import { paymentsRoutes } from "./routes/paymentsRoutes";
 import { logSecurityEvent, SecurityEventType } from "./services/securityEventService";
 import { sendError } from "./utils/response";
 import { citiesRoutes } from './routes/citiesRoutes';
@@ -74,6 +75,7 @@ export const createApp = () => {
     );
 
     //===============Middleware============
+    app.use("/api/v1/payments/webhook", express.raw({ type: "application/json", limit: "256kb" }));
     app.use(express.json({limit: '10kb'}));
     app.set('query parser', (str: string) => qs.parse(str));
 
@@ -142,6 +144,7 @@ export const createApp = () => {
     app.use(`/operations`, operationsRouter)
     app.use(`/health`, healthRouter)
     app.use(`${API_PREFIX}/bookings`, bookingsRoutes)
+    app.use(`${API_PREFIX}/payments`, paymentsRoutes)
     app.use(`${API_PREFIX}/lockers`, lockersRoutes)
     app.use(`${API_PREFIX}/cities`, citiesRoutes)
     app.use(`${API_PREFIX}/admin`, adminRouter) //смена ролей админом

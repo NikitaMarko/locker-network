@@ -27,6 +27,8 @@ const envSchema = z.object({
     OPERATIONS_QUEUE_URL: optionalUrl,
     CACHE_PROJECTION_QUEUE_URL: optionalUrl,
     CLOUDFRONT_URL: optionalUrl,
+    STRIPE_WEBHOOK_SECRET: z.string().optional(),
+    STRIPE_WEBHOOK_TOLERANCE_SECONDS: z.coerce.number().int().positive().default(300),
     AWS_REGION: z.string().default("eu-west-1"),
     AWS_PROFILE: z.string().optional(),
     AWS_ENDPOINT_URL: optionalUrl,
