@@ -24,6 +24,7 @@ services:
     environment:
       SERVICES: sqs,dynamodb,lambda,logs,iam
       AWS_DEFAULT_REGION: eu-west-1
+      DATABASE_URL: postgresql://root:root@postgres:5432/locker
       DEBUG: 1
       PERSISTENCE: 1
       LAMBDA_EXECUTOR: docker-reuse
@@ -85,6 +86,7 @@ services:
       OPERATIONS_QUEUE_URL: http://localstack:4566/000000000000/locker-operations-queue
       CACHE_PROJECTION_QUEUE_URL: http://localstack:4566/000000000000/locker-dev-cache-projection
       SQS_URL: http://localstack:4566/000000000000/locker-operations-queue
+      STRIPE_WEBHOOK_SECRET: whsec_localstack_test
       USE_LAMBDA_HEALTH: "false"
       LAMBDA_HEALTH_URL: ""
     healthcheck:

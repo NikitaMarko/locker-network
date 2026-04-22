@@ -499,124 +499,34 @@ http://localhost:3555/api/v1
 |--------|------|-------------|------|
 | `GET` | `/health` | Service health check | — |
 
-#### Authentication
-| Method | Path | Description | Auth |
-|--------|------|-------------|------|
-| `POST` | `/api/v1/auth/signup` | Register new user | — |
-| `POST` | `/api/v1/auth/login` | Login | — |
-| `POST` | `/api/v1/auth/google` | Login via Google ID token | — |
-| `POST` | `/api/v1/auth/refresh` | Refresh access token | cookie |
-| `POST` | `/api/v1/auth/logout` | Logout | Bearer |
-| `GET` | `/api/v1/auth/me` | Current user profile | Bearer |
+The detailed route contracts live next to the owning modules:
 
-#### Users (coming soon)
-| Method | Path | Description | Auth |
-|--------|------|-------------|------|
-| `GET` | `/api/v1/users/:id` | Get user by ID | Bearer |
-| `PATCH` | `/api/v1/users/:id` | Update profile | Bearer |
-| `DELETE` | `/api/v1/users/:id` | Delete account | Bearer |
-
-#### Lockers (in progress)
-| Method | Path | Description | Auth |
-|--------|------|-------------|------|
-| `GET` | `/api/v1/lockers/boxes` | Public locker list from cache | — |
-| `GET` | `/api/v1/lockers/stations` | Public station list from cache | — |
-| `GET` | `/api/v1/lockers/boxes/:id` | User locker details from cache | Bearer User |
-| `GET` | `/api/v1/lockers/stations/:id` | User station details from cache | Bearer User |
-| `GET` | `/api/v1/lockers/admin/boxes` | Staff locker list from backend projection | Bearer Operator/Admin |
-| `GET` | `/api/v1/lockers/admin/boxes/:id` | Staff locker details from backend projection | Bearer Operator/Admin |
-| `POST` | `/api/v1/lockers/admin/boxes` | Create locker box | Bearer Operator/Admin |
-| `PATCH` | `/api/v1/lockers/admin/boxes/:id/status` | Change locker status | Bearer Operator/Admin |
-| `POST` | `/api/v1/lockers/admin/boxes/:id/resync-cache` | Immediate locker cache refresh in DynamoDB | Bearer Admin |
-| `PATCH` | `/api/v1/lockers/oper/boxes/:id/delete` | Delete locker box | Bearer Operator |
-| `GET` | `/api/v1/lockers/admin/stations` | Staff station list from backend projection | Bearer Operator/Admin |
-| `GET` | `/api/v1/lockers/admin/stations/:id` | Staff station details from backend projection | Bearer Operator/Admin |
-| `POST` | `/api/v1/lockers/admin/stations` | Create station | Bearer Operator/Admin |
-| `PATCH` | `/api/v1/lockers/admin/stations/:id/status` | Change station status | Bearer Operator/Admin |
-| `POST` | `/api/v1/lockers/admin/stations/:id/resync-cache` | Immediate station cache refresh in Redis | Bearer Admin |
-| `POST` | `/api/v1/lockers/admin/cache/reconcile` | Admin reconcile endpoint for unscheduled direct cache refresh | Bearer Admin |
-| `PATCH` | `/api/v1/lockers/oper/stations/:id/delete` | Delete station | Bearer Operator |
-
-#### Bookings (coming soon)
-| Method | Path | Description | Auth |
-|--------|------|-------------|------|
-| `GET` | `/api/v1/bookings` | User's bookings | Bearer |
-| `POST` | `/api/v1/bookings` | Create booking | Bearer |
-| `PATCH` | `/api/v1/bookings/:id` | Update booking | Bearer |
-| `DELETE` | `/api/v1/bookings/:id` | Cancel booking | Bearer |
-
-#### Audit (Admin only, coming soon)
-| Method | Path | Description | Auth |
-|--------|------|-------------|------|
-| `GET` | `/api/v1/audit-logs` | View audit logs | Admin |
+- Authentication: [auth.md](./auth.md)
+- Lockers: [lockers.md](./lockers.md)
+- Stations: [stations.md](./stations.md)
+- Booking flow: [booking-flow-contracts.md](./booking-flow-contracts.md)
+- Cache architecture: [cache.md](./cache.md)
+- Locker cache DynamoDB contract: [locker-cache-dynamo.md](./locker-cache-dynamo.md)
+- Security event transport: [logger-contracts.md](./logger-contracts.md)
+- Security event taxonomy: [logger-events.md](./logger-events.md)
 
 ---
 
 ## 🔑 Authentication Flow
 
-```
-1. LOGIN / REGISTER
-   POST /api/v1/auth/login or /api/v1/auth/signup
-   ← accessToken in JSON body
-   ← refreshToken in httpOnly cookie (browser handles automatically)
+Auth contracts are maintained in [auth.md](./auth.md).
 
-2. AUTHENTICATED REQUEST
-   GET /api/v1/auth/me
-   → Authorization: Bearer <accessToken>
+High-level flow:
 
-3. TOKEN EXPIRED (401)
-   POST /api/v1/auth/refresh
-   ← new accessToken in JSON body
-   ← new refreshToken in httpOnly cookie (refresh token rotation)
-   old refresh token is invalidated
+1. `POST /api/v1/auth/signup` or `POST /api/v1/auth/login` returns an access token and sets the refresh-token cookie.
+2. Protected routes use `Authorization: Bearer <accessToken>`.
+3. `POST /api/v1/auth/refresh` rotates the refresh session and returns a new access token.
+4. `POST /api/v1/auth/logout` revokes the active refresh session.
 
-4. LOGOUT / REVOKE
-   → current refresh session is revoked
-   → new login revokes all older active refresh sessions for the same user
-```
+Current TTLs:
 
-### Token payload
-
-```typescript
-interface TokenPayload {
-  userId: string;       // User UUID
-  role: Role;           // USER | OPERATOR | ADMIN
-  sessionId: string;    // Active refresh-session id
-}
-```
-
-### Token TTL
-
-| Token | TTL | Storage |
-|-------|-----|---------|
-| `accessToken` | 15 minutes | JSON response body; client storage is frontend-specific |
-| `refreshToken` | 7 days | httpOnly cookie |
-
-### curl examples
-
-```bash
-# Register
-curl -X POST http://localhost:3555/api/v1/auth/signup \
-  -H "Content-Type: application/json" \
-  -d '{"name":"John Doe","email":"john@example.com","password":"SecurePass123!"}'
-
-# Login
-curl -X POST http://localhost:3555/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"john@example.com","password":"SecurePass123!"}'
-
-# Protected request
-curl http://localhost:3555/api/v1/auth/me \
-  -H "Authorization: Bearer <accessToken>"
-
-# Refresh (cookie sent automatically)
-curl -X POST http://localhost:3555/api/v1/auth/refresh \
-  --cookie "refreshToken=<token>"
-
-# Logout
-curl -X POST http://localhost:3555/api/v1/auth/logout \
-  -H "Authorization: Bearer <accessToken>"
-```
+- `accessToken`: 15 minutes
+- `refreshToken`: 7 days
 
 ---
 
@@ -715,129 +625,46 @@ If `USE_LAMBDA_HEALTH=true` and the Lambda request fails or times out, the backe
 
 ## 🗃️ Cache Behaviour
 
-For the full role matrix and cache flow description, see [catalog-cache-and-roles.md](./catalog-cache-and-roles.md).
+Cache details are intentionally split by responsibility:
 
-Public station endpoints read from Redis by default. Public locker endpoints read from DynamoDB only.
+- overview: [cache.md](./cache.md)
+- role matrix and read/write paths: [catalog-cache-and-roles.md](./catalog-cache-and-roles.md)
+- DynamoDB locker projection contract: [locker-cache-dynamo.md](./locker-cache-dynamo.md)
 
-If Redis is unavailable, the backend falls back to RDS projections for:
+Quick summary:
 
-- `GET /api/v1/lockers/stations`
-- `GET /api/v1/lockers/stations/:id`
-
-Admin cache reconciliation endpoint:
-
-```bash
-curl -X POST http://localhost:3555/api/v1/lockers/admin/cache/reconcile \
-  -H "Authorization: Bearer <adminAccessToken>"
-```
-
-Behaviour:
-
-- endpoint is kept for unscheduled cache reconcile / refresh operations
-- stations: compare RDS projections with Redis and upsert/delete cache records directly
-- lockers: compare RDS metadata with DynamoDB and upsert/delete cache records directly
-- if Redis cannot be read, station reconcile switches to `rds-fallback-full-resync`
-- if DynamoDB cannot be read, locker reconcile switches to `rds-fallback-full-resync`
-- station cache freshness depends on the station projection version. Locker create/status/delete operations bump `LockerStation.version`, so `cache/reconcile` can detect stale station cache entries even when only the station's locker set changed
-- locker create/status/delete update locker cache in DynamoDB directly
-- station create stays deferred and does not rewrite Redis directly
-- station status/delete update dependent locker cache in DynamoDB directly, but keep Redis station cache deferred
-- `INACTIVE` stations are not deleted unless they are also `isDeleted = true`
-- After locker mutations, stale station cache symptoms usually look like:
-  - `GET /api/v1/lockers/stations` returns `_count.lockers: 0`
-  - `GET /api/v1/lockers/stations/:id` returns `lockers: []`
-  - `GET /api/v1/lockers/boxes` still returns locker rows from DynamoDB
-- Running `POST /api/v1/lockers/admin/cache/reconcile` rewrites drifted cache records immediately.
+- PostgreSQL is the source of truth.
+- Public station reads prefer Redis and can fall back to RDS projections.
+- Public locker reads use the DynamoDB locker cache.
+- Admin reconcile and resync endpoints are the manual recovery path for cache drift.
 
 ## Booking Flow
 
-Booking initialization is async and split into staging plus payment confirmation:
+The canonical booking contract is [booking-flow-contracts.md](./booking-flow-contracts.md).
 
-- `POST /api/v1/bookings/init` creates an operation in DynamoDB and sends `BOOKING_INIT` to SQS
-- `GET /api/v1/operations/:id` returns processing state and, on success, the staged payment payload including `paymentUrl`
-- frontend redirects directly to `paymentUrl`; there is no separate `POST /payments/create-session`
-- payment provider calls Lambda webhook `POST /payments/webhook`
-- webhook confirms the staged booking, writes final `Booking` and `Payment` rows to PostgreSQL, updates Dynamo booking state, and moves locker cache status to `OCCUPIED`
-- `GET /api/v1/bookings/:id` returns the final booking state for post-payment polling
+Current high-level flow:
 
-Required infra for this flow:
+1. `POST /api/v1/bookings/init` enqueues `BOOKING_INIT`.
+2. `GET /api/v1/operations/:id` is used for polling async progress and payment session data.
+3. `POST /api/v1/payments/webhook` confirms payment and continues the async flow.
+4. `GET /api/v1/bookings/:id` reads the staged/final booking state.
 
-- operations table in DynamoDB
-- locker cache table in DynamoDB
-- bookings table in DynamoDB for staged pending-payment records
-- payment webhook Lambda with access to PostgreSQL and both Dynamo tables
+API conventions in this flow:
+
+- booking success/error responses use the shared envelope from `src/utils/response.ts`
+- async booking mutations return `202 Accepted` once the command is queued successfully
+- `GET /api/v1/bookings/my` returns the same public booking shape as `GET /api/v1/bookings/:id`, but as an array
 
 ## 🏥 Health Check Async
 
-### Data Models:
+Async operation handling is documented in [../lambda/README.md](../lambda/README.md) and in the booking contracts for booking-specific commands.
 
-```ts 
-type Operation = {
-    operationId: string,
-    timestamp: string,
-    status: OperationStatus,
-}
-enum OperationStatus {
-    PENDING = "PENDING",
-    PROCESSING = "PROCESSING",
-    SUCCESS = "SUCCESS",
-    FAILED = "FAILED",
-}
-```
-### Endpoints:
+Shared operation statuses:
 
-#### POST /operations/health
-
-- Request Body: not required
-
-Response `200 OK`:
-```json
-{
-    "success": true,
-    "data": {
-        "operationId": "305fa517-25a4-41ca-b0c9-f41c331a9a8b",
-        "status": "PENDING"
-    }
-}
-```
-
-Response `500 Internal Server Error`:
-```json
-{
-  "status": "error",
-  "message": "Failed to create operation"
-}
-```
-
-#### GET /operations/:id
-
-Response `200 OK`:
-```json
-{
-    "success": true,
-    "data": {
-        "operationId": "305fa517-25a4-41ca-b0c9-f41c331a9a8b",
-        "status":  "PROCESSING",
-        "timestamp": "2026-03-29T18:24:40.076Z"
-    }
-}
-```
-
-Response `404 Not Found`:
-```json
-{
-    "status": "error",
-    "message": "Operation not found"
-}
-```
-
-Response `500 Internal Server Error`:
-```json
-{
-  "status": "error",
-  "message": "Failed to getInfo operation"
-}
-```
+- `PENDING`
+- `PROCESSING`
+- `SUCCESS`
+- `FAILED`
 
 ### Two modes
 
