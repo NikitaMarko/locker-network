@@ -1,11 +1,12 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand, DeleteCommand, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, PutCommand, DeleteCommand, GetCommand, UpdateCommand, TransactWriteCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
  
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
  
 const LOCKER_CACHE_TABLE = process.env.LOCKER_CACHE_TABLE || 'locker-locker-cache';
 const OPERATIONS_TABLE = process.env.OPERATIONS_TABLE || 'locker-dev-operations-dynamodb';
+const BOOKING_TABLE = process.env.BOOKING_TABLE || 'locker-dev-booking';
  
 // ─── Operations table ───
  
@@ -25,6 +26,30 @@ export const updateOperationStatus = async (
       ':status': status,
       ...(errorMessage && { ':err': errorMessage }),
     },
+  }));
+};
+
+export const updateOperationWithResult = async (
+  operationId: string,
+  status: string,
+  extra: Record<string, unknown>,
+) => {
+  const setParts = ['#s = :status'];
+  const names: Record<string, string> = { '#s': 'status' };
+  const values: Record<string, unknown> = { ':status': status };
+ 
+  for (const [key, value] of Object.entries(extra)) {
+    setParts.push(`#${key} = :${key}`);
+    names[`#${key}`] = key;
+    values[`:${key}`] = value;
+  }
+ 
+  await docClient.send(new UpdateCommand({
+    TableName: OPERATIONS_TABLE,
+    Key: { operationId },
+    UpdateExpression: `SET ${setParts.join(', ')}`,
+    ExpressionAttributeNames: names,
+    ExpressionAttributeValues: values,
   }));
 };
  
@@ -60,5 +85,137 @@ export const deleteLockerCache = async (lockerBoxId: string) => {
   await docClient.send(new DeleteCommand({
     TableName: LOCKER_CACHE_TABLE,
     Key: { lockerBoxId },
+  }));
+};
+
+export const findAvailableLocker = async (stationId: string, size: string) => {
+  // Scan locker-cache for matching station + size + AVAILABLE
+  // In production, use a GSI for better performance
+  const result = await docClient.send(new QueryCommand({
+    TableName: LOCKER_CACHE_TABLE,
+    IndexName: 'stationId-index',
+    KeyConditionExpression: 'stationId = :stationId',
+    FilterExpression: '#size = :size AND #status = :status',
+    ExpressionAttributeNames: {
+      '#size': 'size',
+      '#status': 'status',
+    },
+    ExpressionAttributeValues: {
+      ':stationId': stationId,
+      ':size': size,
+      ':status': 'AVAILABLE',
+    },
+    Limit: 1,
+  }));
+ 
+  return result.Items?.[0] || null;
+};
+ 
+export const updateLockerStatus = async (lockerBoxId: string, status: string) => {
+  await docClient.send(new UpdateCommand({
+    TableName: LOCKER_CACHE_TABLE,
+    Key: { lockerBoxId },
+    UpdateExpression: 'SET #s = :status, lastStatusChangedAt = :now',
+    ExpressionAttributeNames: { '#s': 'status' },
+    ExpressionAttributeValues: {
+      ':status': status,
+      ':now': new Date().toISOString(),
+    },
+  }));
+};
+ 
+// ─── Booking table ───
+ 
+export const createBooking = async (booking: Record<string, unknown>) => {
+  await docClient.send(new PutCommand({
+    TableName: BOOKING_TABLE,
+    Item: booking,
+  }));
+};
+ 
+export const getBooking = async (bookingId: string) => {
+  const result = await docClient.send(new GetCommand({
+    TableName: BOOKING_TABLE,
+    Key: { bookingId },
+  }));
+  return result.Item || null;
+};
+ 
+export const updateBookingStatus = async (
+  bookingId: string,
+  status: string,
+  extra?: Record<string, unknown>,
+) => {
+  const setParts = ['#s = :status'];
+  const names: Record<string, string> = { '#s': 'status' };
+  const values: Record<string, unknown> = { ':status': status };
+ 
+  if (extra) {
+    for (const [key, value] of Object.entries(extra)) {
+      setParts.push(`#${key} = :${key}`);
+      names[`#${key}`] = key;
+      values[`:${key}`] = value;
+    }
+  }
+ 
+  await docClient.send(new UpdateCommand({
+    TableName: BOOKING_TABLE,
+    Key: { bookingId },
+    UpdateExpression: `SET ${setParts.join(', ')}`,
+    ExpressionAttributeNames: names,
+    ExpressionAttributeValues: values,
+  }));
+};
+ 
+// ─── Atomic transaction: create booking + reserve locker + update operation ───
+ 
+export const atomicBookingInit = async (
+  booking: Record<string, unknown>,
+  lockerBoxId: string,
+  operationId: string,
+  operationResult: Record<string, unknown>,
+) => {
+  await docClient.send(new TransactWriteCommand({
+    TransactItems: [
+      {
+        Put: {
+          TableName: BOOKING_TABLE,
+          Item: booking,
+        },
+      },
+      {
+        Update: {
+          TableName: LOCKER_CACHE_TABLE,
+          Key: { lockerBoxId },
+          UpdateExpression: 'SET #s = :reserved, lastStatusChangedAt = :now',
+          ConditionExpression: '#s = :available',
+          ExpressionAttributeNames: { '#s': 'status' },
+          ExpressionAttributeValues: {
+            ':reserved': 'RESERVED',
+            ':available': 'AVAILABLE',
+            ':now': new Date().toISOString(),
+          },
+        },
+      },
+      {
+        Update: {
+          TableName: OPERATIONS_TABLE,
+          Key: { operationId },
+          UpdateExpression: 'SET #s = :status, #bid = :bookingId, #lid = :lockerBoxId, #r = :result',
+          ExpressionAttributeNames: {
+            '#s': 'status',
+            '#bid': 'bookingId',
+            '#lid': 'lockerBoxId',
+            '#r': 'result',
+          },
+          ExpressionAttributeValues: {
+            ':status': 'SUCCESS',
+            ':bookingId': booking.bookingId as string,
+            ':lockerBoxId': lockerBoxId,
+            ':result': operationResult,
+          },
+        },
+      },
+    ],
   }));
 };
