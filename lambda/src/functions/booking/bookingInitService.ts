@@ -12,7 +12,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2026-03-25.dahlia',
 });
  
-const BOOKING_TTL_MINUTES = 15;
+const BOOKING_TTL_MINUTES = 30;
 const CURRENCY = 'ILS';
 const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || 'https://main.d3vb1066jloxjy.amplifyapp.com';
 const SUCCESS_URL = `${FRONTEND_BASE_URL}/payment/success`;
