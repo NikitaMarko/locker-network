@@ -25,6 +25,11 @@ Parameters:
       - dev
       - staging
       - prod
+  StripeSecretKey:
+    Type: String
+    Description: Stripe API secret key
+    NoEcho: true
+    Default: "sk_test_placeholder"
 
 Resources:
   HealthCheckFunction:
@@ -72,9 +77,17 @@ Resources:
       Environment:
         Variables:
           OPERATIONS_TABLE: !Ref OperationsTable
+          BOOKING_TABLE: !Ref BookingTable
+          LOCKER_CACHE_TABLE: !Ref LockerCacheTable
+          STRIPE_SECRET_KEY: !Ref StripeSecretKey
+          FRONTEND_BASE_URL: "https://main.d3vb1066jloxjy.amplifyapp.com"
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref OperationsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref BookingTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref LockerCacheTable
       Events:
         SQSEvent:
           Type: SQS
@@ -97,10 +110,35 @@ Resources:
       AttributeDefinitions:
         - AttributeName: lockerBoxId
           AttributeType: S
+        - AttributeName: stationId
+          AttributeType: S
       KeySchema:
         - AttributeName: lockerBoxId
           KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: stationId-index
+          KeySchema:
+            - AttributeName: stationId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
       BillingMode: PAY_PER_REQUEST
+
+  # ── Booking DynamoDB Table ──
+  BookingTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub locker-${Environment}-booking
+      AttributeDefinitions:
+        - AttributeName: bookingId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: bookingId
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
  
   # ── Cache Projection Handler Lambda ──
   CacheProjectionHandlerFunction:
@@ -145,3 +183,6 @@ Outputs:
   LockerCacheTableName:
     Description: DynamoDB table for locker cache
     Value: !Ref LockerCacheTable
+  BookingTableName:
+    Description: DynamoDB table for bookings
+    Value: !Ref BookingTable
