@@ -4,6 +4,10 @@ import { SecurityEventPayload } from '../../types/contracts/SecurityEventContrac
 import { updateOperationStatus } from '../../db/dynamodb';
 import { handleHealthCheck } from './lambdaHealthService';
 import { handleSecurityEvent } from './securityEventService';
+import { handlePaymentConfirm } from '../booking/paymentConfirmService';
+import { BookingInitCommand, PaymentConfirmCommand, BookingExtendCommand } from '../../types/contracts/BookingContracts';
+import { handleBookingExtend } from '../booking/bookingExtendService';
+import { handleBookingInit } from '../booking/bookingInitService';
  
 export const handler = async (event: SQSEvent): Promise<void> => {
   for (const record of event.Records) {
@@ -29,6 +33,18 @@ export const handler = async (event: SQSEvent): Promise<void> => {
             command.operationId,
             command.payload as unknown as SecurityEventPayload,
           );
+          break;
+
+        case OperationType.BOOKING_INIT:
+          await handleBookingInit(command as unknown as BookingInitCommand);
+          break;
+ 
+        case OperationType.PAYMENT_CONFIRM:
+          await handlePaymentConfirm(command as unknown as PaymentConfirmCommand);
+          break;
+ 
+        case OperationType.BOOKING_EXTEND:
+          await handleBookingExtend(command as unknown as BookingExtendCommand);
           break;
  
         default:
