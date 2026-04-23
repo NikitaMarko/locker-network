@@ -541,6 +541,8 @@ export class BookingService {
     async extendBooking(req: Request, res: Response) {
         const bookingId = req.params.id as string;
         const userId = req.user?.userId;
+        let operationId: string | undefined;
+        let operationCreated = false;
 
         if (!userId) {
             throw new HttpError(401, "Unauthorized");
@@ -589,9 +591,18 @@ export class BookingService {
                 );
             }
 
-            const operationId = uuidv4();
+            operationId = uuidv4();
             const nextBookingStatus = isExpiredReactivation ? "ACTIVE" : booking.status;
             const nextLockerStatus = isExpiredReactivation ? "OCCUPIED" : lockerStatus;
+
+            await operationRepository.create({
+                operationId,
+                userId,
+                timestamp: new Date().toISOString(),
+                status: OperationStatus.PENDING,
+                type: OperationType.BOOKING_EXTEND,
+            });
+            operationCreated = true;
 
             await sendBookingExtendToQueue({
                 operationId,
@@ -637,6 +648,14 @@ export class BookingService {
                 202
             );
         } catch (error) {
+            if (operationCreated && operationId) {
+                await operationRepository.updateStatus(
+                    operationId,
+                    OperationStatus.FAILED,
+                    error instanceof Error ? error.message : "Failed to queue booking extend"
+                );
+            }
+
             await logAudit({
                 req,
                 action: ActionType.BOOKING_UPDATE_STATUS_FAILED,
