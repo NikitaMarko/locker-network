@@ -7,6 +7,7 @@ OPERATIONS_QUEUE="locker-operations-queue"
 CACHE_PROJECTION_QUEUE="locker-dev-cache-projection"
 OPERATIONS_TABLE="locker-dev-operations-dynamodb"
 LOCKER_CACHE_TABLE="locker-dev-locker-cache"
+BOOKINGS_TABLE="locker-dev-bookings-dynamodb"
 TS_LAMBDA_DIR="/opt/locker-localstack/ts-lambda"
 OPERATIONS_ZIP_PATH="/tmp/operations-handler.zip"
 CACHE_PROJECTION_ZIP_PATH="/tmp/cache-projection-handler.zip"
@@ -123,6 +124,7 @@ ensure_queue "${CACHE_PROJECTION_QUEUE}"
 echo "[localstack-init] creating dynamodb tables"
 ensure_dynamodb_table "${OPERATIONS_TABLE}" "operationId"
 ensure_dynamodb_table "${LOCKER_CACHE_TABLE}" "lockerBoxId"
+ensure_dynamodb_table "${BOOKINGS_TABLE}" "bookingId"
 
 echo "[localstack-init] packaging lambda"
 python3 - <<'PY'
@@ -132,11 +134,7 @@ import zipfile
 source_root = pathlib.Path("/opt/locker-localstack/ts-lambda")
 if not source_root.exists():
     raise SystemExit("Missing mounted ts lambda directory: /opt/locker-localstack/ts-lambda")
-
-required_paths = [
-    source_root / "dist",
-    source_root / "node_modules",
-]
+required_paths = [source_root / "dist", source_root / "node_modules"]
 
 missing = [str(path) for path in required_paths if not path.exists()]
 if missing:
@@ -144,15 +142,10 @@ if missing:
 
 packages = [
     (
-        pathlib.Path("/opt/locker-localstack/ts-lambda"),
+        pathlib.Path("/etc/localstack/init/ready.d"),
         pathlib.Path("/tmp/operations-handler.zip"),
         {
-            "dist/functions/operations",
-            "dist/db",
-            "dist/types",
-            "node_modules",
-            "package.json",
-            "package-lock.json",
+            "functions/operations-handler.js",
         },
     ),
     (
@@ -180,14 +173,41 @@ for source_dir, zip_path, allowed_prefixes in packages:
                     for prefix in allowed_prefixes
                 ):
                     zf.write(path, relative)
+
+with zipfile.ZipFile(pathlib.Path("/tmp/operations-handler.zip"), "a", zipfile.ZIP_DEFLATED) as zf:
+    for path in source_root.rglob("*"):
+        if path.is_file():
+            relative = path.relative_to(source_root)
+            relative_str = relative.as_posix()
+            if not (
+                relative_str.startswith("node_modules/")
+                and not any(
+                    relative_str == prefix or relative_str.startswith(f"{prefix}/")
+                    for prefix in {
+                        "node_modules/@prisma",
+                        "node_modules/.prisma",
+                        "node_modules/prisma",
+                        "node_modules/typescript",
+                        "node_modules/@types",
+                        "node_modules/fsevents",
+                        "node_modules/undici-types",
+                    }
+                )
+            ):
+                continue
+
+            if relative_str.endswith(".map"):
+                continue
+
+                zf.write(path, relative)
 PY
 
 echo "[localstack-init] creating operations lambda function"
 ensure_lambda_function \
   "${OPERATIONS_LAMBDA}" \
-  "dist/functions/operations/commandHandler.handler" \
+  "functions/operations-handler.handler" \
   "${OPERATIONS_ZIP_PATH}" \
-  "OPERATIONS_TABLE=${OPERATIONS_TABLE},AWS_REGION=${AWS_REGION}"
+  "OPERATIONS_TABLE=${OPERATIONS_TABLE},BOOKINGS_TABLE=${BOOKINGS_TABLE},LOCKER_CACHE_TABLE=${LOCKER_CACHE_TABLE},AWS_REGION=${AWS_REGION}"
 
 OPERATIONS_QUEUE_ARN="arn:aws:sqs:${AWS_REGION}:${ACCOUNT_ID}:${OPERATIONS_QUEUE}"
 

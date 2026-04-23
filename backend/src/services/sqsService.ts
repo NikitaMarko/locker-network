@@ -30,6 +30,60 @@ export type PaymentConfirmCommand = {
     };
 };
 
+export type BookingExtendCommand = {
+    operationId: string;
+    type: OperationType.BOOKING_EXTEND;
+    payload: {
+        bookingId: string;
+        userId: string;
+        expectedEndTime: string;
+    };
+};
+
+export type BookingCancelCommand = {
+    operationId: string;
+    type: OperationType.BOOKING_CANCEL;
+    payload: {
+        bookingId: string;
+        actorId: string;
+    };
+};
+
+export type BookingStatusUpdateCommand = {
+    operationId: string;
+    type: OperationType.BOOKING_UPDATE_STATUS;
+    payload: {
+        bookingId: string;
+        actorId: string;
+        status: string;
+    };
+};
+
+export type BookingInitCommand = {
+    operationId: string;
+    type: OperationType.BOOKING_INIT;
+    payload: {
+        userId: string;
+        stationId: string;
+        size: "S" | "M" | "L";
+        expectedEndTime: string;
+    };
+};
+
+export type BookingExtendConfirmCommand = {
+    operationId: string;
+    type: OperationType.BOOKING_EXTEND_CONFIRM;
+    payload: {
+        bookingId: string;
+        userId: string;
+        expectedEndTime: string;
+        paymentSessionId: string;
+        providerPaymentId: string;
+        amount: number;
+        currency: string;
+    };
+};
+
 type LockerCacheProjectionEvent =
     | {
         eventId: string;
@@ -127,6 +181,26 @@ export async function sendSecurityEventToQueue(event: QueueCommand) {
 }
 
 export async function sendPaymentConfirmToQueue(command: PaymentConfirmCommand) {
+    await sendCommandToQueue(command);
+}
+
+export async function sendBookingExtendToQueue(command: BookingExtendCommand) {
+    await sendCommandToQueue(command);
+}
+
+export async function sendBookingCancelToQueue(command: BookingCancelCommand) {
+    await sendCommandToQueue(command);
+}
+
+export async function sendBookingStatusUpdateToQueue(command: BookingStatusUpdateCommand) {
+    await sendCommandToQueue(command);
+}
+
+export async function sendBookingInitToQueue(command: BookingInitCommand) {
+    await sendCommandToQueue(command);
+}
+
+export async function sendBookingExtendConfirmToQueue(command: BookingExtendConfirmCommand) {
     await sendCommandToQueue(command);
 }
 

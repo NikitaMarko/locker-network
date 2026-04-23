@@ -2,7 +2,8 @@
   "info": {
     "_postman_id": "9f9e1df0-3f3d-4f89-8426-a1be5b6cb9c1",
     "name": "Locker Backend Local",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Updated collection matching the routes currently mounted by the backend."
   },
   "variable": [
     {
@@ -18,6 +19,10 @@
       "value": ""
     },
     {
+      "key": "adminUserId",
+      "value": ""
+    },
+    {
       "key": "operationId",
       "value": ""
     },
@@ -30,8 +35,20 @@
       "value": ""
     },
     {
+      "key": "bookingId",
+      "value": ""
+    },
+    {
       "key": "cityCode",
-      "value": "HFA"
+      "value": "TLV"
+    },
+    {
+      "key": "idempotencyKey",
+      "value": "pm-demo-key-001"
+    },
+    {
+      "key": "stripeSignature",
+      "value": "t=1713772800,v1=replace-with-real-signature"
     }
   ],
   "item": [
@@ -56,9 +73,40 @@
         },
         {
           "name": "POST /operations/health",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.operationId) {",
+                  "  pm.collectionVariables.set('operationId', json.data.operationId);",
+                  "}"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
             "url": {
               "raw": "{{baseUrl}}/operations/health",
               "host": [
@@ -75,7 +123,12 @@
           "name": "GET /operations/:id",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/operations/{{operationId}}",
               "host": [
@@ -105,7 +158,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Postman User\",\n  \"email\": \"postman.user@example.com\",\n  \"password\": \"SecurePass123!\"\n}"
+              "raw": "{\n  \"name\": \"Postman User\",\n  \"email\": \"postman.user@example.com\",\n  \"password\": \"SecurePass123!\",\n  \"phone\": \"+972501112233\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/signup",
@@ -127,16 +180,17 @@
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
                   "const json = pm.response.json();",
                   "if (json?.data?.accessToken) {",
                   "  pm.collectionVariables.set('accessToken', json.data.accessToken);",
                   "}",
-                  "if (json?.data?.user?.userId) {",
-                  "  pm.collectionVariables.set('userId', json.data.user.userId);",
+                  "const maybeUserId = json?.data?.user?.userId || json?.data?.userId || '';",
+                  "if (maybeUserId) {",
+                  "  pm.collectionVariables.set('userId', maybeUserId);",
                   "}"
-                ],
-                "type": "text/javascript"
+                ]
               }
             }
           ],
@@ -162,6 +216,34 @@
                 "v1",
                 "auth",
                 "login"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /api/v1/auth/google",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idToken\": \"replace-with-real-google-id-token\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/google",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "google"
               ]
             }
           }
@@ -259,7 +341,7 @@
       ]
     },
     {
-      "name": "Lockers Public/User",
+      "name": "Lockers Public",
       "item": [
         {
           "name": "GET /api/v1/lockers/boxes",
@@ -435,6 +517,10 @@
                 "value": "Bearer {{accessToken}}"
               },
               {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-create-box"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -468,6 +554,10 @@
                 "value": "Bearer {{accessToken}}"
               },
               {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-box-status"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -494,6 +584,45 @@
           }
         },
         {
+          "name": "PATCH /api/v1/lockers/admin/boxes/:id/tech-status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-box-tech-status"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"techStatus\": \"MAINTENANCE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/lockers/admin/boxes/{{lockerBoxId}}/tech-status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "lockers",
+                "admin",
+                "boxes",
+                "{{lockerBoxId}}",
+                "tech-status"
+              ]
+            }
+          }
+        },
+        {
           "name": "POST /api/v1/lockers/admin/boxes/:id/resync-cache",
           "request": {
             "method": "POST",
@@ -501,6 +630,10 @@
               {
                 "key": "Authorization",
                 "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-box-resync"
               }
             ],
             "url": {
@@ -581,13 +714,17 @@
                 "value": "Bearer {{accessToken}}"
               },
               {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-create-station"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"city\": \"{{cityCode}}\",\n  \"latitude\": 34.405045,\n  \"longitude\": 37.706076,\n  \"address\": \"Postman station\"\n}"
+              "raw": "{\n  \"city\": \"{{cityCode}}\",\n  \"latitude\": 32.0853,\n  \"longitude\": 34.7818,\n  \"address\": \"Dizengoff 10\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/lockers/admin/stations",
@@ -614,13 +751,17 @@
                 "value": "Bearer {{accessToken}}"
               },
               {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-station-status"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"status\": \"INACTIVE\"\n}"
+              "raw": "{\n  \"status\": \"ACTIVE\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/lockers/admin/stations/{{stationId}}/status",
@@ -647,6 +788,10 @@
               {
                 "key": "Authorization",
                 "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-station-resync"
               }
             ],
             "url": {
@@ -665,12 +810,37 @@
               ]
             }
           }
-        }
-      ]
-    },
-    {
-      "name": "Lockers Operator",
-      "item": [
+        },
+        {
+          "name": "POST /api/v1/lockers/admin/cache/reconcile",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-cache-reconcile"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/lockers/admin/cache/reconcile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "lockers",
+                "admin",
+                "cache",
+                "reconcile"
+              ]
+            }
+          }
+        },
         {
           "name": "PATCH /api/v1/lockers/oper/boxes/:id/delete",
           "request": {
@@ -721,6 +891,315 @@
                 "stations",
                 "{{stationId}}",
                 "delete"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bookings",
+      "item": [
+        {
+          "name": "POST /api/v1/bookings/init",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-booking-init"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stationId\": \"{{stationId}}\",\n  \"size\": \"M\",\n  \"expectedEndTime\": \"2026-04-23T12:00:00.000Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/init",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "init"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/bookings/my",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/my",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "my"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/bookings/:id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/{{bookingId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "{{bookingId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /api/v1/bookings/:id/cancel",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/{{bookingId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "{{bookingId}}",
+                "cancel"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /api/v1/bookings/:id/extend",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-booking-extend"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"expectedEndTime\": \"2026-04-23T15:00:00.000Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/{{bookingId}}/extend",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "{{bookingId}}",
+                "extend"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/bookings/admin",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/admin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "admin"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/bookings/admin/:id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/admin/{{bookingId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "admin",
+                "{{bookingId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "PATCH /api/v1/bookings/admin/:id/status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookings/admin/{{bookingId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookings",
+                "admin",
+                "{{bookingId}}",
+                "status"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "POST /api/v1/payments/webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Stripe-Signature",
+                "value": "{{stripeSignature}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"evt_123\",\n  \"type\": \"checkout.session.completed\",\n  \"data\": {\n    \"object\": {\n      \"id\": \"cs_test_123\",\n      \"payment_intent\": \"pi_123\",\n      \"amount_total\": 2590,\n      \"currency\": \"usd\",\n      \"metadata\": {\n        \"bookingId\": \"{{bookingId}}\",\n        \"paymentFlow\": \"BOOKING_INIT\"\n      }\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/webhook",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "webhook"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "PATCH /api/v1/admin/users/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"OPERATOR\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/{{adminUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "users",
+                "{{adminUserId}}"
               ]
             }
           }

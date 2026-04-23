@@ -1,5 +1,4 @@
-import crypto from "crypto";
-import { randomUUID } from "crypto";
+import crypto, { randomUUID } from "crypto";
 
 import { Request, Response } from "express";
 import { BookingStatus, PaymentStatus, Prisma } from "@prisma/client";
@@ -7,11 +6,12 @@ import { BookingStatus, PaymentStatus, Prisma } from "@prisma/client";
 import { BookingRecordDto } from "../contracts/booking.dto";
 import { HttpError } from "../errorHandler/HttpError";
 import { sendSuccess } from "../utils/response";
+import { env } from "../config/env";
+
 import { getBooking } from "./dynamoService";
 import { OperationType } from "./dto/operationDto";
 import { prismaService } from "./prismaService";
-import { sendPaymentConfirmToQueue } from "./sqsService";
-import { env } from "../config/env";
+import { sendBookingExtendConfirmToQueue, sendPaymentConfirmToQueue } from "./sqsService";
 
 type StripeEventObject = {
     id?: string;
@@ -39,6 +39,7 @@ type PaymentWebhookPayload = {
     providerPaymentId: string;
     amount: number;
     currency: string;
+    paymentFlow: "BOOKING_INIT" | "BOOKING_EXTEND";
 };
 
 function toDecimal(value: number) {
@@ -121,6 +122,8 @@ function extractPaymentPayload(event: StripeWebhookEvent): PaymentWebhookPayload
     const providerPaymentId = object.payment_intent ?? object.metadata?.providerPaymentId ?? undefined;
     const amountMinor = object.amount_total ?? object.amount_received ?? object.amount ?? undefined;
     const currency = object.currency ?? undefined;
+    const paymentFlowRaw = object.metadata?.paymentFlow;
+    const paymentFlow = paymentFlowRaw === "BOOKING_EXTEND" ? "BOOKING_EXTEND" : "BOOKING_INIT";
 
     if (!bookingId || !paymentSessionId || !providerPaymentId || typeof amountMinor !== "number" || !currency) {
         throw new HttpError(400, "Stripe event does not contain required payment fields");
@@ -132,6 +135,7 @@ function extractPaymentPayload(event: StripeWebhookEvent): PaymentWebhookPayload
         providerPaymentId,
         amount: toAmountMajorUnits(amountMinor),
         currency: currency.toUpperCase(),
+        paymentFlow,
     };
 }
 
@@ -142,14 +146,18 @@ export class PaymentService {
         return prismaService.$transaction(async (tx) => {
             const existingBooking = await tx.booking.findUnique({
                 where: { bookingId: stagedBooking.bookingId },
-                include: { payment: true },
+                include: { payments: true },
             });
 
-            if (existingBooking?.payment) {
+            const duplicatedPayment = existingBooking?.payments.find(
+                (payment) => payment.providerPaymentId === paymentPayload.providerPaymentId
+            );
+
+            if (existingBooking && duplicatedPayment) {
                 return {
                     created: false,
                     booking: existingBooking,
-                    payment: existingBooking.payment,
+                    payment: duplicatedPayment,
                 };
             }
 
@@ -202,6 +210,89 @@ export class PaymentService {
         });
     }
 
+    private async finalizeExtendPaymentInRds(stagedBooking: BookingRecordDto, paymentPayload: PaymentWebhookPayload, paidAtIso: string) {
+        const paidAt = new Date(paidAtIso);
+        const nextExpectedEndTime = stagedBooking.pendingExtendExpectedEndTime;
+
+        if (!nextExpectedEndTime) {
+            throw new HttpError(409, "Pending booking extension not found");
+        }
+
+        return prismaService.$transaction(async (tx) => {
+            const existingBooking = await tx.booking.findUnique({
+                where: { bookingId: stagedBooking.bookingId },
+                include: { payments: true },
+            });
+
+            if (!existingBooking) {
+                throw new HttpError(404, "Booking not found in RDS");
+            }
+
+            const duplicatedPayment = existingBooking.payments.find(
+                (payment) => payment.providerPaymentId === paymentPayload.providerPaymentId
+            );
+
+            if (duplicatedPayment) {
+                return {
+                    updated: false,
+                    booking: existingBooking,
+                    payment: duplicatedPayment,
+                };
+            }
+
+            const nextTotalPrice = existingBooking.totalPrice === null
+                ? toDecimal(paymentPayload.amount)
+                : existingBooking.totalPrice.plus(toDecimal(paymentPayload.amount));
+
+            const booking = await tx.booking.update({
+                where: { bookingId: stagedBooking.bookingId },
+                data: {
+                    expectedEndTime: new Date(nextExpectedEndTime),
+                    totalPrice: nextTotalPrice,
+                    ...(existingBooking.status === BookingStatus.EXPIRED
+                        ? { status: BookingStatus.ACTIVE }
+                        : {}),
+                },
+            });
+
+            const payment = await tx.payment.create({
+                data: {
+                    bookingId: stagedBooking.bookingId,
+                    status: PaymentStatus.PAID,
+                    provider: stagedBooking.paymentProvider ?? "stripe",
+                    providerPaymentId: paymentPayload.providerPaymentId,
+                    amount: toDecimal(paymentPayload.amount),
+                    currency: paymentPayload.currency,
+                    paidAt,
+                },
+            });
+
+            await tx.auditLog.create({
+                data: {
+                    action: "PAYMENT_CONFIRM",
+                    entityType: "Booking",
+                    entityId: stagedBooking.bookingId,
+                    lockerId: stagedBooking.lockerBoxId,
+                    details: {
+                        bookingId: stagedBooking.bookingId,
+                        paymentSessionId: paymentPayload.paymentSessionId,
+                        providerPaymentId: paymentPayload.providerPaymentId,
+                        amount: paymentPayload.amount,
+                        currency: paymentPayload.currency,
+                        paymentFlow: paymentPayload.paymentFlow,
+                        pendingExtendExpectedEndTime: nextExpectedEndTime,
+                    },
+                },
+            });
+
+            return {
+                updated: true,
+                booking,
+                payment,
+            };
+        });
+    }
+
     async handleStripeWebhook(req: Request, res: Response) {
         if (!Buffer.isBuffer(req.body)) {
             throw new HttpError(400, "Stripe webhook requires raw request body");
@@ -243,32 +334,65 @@ export class PaymentService {
             throw new HttpError(409, "Booking TTL expired");
         }
 
-        if (stagedBooking.paymentSessionId !== paymentPayload.paymentSessionId) {
-            throw new HttpError(409, "paymentSessionId does not match staged booking");
+        let created = false;
+        let operationId = stagedBooking?.operationId ?? randomUUID();
+
+        if (paymentPayload.paymentFlow === "BOOKING_EXTEND") {
+            if (stagedBooking.extendPaymentSessionId !== paymentPayload.paymentSessionId) {
+                throw new HttpError(409, "extend paymentSessionId does not match staged booking");
+            }
+
+            if (stagedBooking.extendPaymentStatus === "PAID") {
+                throw new HttpError(409, "Booking extension already paid");
+            }
+
+            await this.finalizeExtendPaymentInRds(stagedBooking, paymentPayload, paymentConfirmedAt);
+            operationId = stagedBooking.extendOperationId ?? operationId;
+
+            await sendBookingExtendConfirmToQueue({
+                operationId,
+                type: OperationType.BOOKING_EXTEND_CONFIRM,
+                payload: {
+                    bookingId: paymentPayload.bookingId,
+                    userId: stagedBooking.userId,
+                    expectedEndTime: stagedBooking.pendingExtendExpectedEndTime ?? stagedBooking.expectedEndTime,
+                    paymentSessionId: paymentPayload.paymentSessionId,
+                    providerPaymentId: paymentPayload.providerPaymentId,
+                    amount: paymentPayload.amount,
+                    currency: paymentPayload.currency,
+                },
+            });
+        } else {
+            if (stagedBooking.paymentSessionId !== paymentPayload.paymentSessionId) {
+                throw new HttpError(409, "paymentSessionId does not match staged booking");
+            }
+
+            if (stagedBooking.status === "ACTIVE") {
+                throw new HttpError(409, "Booking already active");
+            }
+
+            if (stagedBooking.paymentStatus === "PAID" && stagedBooking.status !== "PAYMENT_CONFIRMED") {
+                throw new HttpError(409, "Booking already paid");
+            }
+
+            const finalized = await this.finalizePaymentInRds(stagedBooking, paymentPayload, paymentConfirmedAt);
+            created = finalized.created;
+
+            await sendPaymentConfirmToQueue({
+                operationId,
+                type: OperationType.PAYMENT_CONFIRM,
+                payload: paymentPayload,
+            });
         }
-
-        if (stagedBooking.status === "ACTIVE") {
-            throw new HttpError(409, "Booking already active");
-        }
-
-        if (stagedBooking.paymentStatus === "PAID" && stagedBooking.status !== "PAYMENT_CONFIRMED") {
-            throw new HttpError(409, "Booking already paid");
-        }
-
-        const finalized = await this.finalizePaymentInRds(stagedBooking, paymentPayload, paymentConfirmedAt);
-
-        await sendPaymentConfirmToQueue({
-            operationId: stagedBooking?.operationId ?? randomUUID(),
-            type: OperationType.PAYMENT_CONFIRM,
-            payload: paymentPayload,
-        });
 
         return sendSuccess(res, {
             received: true,
             accepted: true,
             bookingId: paymentPayload.bookingId,
+            paymentFlow: paymentPayload.paymentFlow,
+            operationId,
             rdsFinalized: true,
-            created: finalized.created,
+            created,
             paymentConfirmedAt,
             eventId: event.id,
         });

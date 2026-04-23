@@ -252,7 +252,7 @@ model Booking {
 
   idempotencyKey String? @unique
 
-  payment Payment?
+  payments Payment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -285,7 +285,7 @@ model LockerStatusHistory {
 model Payment {
   paymentId String @id @default(uuid())
 
-  bookingId String  @unique
+  bookingId String
   booking   Booking @relation(fields: [bookingId], references: [bookingId], onDelete: Restrict)
 
   status PaymentStatus

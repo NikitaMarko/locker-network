@@ -17,6 +17,17 @@ export const oneBookingSchema = z.object({
     }),
 });
 
+const extendBookingPayloadSchema = z.object({
+    expectedEndTime: z.string().datetime(),
+});
+
+export const extendBookingSchema = z.object({
+    params: z.object({
+        id: z.string().uuid(),
+    }),
+    body: extendBookingPayloadSchema,
+});
+
 export const BookingStatusEnum = z.nativeEnum(BookingStatus);
 
 export const bookingStatusChangeSchema = z.object({

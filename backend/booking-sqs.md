@@ -1,59 +1,16 @@
 ## Booking SQS
 
-- Status: planned, not implemented in current backend producer flow
-- Current operations queue supports `HEALTH_CHECK` and `SECURITY_EVENT`
-- `CREATE_BOOKING` is documented here only as a future contract reference
+This file is kept only as a transport pointer.
 
-### Current operations queue
+The canonical booking transport contract now lives in [booking-flow-contracts.md](./booking-flow-contracts.md).
 
-- Queue URL env: `OPERATIONS_QUEUE_URL`
-- Producer: backend
-- Consumer: lambda command handler
-- Transport: AWS SQS
+Current guidance:
 
-Current message shape:
+- booking commands are part of the async booking flow, not a standalone legacy contract
+- message shape, operation lifecycle, and payment-confirmation flow must be updated in one place only
+- non-booking security-event transport remains documented separately in [logger-contracts.md](./logger-contracts.md)
 
-```json
-{
-  "operationId": "uuid",
-  "type": "HEALTH_CHECK",
-  "payload": {
-    "timestamp": "2026-04-14T00:00:00.000Z"
-  }
-}
-```
+Use these documents instead:
 
-### Planned booking command
-
-```json
-{
-  "operationId": "c6edcc11-3870-4179-b3e1-21757d43f001",
-  "type": "CREATE_BOOKING",
-  "payload": {
-    "userId": "b13c403e-d8f3-46c5-a69e-b0a9894c7001",
-    "lockerBoxId": "510520e8-3e12-4332-b3b5-7d5b54d19991",
-    "expectedEndTime": "2026-04-13T18:00:00.000Z",
-    "correlationId": "corr-201",
-    "requestId": "f7c5d2b5-2c12-4f62-a4d6-50e5ea24d001"
-  }
-}
-```
-
-### Planned backend expectations
-
-- create operation row in DynamoDB before sending SQS message
-- operation status starts with `PENDING`
-- on enqueue failure, operation status becomes `FAILED`
-- use authenticated user id instead of body user id
-- pass `x-correlation-id` into payload
-- pass `requestId` when present for idempotency
-- protect against concurrent booking of the same locker so two requests cannot both succeed
-
-### Planned lambda expectations
-
-- read from `OPERATIONS_QUEUE_URL`
-- validate payload fields
-- create booking
-- update operation status in DynamoDB:
-  - `PROCESSING`
-  - `SUCCESS` or `FAILED`
+- booking HTTP, SQS, DynamoDB, and webhook contracts: [booking-flow-contracts.md](./booking-flow-contracts.md)
+- lambda execution details: [../lambda/README.md](../lambda/README.md)

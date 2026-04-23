@@ -2,6 +2,22 @@ import { NextFunction, Request, Response } from "express";
 
 import { bookingService } from "../services/BookingService";
 
+export const extendBooking = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await bookingService.extendBooking(req, res);
+    } catch (e) {
+        next(e);
+    }
+};
+
+export const getAllBookings = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await bookingService.getAllBookings(req, res);
+    } catch (e) {
+        next(e);
+    }
+};
+
 export const initBooking = async (req: Request, res: Response, next: NextFunction) => {
     try {
         return await bookingService.initBooking(req, res);

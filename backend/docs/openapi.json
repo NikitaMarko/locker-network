@@ -2,8 +2,8 @@
   "openapi": "3.0.0",
   "info": {
     "title": "Locker Network API",
-    "version": "1.0.0",
-    "description": "Locker Network backend. Public station data is served from Redis, locker runtime state and async operations use DynamoDB.",
+    "version": "1.1.0",
+    "description": "Current API surface for the Locker Network backend. This spec reflects the routes mounted in `backend/src/server.ts` and the active Express routers.",
     "contact": {
       "name": "API Support",
       "email": "support@lockernetwork.com"
@@ -22,162 +22,298 @@
       "description": "Production server"
     }
   ],
+  "tags": [
+    {
+      "name": "System",
+      "description": "Service health endpoints"
+    },
+    {
+      "name": "Operations",
+      "description": "Asynchronous operation lifecycle"
+    },
+    {
+      "name": "Auth",
+      "description": "Authentication and session endpoints"
+    },
+    {
+      "name": "Cities",
+      "description": "Supported cities"
+    },
+    {
+      "name": "Lockers",
+      "description": "Locker box endpoints"
+    },
+    {
+      "name": "Stations",
+      "description": "Locker station endpoints"
+    },
+    {
+      "name": "Bookings",
+      "description": "Booking endpoints"
+    },
+    {
+      "name": "Payments",
+      "description": "Payment provider webhooks"
+    },
+    {
+      "name": "Admin",
+      "description": "Administrative endpoints"
+    }
+  ],
   "components": {
     "securitySchemes": {
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "Enter JWT access token"
+        "description": "JWT access token"
       },
       "cookieAuth": {
         "type": "apiKey",
         "in": "cookie",
         "name": "refreshToken",
-        "description": "httpOnly cookie with refresh token"
+        "description": "HTTP-only refresh token cookie"
+      }
+    },
+    "parameters": {
+      "CorrelationIdHeader": {
+        "name": "X-Correlation-Id",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Optional correlation id propagated back in the response headers"
+      },
+      "IdempotencyKeyHeader": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Recommended for mutation endpoints backed by idempotency storage"
+      },
+      "UuidPathId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
       }
     },
     "schemas": {
+      "ApiSuccess": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "status": {
+            "type": "string",
+            "example": "success"
+          },
+          "correlationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {},
+          "meta": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "success",
+          "status",
+          "data"
+        ]
+      },
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "status": {
+            "type": "string",
+            "example": "error"
+          },
+          "correlationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "example": "You are not logged in"
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "example": "UNAUTHORIZED"
+              },
+              "message": {
+                "type": "string",
+                "example": "You are not logged in"
+              },
+              "details": {}
+            },
+            "required": [
+              "code",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "status",
+          "message",
+          "error"
+        ]
+      },
       "User": {
         "type": "object",
         "properties": {
-          "userId": { "type": "string", "format": "uuid" },
-          "name": { "type": "string" },
-          "email": { "type": "string", "format": "email" },
-          "role": { "type": "string", "enum": ["USER", "OPERATOR", "ADMIN"] },
-          "createdAt": { "type": "string", "format": "date-time" }
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "USER",
+              "OPERATOR",
+              "ADMIN"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
         }
       },
       "SignupRequest": {
         "type": "object",
-        "required": ["name", "email", "password"],
+        "required": [
+          "name",
+          "email",
+          "password"
+        ],
         "properties": {
-          "name": { "type": "string", "minLength": 2, "example": "John Doe" },
-          "email": { "type": "string", "format": "email", "example": "john@example.com" },
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "example": "Postman User"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "postman.user@example.com"
+          },
           "password": {
             "type": "string",
             "minLength": 12,
-            "example": "SecurePass123!",
-            "description": "Must contain uppercase, lowercase, number, and special character"
+            "example": "SecurePass123!"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+972501112233"
           }
         }
       },
       "LoginRequest": {
         "type": "object",
-        "required": ["email", "password"],
+        "required": [
+          "email",
+          "password"
+        ],
         "properties": {
-          "email": { "type": "string", "format": "email", "example": "john@example.com" },
-          "password": { "type": "string", "example": "SecurePass123!" }
-        }
-      },
-      "AuthResponse": {
-        "type": "object",
-        "properties": {
-          "accessToken": {
+          "email": {
             "type": "string",
-            "description": "JWT access token (use in Authorization header)"
+            "format": "email",
+            "example": "postman.user@example.com"
+          },
+          "password": {
+            "type": "string",
+            "example": "SecurePass123!"
           }
         }
       },
       "GoogleLoginRequest": {
         "type": "object",
-        "required": ["idToken"],
+        "required": [
+          "idToken"
+        ],
         "properties": {
-          "idToken": { "type": "string", "description": "Google ID token from client OAuth flow" }
+          "idToken": {
+            "type": "string",
+            "description": "Google ID token from the client OAuth flow"
+          }
         }
       },
-      "UserResponse": {
+      "AuthData": {
         "type": "object",
         "properties": {
-          "status": { "type": "string", "example": "success" },
-          "data": { "$ref": "#/components/schemas/User" }
+          "accessToken": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
         }
       },
       "City": {
         "type": "object",
         "properties": {
-          "cityId": { "type": "string", "format": "uuid" },
-          "code": { "type": "string", "example": "TLV" },
-          "name": { "type": "string", "example": "Tel Aviv" }
-        }
-      },
-      "Operation": {
-        "type": "object",
-        "properties": {
-          "operationId": { "type": "string", "format": "uuid" },
-          "timestamp": { "type": "string", "format": "date-time" },
-          "status": { "type": "string", "enum": ["PENDING", "PROCESSING", "COMPLETED", "FAILED"] },
-          "type": { "type": "string", "enum": ["HEALTH_CHECK"] },
-          "result": { "type": "object", "nullable": true },
-          "error": { "type": "string", "nullable": true }
-        }
-      },
-      "LockerBox": {
-        "type": "object",
-        "properties": {
-          "lockerBoxId": { "type": "string", "format": "uuid" },
-          "stationId": { "type": "string", "format": "uuid" },
-          "code": { "type": "string", "example": "A-01" },
-          "size": { "type": "string", "enum": ["S", "M", "L"] },
-          "status": {
+          "cityId": {
             "type": "string",
-            "enum": ["AVAILABLE", "RESERVED", "OCCUPIED", "FAULTY", "EXPIRED"]
+            "format": "uuid"
           },
-          "createdAt": { "type": "string", "format": "date-time" }
-        }
-      },
-      "LockerStation": {
-        "type": "object",
-        "properties": {
-          "stationId": { "type": "string", "format": "uuid" },
-          "location": { "type": "string", "example": "Tel Aviv" },
-          "address": { "type": "string", "example": "Dizengoff 10" },
-          "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "MAINTENANCE"] },
-          "createdAt": { "type": "string", "format": "date-time" }
-        }
-      },
-      "Booking": {
-        "type": "object",
-        "properties": {
-          "bookingId": { "type": "string", "format": "uuid" },
-          "userId": { "type": "string", "format": "uuid" },
-          "lockerBoxId": { "type": "string", "format": "uuid" },
-          "status": {
+          "code": {
             "type": "string",
-            "enum": ["PENDING", "ACTIVE", "ENDED", "FAILED", "CANCELLED", "EXPIRED"]
+            "example": "TLV"
           },
-          "startTime": { "type": "string", "format": "date-time" },
-          "expectedEndTime": { "type": "string", "format": "date-time" },
-          "totalPrice": { "type": "number", "format": "decimal" },
-          "createdAt": { "type": "string", "format": "date-time" }
-        }
-      },
-      "AuditLog": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "actorId": { "type": "string", "format": "uuid", "nullable": true },
-          "lockerId": { "type": "string", "format": "uuid", "nullable": true },
-          "action": { "type": "string", "example": "USER_LOGIN" },
-          "entityType": { "type": "string", "example": "User" },
-          "entityId": { "type": "string", "format": "uuid" },
-          "details": {
-            "type": "object",
-            "properties": {
-              "ipAddress": { "type": "string", "example": "192.168.1.1" },
-              "userAgent": { "type": "string" },
-              "correlationId": { "type": "string", "format": "uuid" }
-            }
-          },
-          "createdAt": { "type": "string", "format": "date-time" }
+          "name": {
+            "type": "string",
+            "example": "Tel Aviv"
+          }
         }
       },
       "ServiceStatus": {
         "type": "object",
         "properties": {
-          "status": { "type": "string", "enum": ["ok", "error"] },
-          "latencyMs": { "type": "integer", "example": 4 },
-          "error": { "type": "string", "nullable": true }
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "error"
+            ]
+          },
+          "latencyMs": {
+            "type": "integer",
+            "nullable": true
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          }
         }
       },
       "HealthResponse": {
@@ -185,218 +321,489 @@
         "properties": {
           "status": {
             "type": "string",
-            "enum": ["ok", "degraded"],
-            "description": "ok — all services healthy, degraded — one or more services unavailable"
+            "enum": [
+              "ok",
+              "degraded"
+            ]
           },
           "time": {
             "type": "string",
-            "format": "date-time",
-            "example": "2026-03-21T14:18:31.141Z"
+            "format": "date-time"
           },
           "source": {
             "type": "string",
-            "enum": ["lambda", "mock", "mock-fallback"],
-            "description": "lambda — response from AWS Lambda, mock — local check, mock-fallback — lambda failed, fell back to local"
+            "enum": [
+              "lambda",
+              "mock",
+              "mock-fallback"
+            ]
           },
           "uptime": {
-            "type": "integer",
-            "description": "Server uptime in seconds",
-            "example": 142
+            "type": "integer"
           },
           "services": {
             "type": "object",
             "properties": {
-              "database": { "$ref": "#/components/schemas/ServiceStatus" },
-              "lambda": { "$ref": "#/components/schemas/ServiceStatus" }
+              "database": {
+                "$ref": "#/components/schemas/ServiceStatus"
+              },
+              "lambda": {
+                "$ref": "#/components/schemas/ServiceStatus"
+              }
             }
           }
         }
       },
-      "Error": {
+      "OperationCreateRequest": {
+        "type": "object",
+        "description": "No request body is currently required.",
+        "additionalProperties": false
+      },
+      "Operation": {
         "type": "object",
         "properties": {
-          "success": { "type": "boolean", "example": false },
-          "correlationId": { "type": "string", "nullable": true },
-          "error": {
-            "type": "object",
-            "properties": {
-              "code": { "type": "string", "example": "UNAUTHORIZED" },
-              "message": { "type": "string", "example": "You are not logged in" },
-              "details": {}
-            }
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "PROCESSING",
+              "COMPLETED",
+              "FAILED"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "HEALTH_CHECK"
+            ]
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
-      "CreateStationRequest": {
-        "type": "object",
-        "required": ["city", "latitude", "longitude"],
-        "properties": {
-          "city": { "type": "string", "example": "TLV" },
-          "latitude": { "type": "number", "example": 32.0853 },
-          "longitude": { "type": "number", "example": 34.7818 },
-          "address": { "type": "string", "example": "Dizengoff 10" }
-        }
+      "LockerSize": {
+        "type": "string",
+        "enum": [
+          "S",
+          "M",
+          "L"
+        ]
       },
-      "ChangeStationStatusRequest": {
-        "type": "object",
-        "required": ["status"],
-        "properties": {
-          "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "MAINTENANCE"] }
-        }
+      "LockerStatus": {
+        "type": "string",
+        "enum": [
+          "AVAILABLE",
+          "RESERVED",
+          "OCCUPIED",
+          "FAULTY",
+          "EXPIRED"
+        ]
       },
-      "CreateLockerRequest": {
-        "type": "object",
-        "required": ["stationId", "code", "size"],
-        "properties": {
-          "stationId": { "type": "string", "format": "uuid" },
-          "code": { "type": "string", "example": "A007" },
-          "size": { "type": "string", "enum": ["S", "M", "L"] }
-        }
+      "TechnicalStatus": {
+        "type": "string",
+        "enum": [
+          "READY",
+          "ACTIVE",
+          "INACTIVE",
+          "MAINTENANCE",
+          "FAULTY"
+        ]
       },
-      "ChangeLockerStatusRequest": {
-        "type": "object",
-        "required": ["status"],
-        "properties": {
-          "status": { "type": "string", "enum": ["AVAILABLE", "RESERVED", "OCCUPIED", "FAULTY", "EXPIRED"] }
-        }
+      "StationStatus": {
+        "type": "string",
+        "enum": [
+          "READY",
+          "ACTIVE",
+          "INACTIVE",
+          "MAINTENANCE"
+        ]
       },
-      "StationCacheLocker": {
-        "type": "object",
-        "properties": {
-          "lockerBoxId": { "type": "string", "format": "uuid" },
-          "stationId": { "type": "string", "format": "uuid" },
-          "code": { "type": "string" },
-          "size": { "type": "string", "enum": ["S", "M", "L"] },
-          "status": { "type": "string", "enum": ["AVAILABLE", "RESERVED", "OCCUPIED", "FAULTY", "EXPIRED"] },
-          "version": { "type": "integer" },
-          "lastStatusChangedAt": { "type": "string", "format": "date-time" },
-          "pricePerHour": { "type": "string", "nullable": true }
-        }
+      "BookingStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "ACTIVE",
+          "ENDED",
+          "FAILED",
+          "CANCELLED",
+          "EXPIRED"
+        ]
       },
       "StationListItem": {
         "type": "object",
         "properties": {
-          "stationId": { "type": "string", "format": "uuid" },
-          "cityId": { "type": "string", "format": "uuid" },
-          "address": { "type": "string", "nullable": true },
-          "latitude": { "type": "number" },
-          "longitude": { "type": "number" },
-          "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "MAINTENANCE"] },
-          "version": { "type": "integer" },
-          "distance": { "type": "number", "nullable": true },
+          "stationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          },
+          "status": {
+            "$ref": "#/components/schemas/StationStatus"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "distance": {
+            "type": "number",
+            "nullable": true
+          },
           "city": {
             "type": "object",
             "properties": {
-              "code": { "type": "string" },
-              "name": { "type": "string" }
+              "code": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
             }
+          }
+        }
+      },
+      "LockerBoxSummary": {
+        "type": "object",
+        "properties": {
+          "lockerBoxId": {
+            "type": "string",
+            "format": "uuid"
           },
-          "_count": {
-            "type": "object",
-            "properties": {
-              "lockers": { "type": "integer" }
-            }
+          "stationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "example": "A-01"
+          },
+          "size": {
+            "$ref": "#/components/schemas/LockerSize"
+          },
+          "status": {
+            "$ref": "#/components/schemas/LockerStatus"
+          },
+          "techStatus": {
+            "$ref": "#/components/schemas/TechnicalStatus"
           }
         }
       },
       "StationDetails": {
         "type": "object",
         "properties": {
-          "stationId": { "type": "string", "format": "uuid" },
-          "cityId": { "type": "string", "format": "uuid" },
-          "address": { "type": "string", "nullable": true },
-          "latitude": { "type": "number" },
-          "longitude": { "type": "number" },
-          "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "MAINTENANCE"] },
-          "version": { "type": "integer" },
-          "availableLockers": { "type": "integer" },
-          "city": {
-            "type": "object",
-            "properties": {
-              "code": { "type": "string" },
-              "name": { "type": "string" }
-            }
+          "stationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          },
+          "status": {
+            "$ref": "#/components/schemas/StationStatus"
+          },
+          "availableLockers": {
+            "type": "integer"
           },
           "lockers": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/StationCacheLocker" }
+            "items": {
+              "$ref": "#/components/schemas/LockerBoxSummary"
+            }
           }
         }
       },
       "LockerDetails": {
         "type": "object",
         "properties": {
-          "lockerBoxId": { "type": "string", "format": "uuid" },
-          "stationId": { "type": "string", "format": "uuid" },
-          "code": { "type": "string" },
-          "size": { "type": "string", "enum": ["S", "M", "L"] },
-          "status": { "type": "string", "enum": ["AVAILABLE", "RESERVED", "OCCUPIED", "FAULTY", "EXPIRED"] },
-          "version": { "type": "integer" },
-          "lastStatusChangedAt": { "type": "string", "format": "date-time" },
-          "pricePerHour": { "type": "string", "nullable": true },
+          "lockerBoxId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "stationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "size": {
+            "$ref": "#/components/schemas/LockerSize"
+          },
+          "status": {
+            "$ref": "#/components/schemas/LockerStatus"
+          },
+          "techStatus": {
+            "$ref": "#/components/schemas/TechnicalStatus"
+          },
           "station": {
             "type": "object",
             "properties": {
-              "address": { "type": "string", "nullable": true },
-              "city": { "type": "string" },
-              "latitude": { "type": "number" },
-              "longitude": { "type": "number" }
+              "address": {
+                "type": "string",
+                "nullable": true
+              },
+              "city": {
+                "type": "string"
+              },
+              "latitude": {
+                "type": "number"
+              },
+              "longitude": {
+                "type": "number"
+              }
             }
           }
         }
       },
-      "StationMutationMeta": {
+      "CreateLockerRequest": {
         "type": "object",
+        "required": [
+          "stationId",
+          "code",
+          "size"
+        ],
         "properties": {
-          "stationCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED", "DEFERRED"] }
-        }
-      },
-      "StationLockerMutationMeta": {
-        "type": "object",
-        "properties": {
-          "stationCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED", "DEFERRED"] },
-          "lockerCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED", "DEFERRED"] }
-        }
-      },
-      "LockerMutationMeta": {
-        "type": "object",
-        "properties": {
-          "stationCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED", "DEFERRED"] },
-          "lockerCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED", "DEFERRED"] }
-        }
-      },
-      "CacheReconcileMeta": {
-        "type": "object",
-        "properties": {
-          "stationCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED"] },
-          "lockerCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED"] }
-        }
-      },
-      "CacheReconcileResponse": {
-        "type": "object",
-        "properties": {
-          "mode": {
-            "type": "object",
-            "properties": {
-              "stations": { "type": "string", "enum": ["compare-and-fill", "rds-fallback-full-resync"] },
-              "lockers": { "type": "string", "enum": ["compare-and-fill", "rds-fallback-full-resync"] }
-            }
+          "stationId": {
+            "type": "string",
+            "format": "uuid"
           },
-          "stations": {
-            "type": "object",
-            "properties": {
-              "sourceCount": { "type": "integer" },
-              "queuedCount": { "type": "integer" },
-              "deleteQueuedCount": { "type": "integer" }
-            }
+          "code": {
+            "type": "string",
+            "example": "A007"
           },
-          "lockers": {
+          "size": {
+            "$ref": "#/components/schemas/LockerSize"
+          }
+        }
+      },
+      "ChangeLockerStatusRequest": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/LockerStatus"
+          }
+        }
+      },
+      "ChangeLockerTechStatusRequest": {
+        "type": "object",
+        "required": [
+          "techStatus"
+        ],
+        "properties": {
+          "techStatus": {
+            "$ref": "#/components/schemas/TechnicalStatus"
+          }
+        }
+      },
+      "CreateStationRequest": {
+        "type": "object",
+        "required": [
+          "city",
+          "latitude",
+          "longitude"
+        ],
+        "properties": {
+          "city": {
+            "type": "string",
+            "example": "TLV"
+          },
+          "latitude": {
+            "type": "number",
+            "example": 32.0853
+          },
+          "longitude": {
+            "type": "number",
+            "example": 34.7818
+          },
+          "address": {
+            "type": "string",
+            "example": "Dizengoff 10"
+          }
+        }
+      },
+      "ChangeStationStatusRequest": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/StationStatus"
+          }
+        }
+      },
+      "BookingInitRequest": {
+        "type": "object",
+        "required": [
+          "stationId",
+          "size",
+          "expectedEndTime"
+        ],
+        "properties": {
+          "stationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "size": {
+            "$ref": "#/components/schemas/LockerSize"
+          },
+          "expectedEndTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "BookingExtendRequest": {
+        "type": "object",
+        "required": [
+          "expectedEndTime"
+        ],
+        "properties": {
+          "expectedEndTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "BookingStatusChangeRequest": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/BookingStatus"
+          }
+        }
+      },
+      "BookingSummary": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "stationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lockerBoxId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BookingStatus"
+          },
+          "expectedEndTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "StripeWebhookRequest": {
+        "type": "object",
+        "description": "Simplified checkout.session.completed example payload",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "evt_123"
+          },
+          "type": {
+            "type": "string",
+            "example": "checkout.session.completed"
+          },
+          "data": {
             "type": "object",
             "properties": {
-              "sourceCount": { "type": "integer" },
-              "queuedCount": { "type": "integer" },
-              "deleteQueuedCount": { "type": "integer" }
+              "object": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "example": "cs_test_123"
+                  },
+                  "payment_intent": {
+                    "type": "string",
+                    "example": "pi_123"
+                  },
+                  "amount_total": {
+                    "type": "integer",
+                    "example": 2590
+                  },
+                  "currency": {
+                    "type": "string",
+                    "example": "usd"
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "properties": {
+                      "bookingId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "paymentFlow": {
+                        "type": "string",
+                        "enum": [
+                          "BOOKING_INIT",
+                          "BOOKING_EXTEND"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
             }
+          }
+        }
+      },
+      "UpdateUserRoleRequest": {
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "USER",
+              "OPERATOR",
+              "ADMIN"
+            ]
           }
         }
       }
@@ -406,8 +813,29 @@
         "description": "Missing or invalid access token",
         "content": {
           "application/json": {
-            "schema": { "$ref": "#/components/schemas/Error" },
-            "example": { "success": false, "error": { "code": "UNAUTHORIZED", "message": "You are not logged in" } }
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Authenticated but not allowed for this resource",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Entity not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
           }
         }
       },
@@ -415,296 +843,38 @@
         "description": "Rate limit exceeded",
         "content": {
           "application/json": {
-            "schema": { "$ref": "#/components/schemas/Error" },
-            "example": { "success": false, "error": { "code": "RATE_LIMIT_EXCEEDED", "message": "Too many requests" } }
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
           }
         }
       }
     }
   },
-  "tags": [
-    { "name": "System", "description": "Health and system endpoints" },
-    { "name": "Auth", "description": "Authentication endpoints" },
-    { "name": "Users", "description": "User profile endpoints" },
-    { "name": "Lockers", "description": "Locker management" },
-    { "name": "Stations", "description": "Station management" },
-    { "name": "Bookings", "description": "Booking/Reservation endpoints" },
-    { "name": "Audit", "description": "Audit logs (Admin only)" }
-  ],
   "paths": {
     "/health": {
       "get": {
-        "tags": ["System"],
+        "tags": [
+          "System"
+        ],
         "summary": "Health check",
-        "description": "Returns service health status.\n\n**Two modes** (controlled by `USE_LAMBDA_HEALTH` env variable):\n- `mock` — Node.js checks PostgreSQL directly\n- `lambda` — delegates to AWS Lambda, falls back to mock if Lambda is unreachable\n\nUsed by load balancers and monitoring systems. No authentication required.",
-        "operationId": "getHealth",
         "responses": {
           "200": {
-            "description": "All services healthy",
+            "description": "Healthy or degraded status payload",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/HealthResponse" },
-                "examples": {
-                  "mock": {
-                    "summary": "Mock mode response",
-                    "value": {
-                      "status": "ok",
-                      "time": "2026-03-21T14:18:31.141Z",
-                      "source": "mock",
-                      "uptime": 142,
-                      "services": {
-                        "database": { "status": "ok", "latencyMs": 4 }
-                      }
-                    }
-                  },
-                  "lambda": {
-                    "summary": "Lambda mode response",
-                    "value": {
-                      "status": "ok",
-                      "time": "2026-03-21T14:18:31.141Z",
-                      "source": "lambda",
-                      "uptime": 3600,
-                      "services": {
-                        "database": { "status": "ok", "latencyMs": 12 },
-                        "lambda": { "status": "ok", "latencyMs": 87 }
-                      }
-                    }
-                  }
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
                 }
               }
             }
           },
           "503": {
-            "description": "One or more services unavailable",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/HealthResponse" },
-                "example": {
-                  "status": "degraded",
-                  "time": "2026-03-21T14:18:31.141Z",
-                  "source": "mock-fallback",
-                  "uptime": 142,
-                  "services": {
-                    "database": { "status": "error", "latencyMs": 5001, "error": "Database unreachable" },
-                    "lambda": { "status": "error", "error": "Connection timeout" }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/auth/signup": {
-      "post": {
-        "tags": ["Auth"],
-        "summary": "Register new user",
-        "description": "Create a new user account. Password must contain uppercase, lowercase, number, and special character (min 12 chars).",
-        "operationId": "registerUser",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/SignupRequest" }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "User successfully registered",
-            "headers": {
-              "Set-Cookie": {
-                "description": "httpOnly refresh token cookie",
-                "schema": {
-                  "type": "string",
-                  "example": "refreshToken=eyJ...; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=604800"
-                }
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/AuthResponse" }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation error or user already exists",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" },
-                "example": { "status": "error", "message": "User already exists", "statusCode": 400 }
-              }
-            }
-          },
-          "429": { "$ref": "#/components/responses/TooManyRequests" }
-        }
-      }
-    },
-    "/api/v1/auth/login": {
-      "post": {
-        "tags": ["Auth"],
-        "summary": "Authenticate user",
-        "description": "Login with email and password. Rate limited to 5 attempts per 15 minutes per email.",
-        "operationId": "loginUser",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/LoginRequest" }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successfully authenticated",
-            "headers": {
-              "Set-Cookie": {
-                "description": "httpOnly refresh token cookie",
-                "schema": { "type": "string" }
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/AuthResponse" },
-                "example": { "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid credentials",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" },
-                "example": { "status": "error", "message": "Invalid credentials", "statusCode": 401 }
-              }
-            }
-          },
-          "429": { "$ref": "#/components/responses/TooManyRequests" }
-        }
-      }
-    },
-    "/api/v1/auth/refresh": {
-      "post": {
-        "tags": ["Auth"],
-        "summary": "Refresh access token",
-        "description": "Get a new access token using the `refreshToken` httpOnly cookie. The old refresh token is invalidated and a new one is issued (token rotation). `tokenVersion` is incremented on each refresh.",
-        "operationId": "refreshToken",
-        "security": [{ "cookieAuth": [] }],
-        "responses": {
-          "200": {
-            "description": "New access token generated",
-            "headers": {
-              "Set-Cookie": {
-                "description": "New httpOnly refresh token cookie (replaces old one)",
-                "schema": { "type": "string" }
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/AuthResponse" },
-                "example": { "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid, expired, or already used refresh token",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" },
-                "examples": {
-                  "missing": { "value": { "status": "error", "message": "No refresh token", "statusCode": 401 } },
-                  "invalid": { "value": { "status": "error", "message": "Invalid refresh token", "statusCode": 401 } },
-                  "reused": { "value": { "status": "error", "message": "Refresh token already used", "statusCode": 401 } },
-                  "revoked": { "value": { "status": "error", "message": "Token revoked", "statusCode": 401 } }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/auth/google": {
-      "post": {
-        "tags": ["Auth"],
-        "summary": "Authenticate with Google ID token",
-        "operationId": "googleLogin",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/GoogleLoginRequest" }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successfully authenticated",
-            "headers": {
-              "Set-Cookie": {
-                "description": "httpOnly refresh token cookie",
-                "schema": { "type": "string" }
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/AuthResponse" }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid Google token",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
-              }
-            }
-          },
-          "429": { "$ref": "#/components/responses/TooManyRequests" }
-        }
-      }
-    },
-    "/api/v1/auth/me": {
-      "get": {
-        "tags": ["Auth", "Users"],
-        "summary": "Get current user profile",
-        "operationId": "getCurrentUser",
-        "security": [{ "bearerAuth": [] }],
-        "responses": {
-          "200": {
-            "description": "Current user data",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/UserResponse" },
-                "example": {
-                  "status": "success",
-                  "data": {
-                    "userId": "550e8400-e29b-41d4-a716-446655440000",
-                    "name": "John Doe",
-                    "email": "john@example.com",
-                    "role": "USER",
-                    "createdAt": "2026-03-21T14:18:31.141Z"
-                  }
-                }
-              }
-            }
-          },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
-        }
-      }
-    },
-    "/api/v1/cities": {
-      "get": {
-        "tags": ["Stations"],
-        "summary": "Get active cities",
-        "operationId": "getCities",
-        "responses": {
-          "200": {
-            "description": "Active cities list",
+            "description": "One or more dependencies are unavailable",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": { "$ref": "#/components/schemas/City" }
+                  "$ref": "#/components/schemas/HealthResponse"
                 }
               }
             }
@@ -714,126 +884,331 @@
     },
     "/operations/health": {
       "post": {
-        "tags": ["System"],
-        "summary": "Create async health-check operation",
-        "operationId": "createHealthOperation",
+        "tags": [
+          "Operations"
+        ],
+        "summary": "Create health-check operation",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperationCreateRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "Operation queued",
+            "description": "Operation created",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean" },
-                    "correlationId": { "type": "string" },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "operationId": { "type": "string", "format": "uuid" },
-                        "status": { "type": "string", "enum": ["PENDING"] }
-                      }
-                    }
+                  "$ref": "#/components/schemas/ApiSuccess"
+                },
+                "example": {
+                  "success": true,
+                  "status": "success",
+                  "correlationId": "0d9f4f8f-0f31-4f4f-a38e-dafb2cb3d12d",
+                  "data": {
+                    "operationId": "c6f6fe64-8db5-4207-a38c-fb1b2a84a656",
+                    "status": "PENDING"
                   }
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         }
       }
     },
     "/operations/{id}": {
       "get": {
-        "tags": ["System"],
-        "summary": "Get async operation status",
-        "operationId": "getOperationStatus",
+        "tags": [
+          "Operations"
+        ],
+        "summary": "Get operation status",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "string", "format": "uuid" }
+            "$ref": "#/components/parameters/UuidPathId"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
           }
         ],
         "responses": {
           "200": {
-            "description": "Operation status",
+            "description": "Current operation state",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean" },
-                    "correlationId": { "type": "string" },
-                    "data": { "$ref": "#/components/schemas/Operation" }
+                  "$ref": "#/components/schemas/ApiSuccess"
+                },
+                "example": {
+                  "success": true,
+                  "status": "success",
+                  "data": {
+                    "operationId": "c6f6fe64-8db5-4207-a38c-fb1b2a84a656",
+                    "status": "COMPLETED",
+                    "type": "HEALTH_CHECK",
+                    "timestamp": "2026-04-22T08:30:00.000Z"
                   }
                 }
               }
             }
           },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
           "404": {
-            "description": "Operation not found",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/signup": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Register a user",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignupRequest"
               }
             }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Registration succeeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Login with email and password",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/google": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Login via Google ID token",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationIdHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleLoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Refresh access token from cookie",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "New access token returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         }
       }
     },
     "/api/v1/auth/logout": {
       "post": {
-        "tags": ["Auth"],
-        "summary": "Logout user",
-        "description": "Invalidates refresh token and increments tokenVersion, revoking all active tokens.",
-        "operationId": "logoutUser",
-        "security": [{ "bearerAuth": [] }],
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Logout current session",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Successfully logged out",
+            "description": "Logged out successfully",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": { "type": "string", "example": "Logged out" }
-                  }
+                  "$ref": "#/components/schemas/ApiSuccess"
                 }
               }
             }
           },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
         }
       }
     },
-    "/api/v1/lockers/stations": {
+    "/api/v1/auth/me": {
       "get": {
-        "tags": ["Stations"],
-        "summary": "Get public station list",
-        "description": "Returns station list from Redis station cache by default. Falls back to RDS projections if Redis is unavailable.",
-        "parameters": [
-          { "name": "city", "in": "query", "schema": { "type": "string" } },
-          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "MAINTENANCE"] } },
-          { "name": "lat", "in": "query", "schema": { "type": "number" } },
-          { "name": "lng", "in": "query", "schema": { "type": "number" } },
-          { "name": "radius", "in": "query", "schema": { "type": "number" } }
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Get current user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
         ],
         "responses": {
           "200": {
-            "description": "Station list",
+            "description": "Current user payload",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean" },
-                    "correlationId": { "type": "string" },
-                    "data": {
-                      "type": "array",
-                      "items": { "$ref": "#/components/schemas/StationListItem" }
-                    }
-                  }
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/cities": {
+      "get": {
+        "tags": [
+          "Cities"
+        ],
+        "summary": "List cities",
+        "responses": {
+          "200": {
+            "description": "Available cities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
                 }
               }
             }
@@ -841,60 +1216,43 @@
         }
       }
     },
-    "/api/v1/lockers/stations/{id}": {
-      "get": {
-        "tags": ["Stations"],
-        "summary": "Get station details",
-        "description": "Returns one station from Redis station cache by default. Falls back to RDS projection if Redis is unavailable.",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
-        ],
-        "responses": {
-          "200": {
-            "description": "Station details",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean" },
-                    "correlationId": { "type": "string" },
-                    "data": { "$ref": "#/components/schemas/StationDetails" }
-                  }
-                }
-              }
-            }
-          },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
-        }
-      }
-    },
     "/api/v1/lockers/boxes": {
       "get": {
-        "tags": ["Lockers"],
-        "summary": "Get public locker list",
-        "description": "Returns locker list from DynamoDB locker cache. Runtime locker statuses are sourced only from DynamoDB.",
+        "tags": [
+          "Lockers"
+        ],
+        "summary": "List public locker boxes",
         "parameters": [
-          { "name": "stationId", "in": "query", "schema": { "type": "string", "format": "uuid" } },
-          { "name": "size", "in": "query", "schema": { "type": "string", "enum": ["S", "M", "L"] } },
-          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["AVAILABLE", "RESERVED", "OCCUPIED", "FAULTY", "EXPIRED"] } }
+          {
+            "name": "stationId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/LockerSize"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/LockerStatus"
+            }
+          }
         ],
         "responses": {
           "200": {
-            "description": "Locker list",
+            "description": "Filtered locker list",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean" },
-                    "correlationId": { "type": "string" },
-                    "data": {
-                      "type": "array",
-                      "items": { "$ref": "#/components/schemas/LockerDetails" }
-                    }
-                  }
+                  "$ref": "#/components/schemas/ApiSuccess"
                 }
               }
             }
@@ -904,12 +1262,19 @@
     },
     "/api/v1/lockers/boxes/{id}": {
       "get": {
-        "tags": ["Lockers"],
+        "tags": [
+          "Lockers"
+        ],
         "summary": "Get locker details",
-        "description": "Returns one locker from DynamoDB locker cache. Runtime locker statuses are sourced only from DynamoDB.",
-        "security": [{ "bearerAuth": [] }],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          }
         ],
         "responses": {
           "200": {
@@ -917,193 +1282,167 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean" },
-                    "correlationId": { "type": "string" },
-                    "data": { "$ref": "#/components/schemas/LockerDetails" }
-                  }
+                  "$ref": "#/components/schemas/ApiSuccess"
                 }
               }
             }
           },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
         }
       }
     },
-    "/api/v1/lockers/admin/stations": {
+    "/api/v1/lockers/stations": {
       "get": {
-        "tags": ["Stations"],
-        "summary": "Get admin station list",
-        "description": "Returns admin station list built from PostgreSQL station metadata and current locker state.",
-        "security": [{ "bearerAuth": [] }],
-        "responses": {
-          "200": {
-            "description": "Admin station list"
+        "tags": [
+          "Stations"
+        ],
+        "summary": "List public locker stations",
+        "parameters": [
+          {
+            "name": "city",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
-        }
-      },
-      "post": {
-        "tags": ["Stations"],
-        "summary": "Create station",
-        "description": "Creates station in RDS. Backend does not write Redis station cache directly; refresh remains deferred until read warmup or explicit admin refresh.",
-        "security": [{ "bearerAuth": [] }],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/CreateStationRequest" }
+          {
+            "name": "lat",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lng",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "radius",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/StationStatus"
             }
           }
-        },
+        ],
         "responses": {
           "200": {
-            "description": "Station created",
+            "description": "Filtered station list",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean" },
-                    "correlationId": { "type": "string" },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "id": { "type": "string", "format": "uuid" },
-                        "city": { "type": "string" }
-                      }
-                    },
-                    "meta": { "$ref": "#/components/schemas/StationMutationMeta" }
-                  }
+                  "$ref": "#/components/schemas/ApiSuccess"
                 }
               }
-            }
-          },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
-        }
-      }
-    },
-    "/api/v1/lockers/admin/stations/{id}": {
-      "get": {
-        "tags": ["Stations"],
-        "summary": "Get admin station details",
-        "description": "Returns admin station details built from PostgreSQL station metadata and current locker state.",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
-        ],
-        "responses": {
-          "200": { "description": "Admin station details" },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
-        }
-      }
-    },
-    "/api/v1/lockers/admin/stations/{id}/status": {
-      "patch": {
-        "tags": ["Stations"],
-        "summary": "Change station status",
-        "description": "Updates station metadata in PostgreSQL. Backend keeps Redis station cache deferred on station status change, but rewrites dependent locker projections in DynamoDB directly.",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/ChangeStationStatusRequest" }
             }
           }
-        },
-        "responses": {
-          "200": {
-            "description": "Station status changed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean" },
-                    "correlationId": { "type": "string" },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "stationId": { "type": "string", "format": "uuid" },
-                        "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "MAINTENANCE"] }
-                      }
-                    },
-                    "meta": { "$ref": "#/components/schemas/StationLockerMutationMeta" }
-                  }
-                }
-              }
-            }
-          },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
         }
       }
     },
-    "/api/v1/lockers/admin/stations/{id}/resync-cache": {
-      "post": {
-        "tags": ["Stations"],
-        "summary": "Resync station cache",
-        "description": "Administrative station cache refresh endpoint. Rebuilds one station projection from RDS and writes it directly to Redis.",
-        "security": [{ "bearerAuth": [] }],
+    "/api/v1/lockers/stations/{id}": {
+      "get": {
+        "tags": [
+          "Stations"
+        ],
+        "summary": "Get station details",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          }
         ],
         "responses": {
-          "202": {
-            "description": "Station cache resynced",
+          "200": {
+            "description": "Station details",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean" },
-                    "correlationId": { "type": "string" },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "stationId": { "type": "string", "format": "uuid" }
-                      }
-                    },
-                    "meta": {
-                      "type": "object",
-                      "properties": {
-                        "stationCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED"] }
-                      }
-                    }
-                  }
+                  "$ref": "#/components/schemas/ApiSuccess"
                 }
               }
             }
           },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
         }
       }
     },
     "/api/v1/lockers/admin/boxes": {
       "get": {
-        "tags": ["Lockers"],
-        "summary": "Get admin locker list",
-        "description": "Returns admin locker list built from PostgreSQL locker metadata and current locker state.",
-        "security": [{ "bearerAuth": [] }],
+        "tags": [
+          "Lockers",
+          "Admin"
+        ],
+        "summary": "List boxes for admin/operator",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "responses": {
-          "200": { "description": "Admin locker list" },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
+          "200": {
+            "description": "Box list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
         }
       },
       "post": {
-        "tags": ["Lockers"],
-        "summary": "Create locker",
-        "description": "Creates locker metadata in RDS, then writes the locker cache projection directly to DynamoDB. Backend does not write related Redis station cache directly.",
-        "security": [{ "bearerAuth": [] }],
+        "tags": [
+          "Lockers",
+          "Admin"
+        ],
+        "summary": "Create a locker box",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/CreateLockerRequest" }
+              "schema": {
+                "$ref": "#/components/schemas/CreateLockerRequest"
+              }
             }
           }
         },
@@ -1113,56 +1452,78 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean" },
-                    "correlationId": { "type": "string" },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "id": { "type": "string", "format": "uuid" },
-                        "stationId": { "type": "string", "format": "uuid" }
-                      }
-                    },
-                    "meta": { "$ref": "#/components/schemas/LockerMutationMeta" }
-                  }
+                  "$ref": "#/components/schemas/ApiSuccess"
                 }
               }
             }
           },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
         }
       }
     },
     "/api/v1/lockers/admin/boxes/{id}": {
       "get": {
-        "tags": ["Lockers"],
-        "summary": "Get admin locker details",
-        "description": "Returns admin locker details built from PostgreSQL locker metadata and current locker state.",
-        "security": [{ "bearerAuth": [] }],
+        "tags": [
+          "Lockers",
+          "Admin"
+        ],
+        "summary": "Get box details for admin/operator",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          }
         ],
         "responses": {
-          "200": { "description": "Admin locker details" },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
+          "200": {
+            "description": "Box details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/v1/lockers/admin/boxes/{id}/status": {
       "patch": {
-        "tags": ["Lockers"],
-        "summary": "Change locker status",
-        "description": "Updates locker status in PostgreSQL-backed metadata flow, then writes the updated locker cache projection directly to DynamoDB. Backend does not mutate related Redis station cache directly.",
-        "security": [{ "bearerAuth": [] }],
+        "tags": [
+          "Lockers",
+          "Admin"
+        ],
+        "summary": "Change locker business status",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
         ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/ChangeLockerStatusRequest" }
+              "schema": {
+                "$ref": "#/components/schemas/ChangeLockerStatusRequest"
+              }
             }
           }
         },
@@ -1172,76 +1533,313 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean" },
-                    "correlationId": { "type": "string" },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "lockerBoxId": { "type": "string", "format": "uuid" },
-                        "stationId": { "type": "string", "format": "uuid" },
-                        "status": { "type": "string", "enum": ["AVAILABLE", "RESERVED", "OCCUPIED", "FAULTY", "EXPIRED"] }
-                      }
-                    },
-                    "meta": { "$ref": "#/components/schemas/LockerMutationMeta" }
-                  }
+                  "$ref": "#/components/schemas/ApiSuccess"
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/boxes/{id}/tech-status": {
+      "patch": {
+        "tags": [
+          "Lockers",
+          "Admin"
+        ],
+        "summary": "Change locker technical status",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
           },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeLockerTechStatusRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Locker tech status changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/v1/lockers/admin/boxes/{id}/resync-cache": {
       "post": {
-        "tags": ["Lockers"],
-        "summary": "Resync locker cache",
-        "description": "Administrative locker cache refresh endpoint. Rebuilds one locker projection and writes it directly to DynamoDB.",
-        "security": [{ "bearerAuth": [] }],
+        "tags": [
+          "Lockers",
+          "Admin"
+        ],
+        "summary": "Resync one locker box into cache",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
         ],
         "responses": {
-          "202": {
-            "description": "Locker cache resynced",
+          "200": {
+            "description": "Cache sync request completed",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean" },
-                    "correlationId": { "type": "string" },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "lockerBoxId": { "type": "string", "format": "uuid" }
-                      }
-                    },
-                    "meta": {
-                      "type": "object",
-                      "properties": {
-                        "lockerCacheStatus": { "type": "string", "enum": ["SYNCED", "FAILED"] }
-                      }
-                    }
-                  }
+                  "$ref": "#/components/schemas/ApiSuccess"
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/stations": {
+      "get": {
+        "tags": [
+          "Stations",
+          "Admin"
+        ],
+        "summary": "List stations for admin/operator",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Station list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Stations",
+          "Admin"
+        ],
+        "summary": "Create station",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Station created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/stations/{id}": {
+      "get": {
+        "tags": [
+          "Stations",
+          "Admin"
+        ],
+        "summary": "Get station details for admin/operator",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Station details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/stations/{id}/status": {
+      "patch": {
+        "tags": [
+          "Stations",
+          "Admin"
+        ],
+        "summary": "Change station status",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
           },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeStationStatusRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Station status changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/stations/{id}/resync-cache": {
+      "post": {
+        "tags": [
+          "Stations",
+          "Admin"
+        ],
+        "summary": "Resync one station into cache",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cache sync request completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/cache/reconcile": {
+      "post": {
+        "tags": [
+          "Stations",
+          "Admin"
+        ],
+        "summary": "Reconcile station and locker caches",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reconciliation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/v1/lockers/oper/boxes/{id}/delete": {
       "patch": {
-        "tags": ["Lockers"],
-        "summary": "Delete locker",
-        "description": "Soft-deletes locker metadata in PostgreSQL, then deletes the locker cache projection directly from DynamoDB. Backend does not refresh related Redis station cache directly.",
-        "security": [{ "bearerAuth": [] }],
+        "tags": [
+          "Lockers",
+          "Admin"
+        ],
+        "summary": "Soft-delete locker box",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          }
         ],
         "responses": {
           "200": {
@@ -1249,36 +1847,30 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean" },
-                    "correlationId": { "type": "string" },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "message": { "type": "string" },
-                        "lockerBoxId": { "type": "string", "format": "uuid" },
-                        "stationId": { "type": "string", "format": "uuid" }
-                      }
-                    },
-                    "meta": { "$ref": "#/components/schemas/LockerMutationMeta" }
-                  }
+                  "$ref": "#/components/schemas/ApiSuccess"
                 }
               }
             }
-          },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
+          }
         }
       }
     },
     "/api/v1/lockers/oper/stations/{id}/delete": {
       "patch": {
-        "tags": ["Stations"],
-        "summary": "Delete station",
-        "description": "Soft-deletes station metadata in PostgreSQL. Backend keeps Redis station cache deferred, but removes dependent locker projections from DynamoDB directly.",
-        "security": [{ "bearerAuth": [] }],
+        "tags": [
+          "Stations",
+          "Admin"
+        ],
+        "summary": "Soft-delete station",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          }
         ],
         "responses": {
           "200": {
@@ -1286,51 +1878,401 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean" },
-                    "correlationId": { "type": "string" },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "message": { "type": "string" },
-                        "stationId": { "type": "string", "format": "uuid" }
-                      }
-                    },
-                    "meta": { "$ref": "#/components/schemas/StationLockerMutationMeta" }
-                  }
+                  "$ref": "#/components/schemas/ApiSuccess"
                 }
               }
             }
-          },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
+          }
         }
       }
     },
-    "/api/v1/lockers/admin/cache/reconcile": {
+    "/api/v1/bookings/init": {
       "post": {
-        "tags": ["Stations", "Lockers"],
-        "summary": "Reconcile catalog cache",
-        "description": "Administrative reconcile endpoint for unscheduled cache refresh flow. Compares Redis and DynamoDB cache state against RDS projections and upserts or deletes stale cache records directly.",
-        "security": [{ "bearerAuth": [] }],
+        "tags": [
+          "Bookings"
+        ],
+        "summary": "Initialize booking",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookingInitRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "202": {
-            "description": "Cache reconcile executed in backend direct-write mode",
+            "description": "Booking init queued",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean" },
-                    "correlationId": { "type": "string" },
-                    "data": { "$ref": "#/components/schemas/CacheReconcileResponse" },
-                    "meta": { "$ref": "#/components/schemas/CacheReconcileMeta" }
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/bookings/my": {
+      "get": {
+        "tags": [
+          "Bookings"
+        ],
+        "summary": "List current user bookings",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current user's bookings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bookings/{id}": {
+      "get": {
+        "tags": [
+          "Bookings"
+        ],
+        "summary": "Get booking by id",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Booking details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bookings/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Bookings"
+        ],
+        "summary": "Cancel booking",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Booking already cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Booking cancellation queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bookings/{id}/extend": {
+      "post": {
+        "tags": [
+          "Bookings"
+        ],
+        "summary": "Extend booking",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookingExtendRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Booking extension queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bookings/admin": {
+      "get": {
+        "tags": [
+          "Bookings",
+          "Admin"
+        ],
+        "summary": "List bookings for admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bookings list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bookings/admin/{id}": {
+      "get": {
+        "tags": [
+          "Bookings",
+          "Admin"
+        ],
+        "summary": "Get booking for admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Booking details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bookings/admin/{id}/status": {
+      "patch": {
+        "tags": [
+          "Bookings",
+          "Admin"
+        ],
+        "summary": "Change booking status as admin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookingStatusChangeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Booking status update queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/payments/webhook": {
+      "post": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Stripe webhook",
+        "description": "Consumes raw request body. Express mounts a raw parser specifically for this route. The request must include a valid `Stripe-Signature` header.",
+        "parameters": [
+          {
+            "name": "Stripe-Signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StripeWebhookRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Signature or payload validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users/{id}": {
+      "patch": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Update user role",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserRoleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Role updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                },
+                "example": {
+                  "success": true,
+                  "status": "success",
+                  "data": {
+                    "id": "d5ca3d39-0774-4511-9353-136bc44717ee",
+                    "role": "OPERATOR"
                   }
                 }
               }
             }
           },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
         }
       }
     }
