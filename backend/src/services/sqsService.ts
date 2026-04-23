@@ -62,12 +62,10 @@ export type BookingStatusUpdateCommand = {
 export type BookingInitCommand = {
     operationId: string;
     type: OperationType.BOOKING_INIT;
-    payload: {
-        userId: string;
-        stationId: string;
-        size: "S" | "M" | "L";
-        expectedEndTime: string;
-    };
+    userId: string;
+    stationId: string;
+    size: "S" | "M" | "L";
+    expectedEndTime: string;
 };
 
 export type BookingExtendConfirmCommand = {

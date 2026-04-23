@@ -130,6 +130,12 @@ export class OperationReadService {
             status: result.status,
             type: result.type,
             timestamp: result.timestamp,
+            ...(typeof (operation as Record<string, unknown>).bookingId === "string"
+                ? { bookingId: (operation as Record<string, unknown>).bookingId }
+                : {}),
+            ...(typeof (operation as Record<string, unknown>).lockerBoxId === "string"
+                ? { lockerBoxId: (operation as Record<string, unknown>).lockerBoxId }
+                : {}),
             ...(result.errorMessage ? { errorMessage: result.errorMessage } : {}),
             ...(result.result ?? {}),
         });
