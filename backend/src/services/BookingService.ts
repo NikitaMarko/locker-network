@@ -10,8 +10,10 @@ import { sendSuccess } from "../utils/response";
 
 import {ActionType, OperationStatus, OperationType} from "./dto/operationDto";
 import {
+    sendBookingCancelToQueue,
     sendBookingExtendToQueue,
-    sendBookingInitToQueue
+    sendBookingInitToQueue,
+    sendBookingStatusUpdateToQueue
 } from "./sqsService";
 import { getAllBookings, getBooking, getLockerCache } from "./dynamoService";
 import {idempotencyService} from "./IdempotencyService";
@@ -121,10 +123,12 @@ export class BookingService {
                     await sendBookingInitToQueue({
                         operationId,
                         type: OperationType.BOOKING_INIT,
-                        userId,
-                        stationId: body.stationId,
-                        size: body.size,
-                        expectedEndTime: body.expectedEndTime,
+                        payload: {
+                            userId,
+                            stationId: body.stationId,
+                            size: body.size,
+                            expectedEndTime: body.expectedEndTime,
+                        },
                     });
 
                     await logAudit({
@@ -282,25 +286,98 @@ export class BookingService {
             throw new HttpError(401, "Unauthorized");
         }
 
-        await logAudit({
+        return idempotencyService.execute(
             req,
-            action: ActionType.BOOKING_UPDATE_STATUS_FAILED,
-            actorId,
-            entityId: bookingId,
-            entityType: "Booking",
-            lockerId: existing.lockerBoxId,
-            details: {
-                previousStatus: existing.status,
-                nextStatus,
-                reason: "Lambda handler is not implemented for BOOKING_UPDATE_STATUS",
-                sourceOfTruth: "backend-guard",
+            res,
+            `booking-status-update:${bookingId}`,
+            {
+                bookingId,
+                status: nextStatus,
             },
-        });
+            async () => {
+                const operationId = uuidv4();
 
-        throw new HttpError(
-            501,
-            "Booking status update is not available until lambda supports BOOKING_UPDATE_STATUS",
-            "FEATURE_NOT_IMPLEMENTED"
+                try {
+                    const updated = await prismaService.booking.update({
+                        where: { bookingId },
+                        data: {
+                            status: nextStatus,
+                            ...(nextStatus === BookingStatus.CANCELLED || nextStatus === BookingStatus.ENDED
+                                ? { endTime: new Date() }
+                                : {}),
+                        },
+                    });
+
+                    await operationRepository.create({
+                        operationId,
+                        userId: actorId,
+                        timestamp: new Date().toISOString(),
+                        status: OperationStatus.PENDING,
+                        type: OperationType.BOOKING_UPDATE_STATUS,
+                    });
+
+                    await sendBookingStatusUpdateToQueue({
+                        operationId,
+                        type: OperationType.BOOKING_UPDATE_STATUS,
+                        payload: {
+                            bookingId,
+                            actorId,
+                            status: nextStatus,
+                        },
+                    });
+
+                    await logAudit({
+                        req,
+                        action: ActionType.OPERATION_CREATE,
+                        actorId,
+                        entityId: operationId,
+                        entityType: "Operation",
+                        lockerId: existing.lockerBoxId,
+                        details: {
+                            operationType: OperationType.BOOKING_UPDATE_STATUS,
+                            bookingId,
+                            previousStatus: existing.status,
+                            nextStatus,
+                            scope: "admin",
+                            sourceOfTruth: "postgres-localstack-sync",
+                        },
+                    });
+
+                    return {
+                        statusCode: 202,
+                        body: toQueuedBookingOperationResponse(
+                            operationId,
+                            OperationType.BOOKING_UPDATE_STATUS,
+                            {
+                                bookingId,
+                                requestedStatus: nextStatus,
+                                persistedStatus: updated.status,
+                            },
+                            "Booking status update queued"
+                        ),
+                    };
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : "Failed to queue booking status update";
+
+                    await operationRepository.updateStatus(operationId, OperationStatus.FAILED, errorMessage);
+                    await logAudit({
+                        req,
+                        action: ActionType.BOOKING_UPDATE_STATUS_FAILED,
+                        actorId,
+                        entityId: bookingId,
+                        entityType: "Booking",
+                        lockerId: existing.lockerBoxId,
+                        details: {
+                            previousStatus: existing.status,
+                            nextStatus,
+                            reason: errorMessage,
+                            sourceOfTruth: "postgres",
+                        },
+                    });
+
+                    throw new HttpError(500, errorMessage);
+                }
+            }
         );
     }
 
@@ -333,25 +410,90 @@ export class BookingService {
             throw new HttpError(401, "Unauthorized");
         }
 
-        await logAudit({
+        return idempotencyService.execute(
             req,
-            action: ActionType.BOOKING_CANCEL_FAILED,
-            actorId: userId,
-            entityId: bookingId,
-            entityType: "Booking",
-            lockerId: booking.lockerBoxId,
-            details: {
-                previousStatus: booking.status,
-                previousLockerStatus: lockerStatus,
-                reason: "Lambda handler is not implemented for BOOKING_CANCEL",
-                sourceOfTruth: "backend-guard",
-            },
-        });
+            res,
+            `booking-cancel:${bookingId}`,
+            { bookingId },
+            async () => {
+                const operationId = uuidv4();
 
-        throw new HttpError(
-            501,
-            "Booking cancellation is not available until lambda supports BOOKING_CANCEL",
-            "FEATURE_NOT_IMPLEMENTED"
+                try {
+                    const updated = await prismaService.booking.update({
+                        where: { bookingId },
+                        data: {
+                            status: BookingStatus.CANCELLED,
+                            endTime: new Date(),
+                        },
+                    });
+
+                    await operationRepository.create({
+                        operationId,
+                        userId,
+                        timestamp: new Date().toISOString(),
+                        status: OperationStatus.PENDING,
+                        type: OperationType.BOOKING_CANCEL,
+                    });
+
+                    await sendBookingCancelToQueue({
+                        operationId,
+                        type: OperationType.BOOKING_CANCEL,
+                        payload: {
+                            bookingId,
+                            actorId: userId,
+                        },
+                    });
+
+                    await logAudit({
+                        req,
+                        action: ActionType.OPERATION_CREATE,
+                        actorId: userId,
+                        entityId: operationId,
+                        entityType: "Operation",
+                        lockerId: booking.lockerBoxId,
+                        details: {
+                            operationType: OperationType.BOOKING_CANCEL,
+                            bookingId,
+                            previousStatus: booking.status,
+                            previousLockerStatus: lockerStatus,
+                            sourceOfTruth: "postgres-localstack-sync",
+                        },
+                    });
+
+                    return {
+                        statusCode: 202,
+                        body: toQueuedBookingOperationResponse(
+                            operationId,
+                            OperationType.BOOKING_CANCEL,
+                            {
+                                bookingId,
+                                persistedStatus: updated.status,
+                            },
+                            "Booking cancellation queued"
+                        ),
+                    };
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : "Failed to queue booking cancel";
+
+                    await operationRepository.updateStatus(operationId, OperationStatus.FAILED, errorMessage);
+                    await logAudit({
+                        req,
+                        action: ActionType.BOOKING_CANCEL_FAILED,
+                        actorId: userId,
+                        entityId: bookingId,
+                        entityType: "Booking",
+                        lockerId: booking.lockerBoxId,
+                        details: {
+                            previousStatus: booking.status,
+                            previousLockerStatus: lockerStatus,
+                            reason: errorMessage,
+                            sourceOfTruth: "postgres",
+                        },
+                    });
+
+                    throw new HttpError(500, errorMessage);
+                }
+            }
         );
     }
 
