@@ -6,6 +6,7 @@ import { logger } from "../../Logger/winston";
 import { lockerCacheRepository } from "../../repositories/cache/LockerCacheRepository";
 import { lockerCatalogProjectionService } from "../../repositories/prisma/LockerCatalogProjectionService";
 import { isDynamoAccessError } from "../../utils/awsErrors";
+import { enqueueLockerProjectionDelete, enqueueLockerProjectionUpsert } from "../sqsService";
 
 export type LockerQuery = {
     stationId?: string;
@@ -14,7 +15,7 @@ export type LockerQuery = {
 };
 
 export type StationCacheStatus = "SYNCED" | "FAILED" | "DEFERRED";
-export type LockerCacheStatus = "SYNCED" | "FAILED";
+export type LockerCacheStatus = "SYNCED" | "FAILED" | "DEFERRED";
 
 const ACTIVE_RUNTIME_STATUSES = new Set<LockerStatus>([
     "AVAILABLE",
@@ -105,14 +106,15 @@ export function lockerMeta(stationCacheStatus: StationCacheStatus, lockerCacheSt
 
 export async function syncLockerProjection(
     projection: Parameters<typeof lockerCacheRepository.upsert>[0],
-    _correlationId?: string,
-    _actorId?: string | null
+    correlationId?: string,
+    actorId?: string | null,
+    projectionVersion = projection.version
 ) {
     try {
-        await lockerCacheRepository.upsert(projection);
-        return "SYNCED" as const;
+        await enqueueLockerProjectionUpsert(projection, correlationId, actorId, projectionVersion);
+        return "DEFERRED" as const;
     } catch (error) {
-        logger.error("Locker cache direct upsert failed", {
+        logger.error("Locker cache projection enqueue failed", {
             lockerBoxId: projection.lockerBoxId,
             error,
         });
@@ -120,12 +122,12 @@ export async function syncLockerProjection(
     }
 }
 
-export async function deleteLockerProjection(lockerBoxId: string, version?: number, _correlationId?: string, _actorId?: string | null) {
+export async function deleteLockerProjection(lockerBoxId: string, version?: number, correlationId?: string, actorId?: string | null) {
     try {
-        await lockerCacheRepository.delete(lockerBoxId, version);
-        return "SYNCED" as const;
+        await enqueueLockerProjectionDelete(lockerBoxId, version, correlationId, actorId);
+        return "DEFERRED" as const;
     } catch (error) {
-        logger.error("Locker cache direct delete failed", {
+        logger.error("Locker cache projection delete enqueue failed", {
             lockerBoxId,
             version,
             error,
@@ -153,12 +155,7 @@ export async function loadLockers() {
 
 export async function loadOneLocker(lockerBoxId: string) {
     try {
-        const projectedLocker = await lockerCatalogProjectionService.getLockerCacheProjection(lockerBoxId);
-        if (projectedLocker) {
-            await lockerCacheRepository.upsert(projectedLocker);
-        }
-
-        return projectedLocker;
+        return await lockerCatalogProjectionService.getLockerCacheProjection(lockerBoxId);
     } catch (error) {
         if (!isDynamoAccessError(error)) {
             throw error;

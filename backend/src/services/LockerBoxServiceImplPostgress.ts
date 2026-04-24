@@ -461,6 +461,33 @@ export class LockerBoxServiceImplPostgres {
             lockerCacheStatus,
         });
     }
+
+    async hardResyncLockerCache(req: Request, res: Response) {
+        const lockerBoxId = req.params.id as string;
+        const [projection, cachedLocker] = await Promise.all([
+            lockerCatalogProjectionService.getLockerCacheProjection(lockerBoxId),
+            loadOneLocker(lockerBoxId),
+        ]);
+
+        if (!projection) {
+            throw new HttpError(404, "Locker not found");
+        }
+
+        const forcedVersion = Math.max(projection.version, (cachedLocker?.version ?? -1) + 1);
+        const lockerCacheStatus = await syncLockerProjection(
+            projection,
+            req.correlationId,
+            req.user?.userId,
+            forcedVersion,
+        );
+
+        return sendSuccess(res, {
+            lockerBoxId,
+            queuedVersion: forcedVersion,
+        }, 202, {
+            lockerCacheStatus,
+        });
+    }
 }
 
 export const boxService = new LockerBoxServiceImplPostgres();

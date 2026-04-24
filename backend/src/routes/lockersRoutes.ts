@@ -41,13 +41,16 @@ lockersRoutes.post('/admin/boxes', authorize(Role.OPERATOR, Role.ADMIN), validat
 lockersRoutes.patch('/admin/boxes/:id/status', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(changeStatusLockerSchema), lockerBoxController.changeBoxStatus);
 lockersRoutes.patch('/admin/boxes/:id/tech-status', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(changeTechStatusLockerSchema), lockerBoxController.changeBoxTechStatus);
 lockersRoutes.post('/admin/boxes/:id/resync-cache', authorize(Role.ADMIN), validateRequest(oneLockerSchema), lockerBoxController.resyncLockerCache);
+lockersRoutes.post('/admin/boxes/:id/hard-resync-cache', authorize(Role.ADMIN), validateRequest(oneLockerSchema), lockerBoxController.hardResyncLockerCache);
 
 lockersRoutes.get('/admin/stations', authorize(Role.OPERATOR, Role.ADMIN), lockerStationController.getAllStation);
 lockersRoutes.get('/admin/stations/:id', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(oneStationSchema), lockerStationController.getOneStationAdmin);
 lockersRoutes.post('/admin/stations', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(createStationSchema), lockerStationController.createStation);
 lockersRoutes.patch('/admin/stations/:id/status', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(changeStatusStationSchema), lockerStationController.changeStationStatus);
 lockersRoutes.post('/admin/stations/:id/resync-cache', authorize(Role.ADMIN), validateRequest(oneStationSchema), lockerStationController.resyncStationCache);
+lockersRoutes.post('/admin/stations/:id/hard-resync-cache', authorize(Role.ADMIN), validateRequest(oneStationSchema), lockerStationController.hardRefreshStationCache);
 lockersRoutes.post('/admin/cache/reconcile', authorize(Role.ADMIN), lockerStationController.reconcileCatalogCache);
+lockersRoutes.post('/admin/cache/hard-refresh', authorize(Role.ADMIN), lockerStationController.hardRefreshCatalogCache);
 
 
 // operator-only routes

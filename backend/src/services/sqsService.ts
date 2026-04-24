@@ -207,13 +207,17 @@ export async function sendBookingExtendConfirmToQueue(command: BookingExtendConf
 export async function enqueueLockerProjectionUpsert(
     projection: LockerCacheDto,
     correlationId?: string,
-    actorId?: string | null
+    actorId?: string | null,
+    projectionVersion = projection.version
 ) {
     await sendCacheProjectionEvent({
-        ...buildCacheProjectionEnvelope(projection.lockerBoxId, projection.version, correlationId, actorId),
+        ...buildCacheProjectionEnvelope(projection.lockerBoxId, projectionVersion, correlationId, actorId),
         entityType: "locker_cache",
         eventType: "UPSERT",
-        payload: projection,
+        payload: {
+            ...projection,
+            version: projectionVersion,
+        },
     });
 }
 

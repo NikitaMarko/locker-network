@@ -75,3 +75,11 @@ export const resyncLockerCache = async (req: Request, res: Response, next: NextF
         next(e);
     }
 }
+
+export const hardResyncLockerCache = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await boxService.hardResyncLockerCache(req, res);
+    } catch (e) {
+        next(e);
+    }
+}

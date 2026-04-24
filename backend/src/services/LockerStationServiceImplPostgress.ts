@@ -321,15 +321,21 @@ export class LockerStationServiceImplPostgres {
 
     async resyncStationCache(req: Request, res: Response) {
         const stationId = req.params.id as string;
-        const stationProjection = await lockerCatalogProjectionService.getStationCacheProjection(stationId);
+        const [stationProjection, lockerProjections] = await Promise.all([
+            lockerCatalogProjectionService.getStationCacheProjection(stationId),
+            lockerCatalogProjectionService.getLockerCacheProjectionsByStationId(stationId),
+        ]);
 
         if (!stationProjection) {
             throw new HttpError(404, "Station not found");
         }
 
-        const stationCacheStatus = await syncStationProjection(stationProjection);
+        const [stationCacheStatus, lockerCacheStatus] = await Promise.all([
+            syncStationProjection(stationProjection),
+            syncLockerProjections(lockerProjections, req.correlationId, req.user?.userId),
+        ]);
 
-        return sendSuccess(res, { stationId }, 202, stationMeta(stationCacheStatus));
+        return sendSuccess(res, { stationId }, 202, stationMeta(stationCacheStatus, lockerCacheStatus));
     }
 }
 
