@@ -15,7 +15,7 @@ export type LockerQuery = {
 };
 
 export type StationCacheStatus = "SYNCED" | "FAILED" | "DEFERRED";
-export type LockerCacheStatus = "DEFERRED" | "FAILED";
+export type LockerCacheStatus = "SYNCED" | "FAILED" | "DEFERRED";
 
 const ACTIVE_RUNTIME_STATUSES = new Set<LockerStatus>([
     "AVAILABLE",
@@ -107,10 +107,11 @@ export function lockerMeta(stationCacheStatus: StationCacheStatus, lockerCacheSt
 export async function syncLockerProjection(
     projection: Parameters<typeof lockerCacheRepository.upsert>[0],
     correlationId?: string,
-    actorId?: string | null
+    actorId?: string | null,
+    projectionVersion = projection.version
 ) {
     try {
-        await enqueueLockerProjectionUpsert(projection, correlationId, actorId);
+        await enqueueLockerProjectionUpsert(projection, correlationId, actorId, projectionVersion);
         return "DEFERRED" as const;
     } catch (error) {
         logger.error("Locker cache projection enqueue failed", {
@@ -154,12 +155,7 @@ export async function loadLockers() {
 
 export async function loadOneLocker(lockerBoxId: string) {
     try {
-        const cachedLocker = await lockerCacheRepository.findById(lockerBoxId);
-        if (cachedLocker) {
-            return cachedLocker;
-        }
-
-        return lockerCatalogProjectionService.getLockerCacheProjection(lockerBoxId);
+        return await lockerCatalogProjectionService.getLockerCacheProjection(lockerBoxId);
     } catch (error) {
         if (!isDynamoAccessError(error)) {
             throw error;

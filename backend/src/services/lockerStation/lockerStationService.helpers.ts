@@ -1,9 +1,10 @@
 import { StationCacheDto, StationListItemDto } from "../../contracts/cache.dto";
 import { logger } from "../../Logger/winston";
+import { lockerCacheRepository } from "../../repositories/cache/LockerCacheRepository";
 import { stationCacheRepository } from "../../repositories/cache/StationCacheRepository";
 import { lockerCatalogProjectionService } from "../../repositories/prisma/LockerCatalogProjectionService";
-import { enqueueLockerProjectionDelete, enqueueLockerProjectionUpsert } from "../sqsService";
 import { isRedisAccessError } from "../../utils/redisErrors";
+import { enqueueLockerProjectionDelete, enqueueLockerProjectionUpsert } from "../sqsService";
 
 export type StationQuery = {
     city?: string;
@@ -14,7 +15,7 @@ export type StationQuery = {
 };
 
 export type StationCacheStatus = "SYNCED" | "FAILED" | "DEFERRED";
-export type LockerCacheStatus = "DEFERRED" | "FAILED";
+export type LockerCacheStatus = "SYNCED" | "FAILED" | "DEFERRED";
 
 function toRadians(value: number) {
     return value * (Math.PI / 180);
@@ -184,12 +185,10 @@ export async function syncLockerProjections(
     actorId?: string | null
 ) {
     try {
-        await Promise.all(
-            projections.map((projection) => enqueueLockerProjectionUpsert(projection, correlationId, actorId))
-        );
+        await Promise.all(projections.map((projection) => enqueueLockerProjectionUpsert(projection, correlationId, actorId)));
         return "DEFERRED" as const;
     } catch (error) {
-        logger.error("Locker cache projection enqueue failed after station change", {
+        logger.error("Locker cache enqueue failed after station change", {
             count: projections.length,
             error,
         });
@@ -197,14 +196,12 @@ export async function syncLockerProjections(
     }
 }
 
-export async function deleteLockerProjections(lockerIds: string[], correlationId?: string, actorId?: string | null) {
+export async function deleteLockerProjections(lockerIds: string[], _correlationId?: string, _actorId?: string | null) {
     try {
-        await Promise.all(
-            lockerIds.map((lockerBoxId) => enqueueLockerProjectionDelete(lockerBoxId, 0, correlationId, actorId))
-        );
+        await Promise.all(lockerIds.map((lockerBoxId) => enqueueLockerProjectionDelete(lockerBoxId, 0, _correlationId, _actorId)));
         return "DEFERRED" as const;
     } catch (error) {
-        logger.error("Locker cache projection delete enqueue failed after station delete", {
+        logger.error("Locker cache delete enqueue failed after station delete", {
             count: lockerIds.length,
             error,
         });

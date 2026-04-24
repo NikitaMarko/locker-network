@@ -9,3 +9,11 @@ export const getAllCities = async (req: Request, res: Response, next: NextFuncti
         next(e);
     }
 };
+
+export const createCities = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await citiesService.createCities(req,res);
+    } catch (e) {
+        next(e);
+    }
+}

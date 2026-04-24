@@ -75,3 +75,19 @@ export const reconcileCatalogCache = async (req: Request, res: Response, next: N
         next(e);
     }
 }
+
+export const hardRefreshCatalogCache = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await cacheSyncService.hardRefreshAll(req, res);
+    } catch (e) {
+        next(e);
+    }
+}
+
+export const hardRefreshStationCache = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await cacheSyncService.hardRefreshStation(req, res);
+    } catch (e) {
+        next(e);
+    }
+}

@@ -10,6 +10,7 @@ import { ActionType } from "./dto/operationDto";
 import { idempotencyService } from "./IdempotencyService";
 import {
     deleteLockerProjections,
+    deleteStationProjection,
     loadOneStationWithFallback,
     loadStationsWithFallback,
     resolveStationDistance,
@@ -76,7 +77,11 @@ export class LockerStationServiceImplPostgres {
                         };
                     });
 
-                    const stationCacheStatus = "DEFERRED" as const;
+                    const stationProjection = await lockerCatalogProjectionService.getStationCacheProjection(result.station.stationId);
+                    if (!stationProjection) {
+                        throw new HttpError(500, "Failed to rebuild station cache projection after create");
+                    }
+                    const syncedStationCacheStatus = await syncStationProjection(stationProjection);
 
                     await logAudit({
                         req,
@@ -88,7 +93,7 @@ export class LockerStationServiceImplPostgres {
 
                     return {
                         body: { id: result.station.stationId, city: result.station.city.code },
-                        meta: stationMeta(stationCacheStatus),
+                        meta: stationMeta(syncedStationCacheStatus),
                     };
                 } catch (e: unknown) {
                     await logAudit({
@@ -213,7 +218,7 @@ export class LockerStationServiceImplPostgres {
                         req.correlationId,
                         req.user?.userId
                     );
-                    const stationCacheStatus = "DEFERRED" as const;
+                    const stationCacheStatus = await syncStationProjection(result.stationProjection);
 
                     await logAudit({
                         req,
@@ -271,7 +276,7 @@ export class LockerStationServiceImplPostgres {
                             },
                         });
 
-                        return { lockerIds };
+                        return { lockerIds, stationVersion: station.updatedAt.getTime() * 1000 + station.version };
                     });
 
                     //Delete from cache
@@ -280,7 +285,7 @@ export class LockerStationServiceImplPostgres {
                         req.correlationId,
                         req.user?.userId
                     );
-                    const stationCacheStatus = "DEFERRED" as const;
+                    const stationCacheStatus = await deleteStationProjection(stationId, result.stationVersion);
 
                     await logAudit({
                         req,
@@ -316,15 +321,21 @@ export class LockerStationServiceImplPostgres {
 
     async resyncStationCache(req: Request, res: Response) {
         const stationId = req.params.id as string;
-        const stationProjection = await lockerCatalogProjectionService.getStationCacheProjection(stationId);
+        const [stationProjection, lockerProjections] = await Promise.all([
+            lockerCatalogProjectionService.getStationCacheProjection(stationId),
+            lockerCatalogProjectionService.getLockerCacheProjectionsByStationId(stationId),
+        ]);
 
         if (!stationProjection) {
             throw new HttpError(404, "Station not found");
         }
 
-        const stationCacheStatus = await syncStationProjection(stationProjection);
+        const [stationCacheStatus, lockerCacheStatus] = await Promise.all([
+            syncStationProjection(stationProjection),
+            syncLockerProjections(lockerProjections, req.correlationId, req.user?.userId),
+        ]);
 
-        return sendSuccess(res, { stationId }, 202, stationMeta(stationCacheStatus));
+        return sendSuccess(res, { stationId }, 202, stationMeta(stationCacheStatus, lockerCacheStatus));
     }
 }
 

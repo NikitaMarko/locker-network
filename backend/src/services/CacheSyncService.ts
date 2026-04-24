@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 
 import { LockerCacheDto, StationCacheDto } from "../contracts/cache.dto";
+import { HttpError } from "../errorHandler/HttpError";
 import { lockerCacheRepository } from "../repositories/cache/LockerCacheRepository";
 import { stationCacheRepository } from "../repositories/cache/StationCacheRepository";
 import { lockerCatalogProjectionService } from "../repositories/prisma/LockerCatalogProjectionService";
@@ -66,7 +67,7 @@ function getLockerDeleteCandidates(
 }
 
 export class CacheSyncService {
-    async reconcileAll(req: Request, res: Response) {
+    private async loadCatalogState() {
         const [stationProjections, lockerProjections] = await Promise.all([
             lockerCatalogProjectionService.getAllStationCacheProjections(),
             lockerCatalogProjectionService.getAllLockerCacheProjections(),
@@ -97,6 +98,89 @@ export class CacheSyncService {
             lockerMode = "rds-fallback-full-resync";
         }
 
+        return {
+            stationProjections,
+            lockerProjections,
+            cachedStations,
+            cachedLockers,
+            stationMode,
+            lockerMode,
+        };
+    }
+
+    private async syncStationCandidates(
+        stationCandidates: StationCacheDto[],
+        stationDeleteCandidates: Array<{ stationId: string; version: number }>,
+    ) {
+        return Promise.allSettled([
+            ...stationCandidates.map((projection) => stationCacheRepository.upsert(projection)),
+            ...stationDeleteCandidates.map(({ stationId, version }) => stationCacheRepository.delete(stationId, version)),
+        ]);
+    }
+
+    private async enqueueLockerCandidates(
+        lockerCandidates: LockerCacheDto[],
+        lockerDeleteCandidates: Array<{ lockerBoxId: string; version: number }>,
+        correlationId?: string,
+        actorId?: string | null,
+        forceVersions?: Map<string, number>,
+    ) {
+        return Promise.allSettled([
+            ...lockerCandidates.map((projection) =>
+                enqueueLockerProjectionUpsert(
+                    projection,
+                    correlationId,
+                    actorId,
+                    forceVersions?.get(projection.lockerBoxId) ?? projection.version,
+                )
+            ),
+            ...lockerDeleteCandidates.map(({ lockerBoxId, version }) =>
+                enqueueLockerProjectionDelete(
+                    lockerBoxId,
+                    forceVersions?.get(lockerBoxId) ?? version,
+                    correlationId,
+                    actorId,
+                )
+            ),
+        ]);
+    }
+
+    private resolveCacheStatus(results: PromiseSettledResult<void>[]) {
+        return results.every((result) => result.status === "fulfilled")
+            ? "SYNCED" as const
+            : "FAILED" as const;
+    }
+
+    private buildForcedVersionMap(
+        sourceLockers: LockerCacheDto[],
+        cachedLockers: LockerCacheDto[],
+        lockerDeleteCandidates: Array<{ lockerBoxId: string; version: number }>,
+    ) {
+        const cachedById = new Map(cachedLockers.map((item) => [item.lockerBoxId, item.version]));
+        const forcedVersions = new Map<string, number>();
+
+        for (const projection of sourceLockers) {
+            const cachedVersion = cachedById.get(projection.lockerBoxId) ?? -1;
+            forcedVersions.set(projection.lockerBoxId, Math.max(projection.version, cachedVersion + 1));
+        }
+
+        for (const candidate of lockerDeleteCandidates) {
+            forcedVersions.set(candidate.lockerBoxId, candidate.version + 1);
+        }
+
+        return forcedVersions;
+    }
+
+    async reconcileAll(req: Request, res: Response) {
+        const {
+            stationProjections,
+            lockerProjections,
+            cachedStations,
+            cachedLockers,
+            stationMode,
+            lockerMode,
+        } = await this.loadCatalogState();
+
         const stationCandidates = stationMode === "compare-and-fill"
             ? getStationSyncCandidates(stationProjections, cachedStations)
             : stationProjections;
@@ -113,33 +197,19 @@ export class CacheSyncService {
             ? getLockerDeleteCandidates(lockerProjections, cachedLockers)
             : [];
 
-        const lockerResults = await Promise.allSettled([
-            ...lockerCandidates.map((projection) =>
-                enqueueLockerProjectionUpsert(projection, req.correlationId, req.user?.userId)
-            ),
-            ...lockerDeleteCandidates.map(({ lockerBoxId, version }) =>
-                enqueueLockerProjectionDelete(lockerBoxId, version, req.correlationId, req.user?.userId)
-            ),
+        const [stationResults, lockerResults] = await Promise.all([
+            this.syncStationCandidates(stationCandidates, stationDeleteCandidates),
+            this.enqueueLockerCandidates(lockerCandidates, lockerDeleteCandidates, req.correlationId, req.user?.userId),
         ]);
 
-        const stationResults = await Promise.allSettled([
-            ...stationCandidates.map((projection) => stationCacheRepository.upsert(projection)),
-            ...stationDeleteCandidates.map(({ stationId, version }) => stationCacheRepository.delete(stationId, version)),
-        ]);
-
-        const stationCacheStatus = stationResults.every((result) => result.status === "fulfilled")
-            ? "SYNCED"
-            : "FAILED";
+        const stationCacheStatus = this.resolveCacheStatus(stationResults);
+        const lockerCacheStatus = this.resolveCacheStatus(lockerResults);
 
         if (stationCacheStatus === "FAILED") {
             logger.error("Station cache reconcile finished with Redis write failures", {
                 failedCount: stationResults.filter((result) => result.status === "rejected").length,
             });
         }
-
-        const lockerCacheStatus = lockerResults.every((result) => result.status === "fulfilled")
-            ? "DEFERRED"
-            : "FAILED";
 
         if (lockerCacheStatus === "FAILED") {
             logger.error("Locker cache reconcile finished with queue enqueue failures", {
@@ -175,6 +245,121 @@ export class CacheSyncService {
         }, 202, {
             stationCacheStatus,
             lockerCacheStatus,
+        });
+    }
+
+    async hardRefreshAll(req: Request, res: Response) {
+        const {
+            stationProjections,
+            lockerProjections,
+            cachedStations,
+            cachedLockers,
+            stationMode,
+            lockerMode,
+        } = await this.loadCatalogState();
+
+        const stationDeleteCandidates = stationMode === "compare-and-fill"
+            ? getStationDeleteCandidates(stationProjections, cachedStations)
+            : [];
+
+        const lockerDeleteCandidates = lockerMode === "compare-and-fill"
+            ? getLockerDeleteCandidates(lockerProjections, cachedLockers)
+            : [];
+
+        const forcedVersions = this.buildForcedVersionMap(lockerProjections, cachedLockers, lockerDeleteCandidates);
+
+        const [stationResults, lockerResults] = await Promise.all([
+            this.syncStationCandidates(stationProjections, stationDeleteCandidates),
+            this.enqueueLockerCandidates(
+                lockerProjections,
+                lockerDeleteCandidates,
+                req.correlationId,
+                req.user?.userId,
+                forcedVersions,
+            ),
+        ]);
+
+        const stationCacheStatus = this.resolveCacheStatus(stationResults);
+        const lockerCacheStatus = this.resolveCacheStatus(lockerResults);
+
+        if (stationCacheStatus === "FAILED") {
+            logger.error("Station hard refresh finished with Redis write failures", {
+                failedCount: stationResults.filter((result) => result.status === "rejected").length,
+            });
+        }
+
+        if (lockerCacheStatus === "FAILED") {
+            logger.error("Locker hard refresh finished with queue enqueue failures", {
+                failedCount: lockerResults.filter((result) => result.status === "rejected").length,
+            });
+        }
+
+        logger.info("Catalog hard refresh executed from RDS source of truth through cache projection queue", {
+            actorId: req.user?.userId,
+            stationProjectionCount: stationProjections.length,
+            cachedStationCount: cachedStations.length,
+            lockerProjectionCount: lockerProjections.length,
+            cachedLockerCount: cachedLockers.length,
+            stationDeleteCount: stationDeleteCandidates.length,
+            lockerDeleteCount: lockerDeleteCandidates.length,
+        });
+
+        return sendSuccess(res, {
+            mode: {
+                stations: stationMode,
+                lockers: lockerMode,
+            },
+            stations: {
+                sourceCount: stationProjections.length,
+                queuedCount: stationProjections.length,
+                deleteQueuedCount: stationDeleteCandidates.length,
+            },
+            lockers: {
+                sourceCount: lockerProjections.length,
+                queuedCount: lockerProjections.length,
+                deleteQueuedCount: lockerDeleteCandidates.length,
+            },
+        }, 202, {
+            stationCacheStatus,
+            lockerCacheStatus,
+        });
+    }
+
+    async hardRefreshStation(req: Request, res: Response) {
+        const stationId = req.params.id as string;
+        const [stationProjection, lockerProjections, cachedLockers] = await Promise.all([
+            lockerCatalogProjectionService.getStationCacheProjection(stationId),
+            lockerCatalogProjectionService.getLockerCacheProjectionsByStationId(stationId),
+            lockerCacheRepository.findByStationId(stationId),
+        ]);
+
+        if (!stationProjection) {
+            throw new HttpError(404, "Station not found");
+        }
+
+        const staleLockerDeletes = getLockerDeleteCandidates(lockerProjections, cachedLockers);
+        const forcedVersions = this.buildForcedVersionMap(lockerProjections, cachedLockers, staleLockerDeletes);
+
+        const [stationResults, lockerResults] = await Promise.all([
+            this.syncStationCandidates([stationProjection], []),
+            this.enqueueLockerCandidates(
+                lockerProjections,
+                staleLockerDeletes,
+                req.correlationId,
+                req.user?.userId,
+                forcedVersions,
+            ),
+        ]);
+
+        return sendSuccess(res, {
+            stationId,
+            lockers: {
+                queuedCount: lockerProjections.length,
+                deleteQueuedCount: staleLockerDeletes.length,
+            },
+        }, 202, {
+            stationCacheStatus: this.resolveCacheStatus(stationResults),
+            lockerCacheStatus: this.resolveCacheStatus(lockerResults),
         });
     }
 }
