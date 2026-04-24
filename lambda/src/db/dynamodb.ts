@@ -111,9 +111,8 @@ export const findAvailableLocker = async (stationId: string, size: string) => {
       ':size': size,
       ':status': 'AVAILABLE',
     },
-    Limit: 1,
   }));
- 
+
   return result.Items?.[0] || null;
 };
  
