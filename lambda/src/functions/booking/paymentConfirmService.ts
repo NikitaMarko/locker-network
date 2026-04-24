@@ -1,5 +1,5 @@
 import { OperationStatus } from '../../types/contracts/OperationContracts';
-import { PaymentConfirmCommand } from '../../types/contracts/BookingContracts';
+import { PaymentConfirmCommand, PaymentConfirmResult } from '../../types/contracts/BookingContracts';
 import {
   getBooking,
   updateBookingStatus,
@@ -91,17 +91,19 @@ export const handlePaymentConfirm = async (command: PaymentConfirmCommand): Prom
   await updateLockerStatus(booking.lockerBoxId, 'OCCUPIED');
  
   // 8. Update operation with full result
+  const result: PaymentConfirmResult = {
+    bookingStatus: 'ACTIVE',
+    paymentStatus: 'PAID',
+    startTime: confirmedAt,
+    expectedEndTime: booking.expectedEndTime,
+    price: booking.price,
+    currency: booking.currency,
+  };
+
   await updateOperationWithResult(operationId, OperationStatus.SUCCESS, {
     bookingId,
     lockerBoxId: booking.lockerBoxId,
-    result: {
-      bookingStatus: 'ACTIVE',
-      paymentStatus: 'PAID',
-      startTime: confirmedAt,
-      expectedEndTime: booking.expectedEndTime,
-      price: booking.price,
-      currency: booking.currency,
-    },
+    result,
   });
  
   console.log(JSON.stringify({

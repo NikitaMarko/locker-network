@@ -22,6 +22,16 @@ export interface PaymentConfirmCommand {
     currency: string;
   };
 }
+
+// ─── Operation result for PAYMENT_CONFIRM ───
+export interface PaymentConfirmResult {
+  bookingStatus: string;
+  paymentStatus: string;
+  startTime: string;
+  expectedEndTime: string;
+  price: number;
+  currency: string;
+}
  
 // ─── BOOKING_EXTEND: SQS command from backend ───
 export interface BookingExtendCommand {
