@@ -577,23 +577,19 @@ export class BookingService {
                 throw new HttpError(400, "expectedEndTime must be later than current expectedEndTime", "VALIDATION_ERROR");
             }
 
-            if (!lockerStatus) {
-                throw new HttpError(409, "Locker status not found in DynamoDB");
-            }
-
-            const isRegularExtension = booking.status === "ACTIVE" && lockerStatus === "OCCUPIED";
-            const isExpiredReactivation = booking.status === "EXPIRED" && lockerStatus === "EXPIRED";
+            const isRegularExtension = booking.status === "ACTIVE";
+            const isExpiredReactivation = booking.status === "EXPIRED";
 
             if (!isRegularExtension && !isExpiredReactivation) {
                 throw new HttpError(
                     409,
-                    "Booking can be extended only for ACTIVE/OCCUPIED or EXPIRED/EXPIRED states"
+                    "Booking can be extended only for ACTIVE or EXPIRED states"
                 );
             }
 
             operationId = uuidv4();
             const nextBookingStatus = isExpiredReactivation ? "ACTIVE" : booking.status;
-            const nextLockerStatus = isExpiredReactivation ? "OCCUPIED" : lockerStatus;
+            const nextLockerStatus = isExpiredReactivation ? "OCCUPIED" : (lockerStatus ?? booking.lockerStatus ?? "UNKNOWN");
 
             await operationRepository.create({
                 operationId,

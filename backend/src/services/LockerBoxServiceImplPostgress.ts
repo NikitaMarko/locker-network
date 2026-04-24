@@ -19,6 +19,7 @@ import {
     syncLockerProjection,
     toLockerResponse,
 } from "./lockerBox/lockerBoxService.helpers";
+import { syncStationProjection } from "./lockerStation/lockerStationService.helpers";
 import { prismaService } from "./prismaService";
 
 export class LockerBoxServiceImplPostgres {
@@ -70,7 +71,10 @@ export class LockerBoxServiceImplPostgres {
                         req.correlationId,
                         req.user?.userId
                     );
-                    const stationCacheStatus = "DEFERRED" as const;
+                    const stationProjection = await lockerCatalogProjectionService.getStationCacheProjection(result.stationId);
+                    const stationCacheStatus = stationProjection
+                        ? await syncStationProjection(stationProjection)
+                        : "FAILED";
 
                     await logAudit({
                         req,
@@ -206,7 +210,10 @@ export class LockerBoxServiceImplPostgres {
                         req.correlationId,
                         req.user?.userId
                     );
-                    const stationCacheStatus = "DEFERRED" as const;
+                    const stationProjection = await lockerCatalogProjectionService.getStationCacheProjection(result.stationId);
+                    const stationCacheStatus = stationProjection
+                        ? await syncStationProjection(stationProjection)
+                        : "FAILED";
 
                     await logAudit({
                         req,
@@ -314,7 +321,10 @@ export class LockerBoxServiceImplPostgres {
                         req.correlationId,
                         req.user?.userId
                     );
-                    const stationCacheStatus = "DEFERRED" as const;
+                    const stationProjection = await lockerCatalogProjectionService.getStationCacheProjection(result.stationId);
+                    const stationCacheStatus = stationProjection
+                        ? await syncStationProjection(stationProjection)
+                        : "FAILED";
 
                     await logAudit({
                         req,
@@ -396,7 +406,10 @@ export class LockerBoxServiceImplPostgres {
                         req.correlationId,
                         req.user?.userId
                     );
-                    const stationCacheStatus = "DEFERRED" as const;
+                    const stationProjection = await lockerCatalogProjectionService.getStationCacheProjection(result.stationId);
+                    const stationCacheStatus = stationProjection
+                        ? await syncStationProjection(stationProjection)
+                        : "FAILED";
 
                     await logAudit({
                         req,

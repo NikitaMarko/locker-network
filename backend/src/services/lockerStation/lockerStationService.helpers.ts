@@ -1,8 +1,8 @@
 import { StationCacheDto, StationListItemDto } from "../../contracts/cache.dto";
 import { logger } from "../../Logger/winston";
+import { lockerCacheRepository } from "../../repositories/cache/LockerCacheRepository";
 import { stationCacheRepository } from "../../repositories/cache/StationCacheRepository";
 import { lockerCatalogProjectionService } from "../../repositories/prisma/LockerCatalogProjectionService";
-import { enqueueLockerProjectionDelete, enqueueLockerProjectionUpsert } from "../sqsService";
 import { isRedisAccessError } from "../../utils/redisErrors";
 
 export type StationQuery = {
@@ -14,7 +14,7 @@ export type StationQuery = {
 };
 
 export type StationCacheStatus = "SYNCED" | "FAILED" | "DEFERRED";
-export type LockerCacheStatus = "DEFERRED" | "FAILED";
+export type LockerCacheStatus = "SYNCED" | "FAILED";
 
 function toRadians(value: number) {
     return value * (Math.PI / 180);
@@ -180,16 +180,14 @@ export async function deleteStationProjection(stationId: string, version: number
 
 export async function syncLockerProjections(
     projections: Awaited<ReturnType<typeof lockerCatalogProjectionService.getLockerCacheProjectionsByStationId>>,
-    correlationId?: string,
-    actorId?: string | null
+    _correlationId?: string,
+    _actorId?: string | null
 ) {
     try {
-        await Promise.all(
-            projections.map((projection) => enqueueLockerProjectionUpsert(projection, correlationId, actorId))
-        );
-        return "DEFERRED" as const;
+        await Promise.all(projections.map((projection) => lockerCacheRepository.upsert(projection)));
+        return "SYNCED" as const;
     } catch (error) {
-        logger.error("Locker cache projection enqueue failed after station change", {
+        logger.error("Locker cache direct upsert failed after station change", {
             count: projections.length,
             error,
         });
@@ -197,14 +195,12 @@ export async function syncLockerProjections(
     }
 }
 
-export async function deleteLockerProjections(lockerIds: string[], correlationId?: string, actorId?: string | null) {
+export async function deleteLockerProjections(lockerIds: string[], _correlationId?: string, _actorId?: string | null) {
     try {
-        await Promise.all(
-            lockerIds.map((lockerBoxId) => enqueueLockerProjectionDelete(lockerBoxId, 0, correlationId, actorId))
-        );
-        return "DEFERRED" as const;
+        await Promise.all(lockerIds.map((lockerBoxId) => lockerCacheRepository.delete(lockerBoxId, 0)));
+        return "SYNCED" as const;
     } catch (error) {
-        logger.error("Locker cache projection delete enqueue failed after station delete", {
+        logger.error("Locker cache direct delete failed after station delete", {
             count: lockerIds.length,
             error,
         });
