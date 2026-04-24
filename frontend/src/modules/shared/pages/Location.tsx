@@ -5,41 +5,31 @@ import { useAuth } from "../../../hooks/useAuth.ts";
 import { Paths } from "../../../config/paths/paths.ts";
 import { useStations } from "../../../hooks/useStations.ts";
 
-
 import { LocationsMapSection } from "../../user/pages/LocationsMapSection.tsx";
 
 export function Location() {
     const { user } = useAuth();
     const navigate = useNavigate();
-
-
     const { stations, isLoading } = useStations({ publicOnly: true });
-
-
     const safeStations = Array.isArray(stations) ? stations : [];
     const activeStations = safeStations.filter(s => s.status === 'ACTIVE');
-
 
     const cities = useMemo(() => {
         const citySet = new Set(activeStations.map(s => typeof s.city === 'string' ? s.city : (s.city?.name || '')));
         return Array.from(citySet).filter(c => c !== '');
     }, [activeStations]);
 
-
-    const [userSelectedCity, setUserSelectedCity] = useState<string>('');
+    const [selectedCity, setSelectedCity] = useState<string>('');
     const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
 
+    const displayedStations = useMemo(() => {
+        if (!selectedCity) return activeStations;
 
-    const currentCity = userSelectedCity || (cities.length > 0 ? cities[0] : '');
-
-
-    const cityStations = useMemo(() => {
         return activeStations.filter(s => {
             const cityName = typeof s.city === 'string' ? s.city : (s.city?.name || '');
-            return cityName === currentCity;
+            return cityName === selectedCity;
         });
-    }, [activeStations, currentCity]);
-
+    }, [activeStations, selectedCity]);
 
     const handleMapAction = (stationId: string) => {
         if (!user) {
@@ -64,28 +54,21 @@ export function Location() {
             </Typography>
 
             <Stack spacing={3} height="100%">
-                {/*<Alert severity="info" sx={{ borderRadius: 4, p: 2, bgcolor: '#f0f7ff', border: '1px solid #d0e3ff' }}>*/}
-                {/*    <Typography variant="h6" fontWeight={800} color="#003e92">*/}
-                {/*        Available Locations*/}
-                {/*    </Typography>*/}
-                {/*    <Typography variant="body2" color="#003e92">*/}
-                {/*        Select a city and address to see station capacity. Login to view locker prices and start a booking.*/}
-                {/*    </Typography>*/}
-                {/*</Alert>*/}
-
-
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                     <TextField
                         select
                         label="1. Select City"
-                        value={currentCity}
+                        value={selectedCity}
                         onChange={(e) => {
-                            setUserSelectedCity(e.target.value);
+                            setSelectedCity(e.target.value);
                             setSelectedStationId(null);
                         }}
                         sx={{ minWidth: 250, bgcolor: 'white', borderRadius: 2 }}
                     >
-                        {cities.length === 0 && <MenuItem disabled value="">No active cities</MenuItem>}
+                        <MenuItem value="">
+                            <em> All Cities</em>
+                        </MenuItem>
+                        {cities.length === 0 && <MenuItem disabled value="none">No active cities</MenuItem>}
                         {cities.map(city => (
                             <MenuItem key={city} value={city}>{city}</MenuItem>
                         ))}
@@ -93,23 +76,22 @@ export function Location() {
 
                     <TextField
                         select
-                        label="2. Select Address (Optional)"
+                        label="2. Select Address"
                         value={selectedStationId || ''}
                         onChange={(e) => setSelectedStationId(e.target.value)}
-                        disabled={cityStations.length === 0}
+                        disabled={!selectedCity || displayedStations.length === 0}
                         sx={{ minWidth: 300, bgcolor: 'white', borderRadius: 2, flexGrow: 1 }}
                     >
                         <MenuItem value="">
-                            <em>Show all in {currentCity}</em>
+                            <em>{selectedCity ? ` Show all in ${selectedCity}` : 'Select a city first'}</em>
                         </MenuItem>
-                        {cityStations.map(st => (
+                        {selectedCity && displayedStations.map(st => (
                             <MenuItem key={st.stationId} value={st.stationId}>
                                 {st.address} ({st._count?.lockers || 0} boxes)
                             </MenuItem>
                         ))}
                     </TextField>
                 </Stack>
-
 
                 <Box sx={{
                     height: '65vh',
@@ -121,7 +103,7 @@ export function Location() {
                     bgcolor: 'white'
                 }}>
                     <LocationsMapSection
-                        stations={cityStations}
+                        stations={displayedStations}
                         selectedId={selectedStationId}
                         onMarkerAction={handleMapAction}
                         actionText={user ? "View Station" : "Login to Book"}

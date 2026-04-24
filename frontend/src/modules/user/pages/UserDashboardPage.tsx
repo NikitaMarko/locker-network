@@ -6,10 +6,8 @@ import { useStations } from "../../../hooks/useStations.ts";
 export default function UserDashboard() {
     const { stations, isLoading, error } = useStations({ publicOnly: true });
 
-
     const safeStations = Array.isArray(stations) ? stations : [];
     const activeStations = safeStations.filter(s => s.status === 'ACTIVE');
-
 
     const cities = useMemo(() => {
         const citySet = new Set(activeStations.map(s => typeof s.city === 'string' ? s.city : (s.city?.name || '')));
@@ -17,19 +15,16 @@ export default function UserDashboard() {
     }, [activeStations]);
 
 
-    const [userSelectedCity, setUserSelectedCity] = useState<string>('');
+    const [selectedCity, setSelectedCity] = useState<string>('');
     const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
+    const displayedStations = useMemo(() => {
+        if (!selectedCity) return activeStations;
 
-
-    const currentCity = userSelectedCity || (cities.length > 0 ? cities[0] : '');
-
-
-    const cityStations = useMemo(() => {
         return activeStations.filter(s => {
             const cityName = typeof s.city === 'string' ? s.city : (s.city?.name || '');
-            return cityName === currentCity;
+            return cityName === selectedCity;
         });
-    }, [activeStations, currentCity]);
+    }, [activeStations, selectedCity]);
 
     if (isLoading) {
         return (
@@ -52,18 +47,21 @@ export default function UserDashboard() {
                     </Typography>
                 </Alert>
 
-
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                     <TextField
                         select
                         label="1. Select City"
-                        value={currentCity}
+                        value={selectedCity}
                         onChange={(e) => {
-                            setUserSelectedCity(e.target.value);
+                            setSelectedCity(e.target.value);
                             setSelectedStationId(null);
                         }}
                         sx={{ minWidth: 250, bgcolor: 'white', borderRadius: 2 }}
                     >
+                        <MenuItem value="">
+                            <em> All Cities</em>
+                        </MenuItem>
+                        {cities.length === 0 && <MenuItem disabled value="none">No active cities</MenuItem>}
                         {cities.map(city => (
                             <MenuItem key={city} value={city}>{city}</MenuItem>
                         ))}
@@ -74,20 +72,19 @@ export default function UserDashboard() {
                         label="2. Select Address (Optional)"
                         value={selectedStationId || ''}
                         onChange={(e) => setSelectedStationId(e.target.value)}
-                        disabled={cityStations.length === 0}
+                        disabled={!selectedCity || displayedStations.length === 0}
                         sx={{ minWidth: 300, bgcolor: 'white', borderRadius: 2, flexGrow: 1 }}
                     >
                         <MenuItem value="">
-                            <em>Show all in {currentCity}</em>
+                            <em>{selectedCity ? ` Show all in ${selectedCity}` : 'Select a city first'}</em>
                         </MenuItem>
-                        {cityStations.map(st => (
+                        {selectedCity && displayedStations.map(st => (
                             <MenuItem key={st.stationId} value={st.stationId}>
                                 {st.address} ({st._count?.lockers || 0} boxes)
                             </MenuItem>
                         ))}
                     </TextField>
                 </Stack>
-
 
                 <Box sx={{
                     height: '65vh',
@@ -103,7 +100,7 @@ export default function UserDashboard() {
                         </Box>
                     ) : (
                         <LocationsMapSection
-                            stations={cityStations}
+                            stations={displayedStations}
                             selectedId={selectedStationId}
                         />
                     )}

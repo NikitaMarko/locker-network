@@ -16,6 +16,63 @@ import {
 import { idempotencyService } from "./IdempotencyService";
 import { sendOperationToQueue } from "./sqsService";
 
+function asString(value: unknown) {
+    return typeof value === "string" ? value : undefined;
+}
+
+function asNumber(value: unknown) {
+    return typeof value === "number" ? value : undefined;
+}
+
+function buildOperationResponsePayload(operation: Operation & Record<string, unknown>) {
+    const result = operation.result && typeof operation.result === "object"
+        ? operation.result as Record<string, unknown>
+        : {};
+
+    const paymentProvider = asString(result.paymentProvider) ?? "stripe";
+    const paymentSessionId = asString(result.paymentSessionId);
+    const paymentIntentId = asString(result.paymentIntentId);
+    const paymentUrl = asString(result.paymentUrl);
+
+    return {
+        operationId: operation.operationId,
+        type: operation.type,
+        status: operation.status,
+        timestamp: operation.timestamp,
+        ...(asString(operation.bookingId) ? { bookingId: asString(operation.bookingId) } : {}),
+        ...(asString(operation.lockerBoxId) ? { lockerBoxId: asString(operation.lockerBoxId) } : {}),
+        ...(asString(result.bookingStatus) ? { bookingStatus: asString(result.bookingStatus) } : {}),
+        ...(asString(result.expiresAt) ? { expiresAt: asString(result.expiresAt) } : {}),
+        ...(asNumber(result.price) !== undefined ? { price: asNumber(result.price) } : {}),
+        ...(asString(result.currency) ? { currency: asString(result.currency) } : {}),
+        ...((paymentSessionId || paymentIntentId || paymentUrl)
+            ? {
+                payment: {
+                    provider: paymentProvider,
+                    ...(paymentSessionId ? { paymentSessionId } : {}),
+                    ...(paymentIntentId ? { paymentIntentId } : {}),
+                    ...(paymentUrl ? { paymentUrl } : {}),
+                },
+            }
+            : {}),
+        ...(operation.errorMessage ? { errorMessage: operation.errorMessage } : {}),
+        ...Object.fromEntries(
+            Object.entries(result).filter(([key]) =>
+                ![
+                    "paymentProvider",
+                    "paymentSessionId",
+                    "paymentIntentId",
+                    "paymentUrl",
+                    "bookingStatus",
+                    "expiresAt",
+                    "price",
+                    "currency",
+                ].includes(key)
+            )
+        ),
+    };
+}
+
 export class OperationCommandService {
     async createHealthCheckOperation(req: Request, res: Response) {
         return idempotencyService.execute(
@@ -123,16 +180,7 @@ export class OperationReadService {
             entityType: "Operation"
         });
 
-        const result = operation as Operation & { result?: Record<string, unknown> };
-
-        return sendSuccess(res, {
-            operationId: result.operationId,
-            status: result.status,
-            type: result.type,
-            timestamp: result.timestamp,
-            ...(result.errorMessage ? { errorMessage: result.errorMessage } : {}),
-            ...(result.result ?? {}),
-        });
+        return sendSuccess(res, buildOperationResponsePayload(operation as Operation & Record<string, unknown>));
     }
 }
 
