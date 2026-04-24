@@ -50,9 +50,12 @@ export const handleBookingExtend = async (command: BookingExtendCommand): Promis
   }
  
   // 4. Update booking
+  const now = new Date().toISOString();
+ 
   await updateBookingStatus(bookingId, 'ACTIVE', {
     expectedEndTime,
-    ttl: 0, // no auto-delete for active bookings
+    updatedAt: now,
+    ttl: 0,
   });
  
   // 5. If expired, reactivate locker too

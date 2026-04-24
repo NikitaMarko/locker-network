@@ -1,7 +1,7 @@
 import Stripe from 'stripe';
 import { randomUUID } from 'crypto';
 import { OperationStatus } from '../../types/contracts/OperationContracts';
-import { BookingInitCommand, BookingRecord } from '../../types/contracts/BookingContracts';
+import { BookingInitCommand, BookingInitResult, BookingRecord } from '../../types/contracts/BookingContracts';
 import {
   findAvailableLocker,
   atomicBookingInit,
@@ -19,8 +19,10 @@ const SUCCESS_URL = `${FRONTEND_BASE_URL}/payment/success`;
 const CANCEL_URL = `${FRONTEND_BASE_URL}/payment/cancel`;
  
 export const handleBookingInit = async (command: BookingInitCommand): Promise<void> => {
-  const { operationId, userId, stationId, size, expectedEndTime } = command;
- 
+const {
+  operationId,
+  payload: { userId, stationId, size, expectedEndTime },
+} = command; 
   console.log(JSON.stringify({
     action: 'BOOKING_INIT_STARTED',
     operationId,
@@ -90,6 +92,7 @@ export const handleBookingInit = async (command: BookingInitCommand): Promise<vo
     lockerBoxId: locker.lockerBoxId,
     size,
     status: 'PENDING',
+    paymentStatus: 'PENDING',
     expectedEndTime,
     expiresAt: expiresAt.toISOString(),
     ttl: Math.floor(expiresAt.getTime() / 1000),
@@ -99,29 +102,35 @@ export const handleBookingInit = async (command: BookingInitCommand): Promise<vo
     paymentSessionId: session.id,
     paymentIntentId: session.payment_intent as string || '',
     paymentUrl: session.url || '',
+    providerPaymentId: null,
+    paymentConfirmedAt: null,
     createdAt: now.toISOString(),
+    updatedAt: now.toISOString(),
   };
  
   // 5. Atomic write: booking + reserve locker + update operation
-  const operationResult = {
+  const operationResult: BookingInitResult = {
     bookingStatus: 'PENDING',
     expiresAt: expiresAt.toISOString(),
     price: totalPrice,
     currency: CURRENCY,
-    paymentUrl: session.url || '',
-    paymentSessionId: session.id,
-    paymentIntentId: session.payment_intent as string || '',
+    payment: {
+      provider: 'stripe',
+      paymentSessionId: session.id,
+      paymentIntentId: session.payment_intent as string || '',
+      paymentUrl: session.url || '',
+    },
   };
  
+    // 6. Atomic write: booking + reserve locker + update operation
   try {
     await atomicBookingInit(
       booking as unknown as Record<string, unknown>,
       locker.lockerBoxId,
       operationId,
-      operationResult,
+      operationResult as unknown as Record<string, unknown>,
     );
   } catch (err) {
-    // Transaction failed — likely locker was taken by someone else
     console.error(JSON.stringify({
       action: 'BOOKING_INIT_TRANSACTION_FAILED',
       operationId,

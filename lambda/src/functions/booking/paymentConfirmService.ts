@@ -4,7 +4,7 @@ import {
   getBooking,
   updateBookingStatus,
   updateLockerStatus,
-  updateOperationStatus,
+  updateOperationWithResult,
 } from '../../db/dynamodb';
  
 export const handlePaymentConfirm = async (command: PaymentConfirmCommand): Promise<void> => {
@@ -23,33 +23,46 @@ export const handlePaymentConfirm = async (command: PaymentConfirmCommand): Prom
  
   if (!booking) {
     console.error(JSON.stringify({ action: 'PAYMENT_CONFIRM_NOT_FOUND', bookingId }));
-    await updateOperationStatus(operationId, OperationStatus.FAILED, `Booking ${bookingId} not found`);
+    await updateOperationWithResult(operationId, OperationStatus.FAILED, {
+      errorMessage: `Booking ${bookingId} not found`,
+    });
     return;
   }
  
-  // 2. Validate
-  if (booking.status === 'ACTIVE') {
+  // 2. Already active — idempotent
+  if (booking.status === 'ACTIVE' && booking.paymentStatus === 'PAID') {
     console.log(JSON.stringify({ action: 'PAYMENT_CONFIRM_ALREADY_ACTIVE', bookingId }));
-    await updateOperationStatus(operationId, OperationStatus.SUCCESS);
+    await updateOperationWithResult(operationId, OperationStatus.SUCCESS, {
+      bookingId,
+      result: {
+        bookingStatus: 'ACTIVE',
+        paymentStatus: 'PAID',
+      },
+    });
     return;
   }
  
+  // 3. Must be PENDING
   if (booking.status !== 'PENDING') {
     console.error(JSON.stringify({ action: 'PAYMENT_CONFIRM_WRONG_STATUS', bookingId, status: booking.status }));
-    await updateOperationStatus(operationId, OperationStatus.FAILED, `Booking status is ${booking.status}, expected PENDING`);
+    await updateOperationWithResult(operationId, OperationStatus.FAILED, {
+      errorMessage: `Booking status is ${booking.status}, expected PENDING`,
+    });
     return;
   }
  
-  // Check TTL
+  // 4. Check TTL
   const now = new Date();
   const expiresAt = new Date(booking.expiresAt);
   if (now > expiresAt) {
     console.error(JSON.stringify({ action: 'PAYMENT_CONFIRM_EXPIRED', bookingId, expiresAt: booking.expiresAt }));
-    await updateOperationStatus(operationId, OperationStatus.FAILED, `Booking expired at ${booking.expiresAt}`);
+    await updateOperationWithResult(operationId, OperationStatus.FAILED, {
+      errorMessage: `Booking expired at ${booking.expiresAt}`,
+    });
     return;
   }
  
-  // Check paymentSessionId match
+  // 5. Check paymentSessionId match
   if (booking.paymentSessionId !== paymentSessionId) {
     console.error(JSON.stringify({
       action: 'PAYMENT_CONFIRM_SESSION_MISMATCH',
@@ -57,24 +70,39 @@ export const handlePaymentConfirm = async (command: PaymentConfirmCommand): Prom
       expected: booking.paymentSessionId,
       received: paymentSessionId,
     }));
-    await updateOperationStatus(operationId, OperationStatus.FAILED, 'Payment session ID mismatch');
+    await updateOperationWithResult(operationId, OperationStatus.FAILED, {
+      errorMessage: 'Payment session ID mismatch',
+    });
     return;
   }
  
-  // 3. Activate booking — remove TTL so DynamoDB doesn't auto-delete
+  // 6. Activate booking
+  const confirmedAt = now.toISOString();
+ 
   await updateBookingStatus(bookingId, 'ACTIVE', {
+    paymentStatus: 'PAID',
     providerPaymentId,
-    paidAmount: amount,
-    paidCurrency: currency,
-    paidAt: now.toISOString(),
-    ttl: 0, // remove TTL
+    paymentConfirmedAt: confirmedAt,
+    updatedAt: confirmedAt,
+    ttl: 0,
   });
  
-  // 4. Update locker: RESERVED → OCCUPIED
+  // 7. Update locker: RESERVED → OCCUPIED
   await updateLockerStatus(booking.lockerBoxId, 'OCCUPIED');
  
-  // 5. Update operation
-  await updateOperationStatus(operationId, OperationStatus.SUCCESS);
+  // 8. Update operation with full result
+  await updateOperationWithResult(operationId, OperationStatus.SUCCESS, {
+    bookingId,
+    lockerBoxId: booking.lockerBoxId,
+    result: {
+      bookingStatus: 'ACTIVE',
+      paymentStatus: 'PAID',
+      startTime: confirmedAt,
+      expectedEndTime: booking.expectedEndTime,
+      price: booking.price,
+      currency: booking.currency,
+    },
+  });
  
   console.log(JSON.stringify({
     action: 'PAYMENT_CONFIRM_SUCCESS',

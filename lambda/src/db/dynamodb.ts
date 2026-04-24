@@ -1,10 +1,18 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand, DeleteCommand, GetCommand, UpdateCommand, TransactWriteCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import {
+  DynamoDBDocumentClient,
+  PutCommand,
+  DeleteCommand,
+  GetCommand,
+  UpdateCommand,
+  QueryCommand,
+  TransactWriteCommand,
+} from '@aws-sdk/lib-dynamodb';
  
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
  
-const LOCKER_CACHE_TABLE = process.env.LOCKER_CACHE_TABLE || 'locker-locker-cache';
+const LOCKER_CACHE_TABLE = process.env.LOCKER_CACHE_TABLE || 'locker-dev-locker-cache';
 const OPERATIONS_TABLE = process.env.OPERATIONS_TABLE || 'locker-dev-operations-dynamodb';
 const BOOKING_TABLE = process.env.BOOKING_TABLE || 'locker-dev-booking';
  
@@ -28,7 +36,7 @@ export const updateOperationStatus = async (
     },
   }));
 };
-
+ 
 export const updateOperationWithResult = async (
   operationId: string,
   status: string,
@@ -87,10 +95,8 @@ export const deleteLockerCache = async (lockerBoxId: string) => {
     Key: { lockerBoxId },
   }));
 };
-
+ 
 export const findAvailableLocker = async (stationId: string, size: string) => {
-  // Scan locker-cache for matching station + size + AVAILABLE
-  // In production, use a GSI for better performance
   const result = await docClient.send(new QueryCommand({
     TableName: LOCKER_CACHE_TABLE,
     IndexName: 'stationId-index',
@@ -115,11 +121,12 @@ export const updateLockerStatus = async (lockerBoxId: string, status: string) =>
   await docClient.send(new UpdateCommand({
     TableName: LOCKER_CACHE_TABLE,
     Key: { lockerBoxId },
-    UpdateExpression: 'SET #s = :status, lastStatusChangedAt = :now',
+    UpdateExpression: 'SET #s = :status, lastStatusChangedAt = :now, version = version + :inc',
     ExpressionAttributeNames: { '#s': 'status' },
     ExpressionAttributeValues: {
       ':status': status,
       ':now': new Date().toISOString(),
+      ':inc': 1,
     },
   }));
 };
@@ -187,13 +194,14 @@ export const atomicBookingInit = async (
         Update: {
           TableName: LOCKER_CACHE_TABLE,
           Key: { lockerBoxId },
-          UpdateExpression: 'SET #s = :reserved, lastStatusChangedAt = :now',
+          UpdateExpression: 'SET #s = :reserved, lastStatusChangedAt = :now, version = version + :inc',
           ConditionExpression: '#s = :available',
           ExpressionAttributeNames: { '#s': 'status' },
           ExpressionAttributeValues: {
             ':reserved': 'RESERVED',
             ':available': 'AVAILABLE',
             ':now': new Date().toISOString(),
+            ':inc': 1,
           },
         },
       },
@@ -201,18 +209,22 @@ export const atomicBookingInit = async (
         Update: {
           TableName: OPERATIONS_TABLE,
           Key: { operationId },
-          UpdateExpression: 'SET #s = :status, #bid = :bookingId, #lid = :lockerBoxId, #r = :result',
+          UpdateExpression: 'SET #s = :status, #bid = :bookingId, #lid = :lockerBoxId, #r = :result, #uid = :userId, #ts = :timestamp',
           ExpressionAttributeNames: {
             '#s': 'status',
             '#bid': 'bookingId',
             '#lid': 'lockerBoxId',
             '#r': 'result',
+            '#uid': 'userId',
+            '#ts': 'timestamp',
           },
           ExpressionAttributeValues: {
             ':status': 'SUCCESS',
             ':bookingId': booking.bookingId as string,
             ':lockerBoxId': lockerBoxId,
             ':result': operationResult,
+            ':userId': booking.userId as string,
+            ':timestamp': new Date().toISOString(),
           },
         },
       },

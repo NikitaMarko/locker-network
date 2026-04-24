@@ -2,10 +2,12 @@
 export interface BookingInitCommand {
   type: 'BOOKING_INIT';
   operationId: string;
-  userId: string;
-  stationId: string;
-  size: 'S' | 'M' | 'L';
-  expectedEndTime: string;
+  payload: {
+    userId: string;
+    stationId: string;
+    size: 'S' | 'M' | 'L';
+    expectedEndTime: string;
+  };
 }
  
 // ─── PAYMENT_CONFIRM: SQS command from backend after Stripe webhook ───
@@ -41,6 +43,7 @@ export interface BookingRecord {
   lockerBoxId: string;
   size: string;
   status: 'PENDING' | 'ACTIVE' | 'CANCELLED' | 'EXPIRED';
+  paymentStatus: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
   expectedEndTime: string;
   expiresAt: string;
   ttl: number;
@@ -50,7 +53,10 @@ export interface BookingRecord {
   paymentSessionId: string;
   paymentIntentId: string;
   paymentUrl: string;
+  providerPaymentId: string | null;
+  paymentConfirmedAt: string | null;
   createdAt: string;
+  updatedAt: string;
 }
  
 // ─── Operation result for BOOKING_INIT ───
@@ -59,7 +65,10 @@ export interface BookingInitResult {
   expiresAt: string;
   price: number;
   currency: string;
-  paymentUrl: string;
-  paymentSessionId: string;
-  paymentIntentId: string;
+  payment: {
+    provider: string;
+    paymentSessionId: string;
+    paymentIntentId: string;
+    paymentUrl: string;
+  };
 }
