@@ -3,6 +3,7 @@ import {Role} from "@prisma/client";
 
 import * as lockerBoxController from "../controllers/lockerBoxController";
 import * as lockerStationController from "../controllers/lockerStationController";
+
 import {validateRequest} from "../middleware/validateRequest";
 import {
     changeStatusStationSchema,
@@ -47,7 +48,7 @@ lockersRoutes.post('/admin/stations', authorize(Role.OPERATOR, Role.ADMIN), vali
 lockersRoutes.patch('/admin/stations/:id/status', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(changeStatusStationSchema), lockerStationController.changeStationStatus);
 lockersRoutes.post('/admin/stations/:id/resync-cache', authorize(Role.ADMIN), validateRequest(oneStationSchema), lockerStationController.resyncStationCache);
 lockersRoutes.post('/admin/cache/reconcile', authorize(Role.ADMIN), lockerStationController.reconcileCatalogCache);
-//lockersRoutes.patch('/admin/users/:id', authorize(Role.ADMIN), adminActionsService.changeRole);
+
 
 // operator-only routes
 lockersRoutes.patch('/oper/boxes/:id/delete', authorize(Role.OPERATOR), validateRequest(oneLockerSchema), lockerBoxController.deleteBox);
