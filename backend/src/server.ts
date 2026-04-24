@@ -147,7 +147,7 @@ export const createApp = () => {
     app.use(`${API_PREFIX}/payments`, paymentsRoutes)
     app.use(`${API_PREFIX}/lockers`, lockersRoutes)
     app.use(`${API_PREFIX}/cities`, citiesRoutes)
-    app.use(`${API_PREFIX}`, adminRoutes)
+    app.use(`${API_PREFIX}/admin/users`, adminRoutes)
 
 
 

@@ -8,4 +8,4 @@ export const adminRoutes = express.Router();
 
 // ---admin only routes---
 
-adminRoutes.patch('/admin/users/:id',auth.protect,authorize(Role.ADMIN),adminActionsController.changeRole);
+adminRoutes.patch('/:id',auth.protect,authorize(Role.ADMIN),adminActionsController.changeRole);
