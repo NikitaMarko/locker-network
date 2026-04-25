@@ -3,13 +3,11 @@ import { Paper, Box, Typography, Stack, Chip, Button } from "@mui/material";
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import { useLockers } from "../../../hooks/useLockers.ts";
 
-
 export function ActiveLockerCard({ locker: booking }: { locker: any }) {
     const { cancelBooking } = useLockers();
     const [timeLeft, setTimeLeft] = useState("");
 
     useEffect(() => {
-
         if (!booking.expectedEndTime) return;
 
         const timer = setInterval(() => {
@@ -22,7 +20,6 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
                 const h = Math.floor(diff / 3600000);
                 const m = Math.floor((diff / 60000) % 60);
                 const s = Math.floor((diff / 1000) % 60);
-
                 setTimeLeft(`${h}h ${m}m ${s}s`);
             }
         }, 1000);
@@ -30,7 +27,8 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
         return () => clearInterval(timer);
     }, [booking.expectedEndTime]);
 
-    const isActive = booking.status === 'ACTIVE';
+
+    const isActive = booking.bookingStatus === 'ACTIVE';
 
     return (
         <Paper sx={{
@@ -40,7 +38,6 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
         }}>
             <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={3}>
                 <Box>
-
                     <Typography variant="h3" fontWeight={900}>
                         Locker #{booking.lockerBoxId ? booking.lockerBoxId.slice(-4).toUpperCase() : '???'}
                     </Typography>
@@ -53,8 +50,9 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
                     </Stack>
 
                     <Stack direction="row" spacing={1}>
+
                         <Chip
-                            label={booking.status}
+                            label={booking.bookingStatus || "UNKNOWN"}
                             color={isActive ? "success" : "warning"}
                             sx={{ fontWeight: 700 }}
                         />
@@ -75,7 +73,6 @@ export function ActiveLockerCard({ locker: booking }: { locker: any }) {
                             {timeLeft || "Calculating..."}
                         </Typography>
                     </Box>
-
 
                     <Button
                         variant="outlined"

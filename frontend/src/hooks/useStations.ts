@@ -43,7 +43,7 @@ export function useStations(options?: { publicOnly?: boolean }) {
         onSuccess: invalidateAll
     });
 
-    // 🔥 КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ
+
     const changeStatus = useMutation({
         mutationFn: ({ id, status }: ChangeStationStatusPayload) => {
 

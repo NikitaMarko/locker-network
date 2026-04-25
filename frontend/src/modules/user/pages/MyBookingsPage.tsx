@@ -2,16 +2,18 @@ import { Box, Typography, Button, Stack, Paper, CircularProgress } from "@mui/ma
 import { useNavigate } from "react-router-dom";
 import SentimentDissatisfiedIcon from '@mui/icons-material/SentimentDissatisfied';
 import { ActiveLockerCard } from "./ActiveLockerCard.tsx";
-import {Paths} from "../../../config/paths/paths.ts";
-import {useMyBookings} from "../../../hooks/useMyBookings.ts";
+import { Paths } from "../../../config/paths/paths.ts";
+import { useMyBookings } from "../../../hooks/useMyBookings.ts";
 
 export default function MyBookingsPage() {
     const navigate = useNavigate();
-    const {data: bookings = [], isLoading} = useMyBookings();
+    const { data: bookings = [], isLoading } = useMyBookings();
 
     const safeBookings = Array.isArray(bookings) ? bookings : [];
+
+
     const activeBookings = safeBookings.filter(
-        (l) => l.status === "ACTIVE" || (l as any).status === "PENDING"
+        (b: any) => b.bookingStatus === "ACTIVE" || b.bookingStatus === "PENDING"
     );
 
     if (isLoading) {
@@ -28,8 +30,8 @@ export default function MyBookingsPage() {
 
             {activeBookings.length > 0 ? (
                 <Stack spacing={2}>
-                    {activeBookings.map((bookings) => (
-                        <ActiveLockerCard key={bookings.bookingId || bookings.id} locker={bookings} />
+                    {activeBookings.map((booking: any) => (
+                        <ActiveLockerCard key={booking.bookingId || booking.id} locker={booking} />
                     ))}
                 </Stack>
             ) : (

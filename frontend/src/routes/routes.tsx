@@ -14,12 +14,14 @@ import DashboardLayout from "../layout/DashboardLayout.tsx";
 // PAGES
 import { Location } from "../modules/shared/pages/Location.tsx";
 import { AdminDashboard } from "../modules/admin/pages/AdminDashboardPage.tsx";
-import StationDetailsPage from "../modules/admin/pages/StationDetailsPage.tsx";   // ← ИСПРАВЛЕНО
+import StationDetailsPage from "../modules/admin/pages/StationDetailsPage.tsx";
 
 // USER PAGES
 import UserDashboardPage from "../modules/user/pages/UserDashboardPage.tsx";
 import MyBookingsPage from "../modules/user/pages/MyBookingsPage.tsx";
 import { StationDetailsPage as UserStationDetailsPage } from "../modules/user/pages/StationDetailsPage.tsx";
+import { PaymentSuccess } from "../modules/user/pages/PaymentSuccess.tsx";
+import { PaymentCancel } from "../modules/user/pages/PaymentCancel.tsx";
 
 import { Info } from "../modules/shared/pages/Info.tsx";
 import { Price } from "../modules/shared/pages/Price.tsx";
@@ -32,8 +34,6 @@ import OperatorStationDetailsPage from "../modules/operator/pages/OperatorStatio
 
 // ADMIN USERS PAGE
 import AdminUsersTables from "../modules/admin/pages/AdminUsersTables.tsx";
-import {PaymentSuccess} from "../modules/user/pages/PaymentSuccess.tsx";
-import {PaymentCancel} from "../modules/user/pages/PaymentCancel.tsx";
 
 export function AppRoutes() {
     return (
@@ -51,6 +51,21 @@ export function AppRoutes() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/403" element={<ForbiddenPage />} />
 
+            <Route
+                path="/payment/success"
+                element={
+                        <PaymentSuccess />
+                }
+            />
+            <Route
+                path="/payment/cancel"
+                element={
+                    <ProtectedRoute>
+                        <PaymentCancel />
+                    </ProtectedRoute>
+                }
+            />
+
             {/* ================= ADMIN ================= */}
             <Route
                 path="/admin"
@@ -63,10 +78,7 @@ export function AppRoutes() {
                 }
             >
                 <Route index element={<AdminDashboard />} />
-
                 <Route path="users" element={<AdminUsersTables />} />
-
-                {/* ← ИСПРАВЛЕНО: теперь используется правильная страница */}
                 <Route path="stations/:stationId" element={<StationDetailsPage />} />
             </Route>
 
@@ -100,10 +112,10 @@ export function AppRoutes() {
                 <Route index element={<UserDashboardPage />} />
                 <Route path="my-bookings" element={<MyBookingsPage />} />
                 <Route path="stations/:id" element={<UserStationDetailsPage />} />
-                <Route path="payment/success" element={<PaymentSuccess />} />
-                <Route path="payment/cancel" element={<PaymentCancel />} />
+
                 <Route path="*" element={<Navigate to={Paths.USER} />} />
             </Route>
+
 
             <Route path="*" element={<Navigate to={Paths.HOME} />} />
         </Routes>
