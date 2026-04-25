@@ -74,7 +74,7 @@ export function useStations(options?: { publicOnly?: boolean }) {
     });
 
     const cancel = useMutation({
-        mutationFn: (lockerBoxId: string) => lockersApi.updateLockerStatus(lockerBoxId, "AVAILABLE"),
+        mutationFn: (lockerBoxId: string) => lockersApi.updateLockerStatus(lockerBoxId, "AVAILABLE" ),
         onSuccess: invalidateAll,
     });
 

@@ -1,7 +1,6 @@
 import { apiClient } from "./apiClient";
 import type {
-    LockerBox,
-    LockerTechnicalStatus
+    LockerBox
 } from "../types/index";
 
 export interface ApiResponse<T> {
@@ -28,11 +27,16 @@ export const lockersApi = {
     // только technicalStatus
     updateLockerStatus: async (
         id: string,
-        status: LockerTechnicalStatus
+        status: string
     ): Promise<LockerBox> => {
+        const isBusinessStatus = ["AVAILABLE", "RESERVED", "OCCUPIED"].includes(status);
+        const payload = isBusinessStatus
+            ? { status: status }
+            : { technicalStatus: status };
+
         const { data } = await apiClient.patch<ApiResponse<LockerBox>>(
             `/lockers/admin/boxes/${id}/status`,
-            { technicalStatus: status }
+            payload
         );
         return data.data;
     },
