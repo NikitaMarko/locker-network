@@ -96,6 +96,7 @@ export const createApp = () => {
                 "Authorization",
                 "Accept",
                 "Idempotency-Key",
+                "X-Idempotency-Key",
                 "X-Correlation-Id",
             ],
             exposedHeaders: ["x-correlation-id"],

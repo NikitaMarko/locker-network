@@ -30,7 +30,7 @@ function hashPayload(payload: unknown) {
 }
 
 function extractIdempotencyKey(req: Request) {
-    const value = req.headers["idempotency-key"];
+    const value = req.headers["idempotency-key"] ?? req.headers["x-idempotency-key"];
     return typeof value === "string" ? value.trim() : undefined;
 }
 
