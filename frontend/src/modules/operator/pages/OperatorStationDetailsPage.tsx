@@ -3,7 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { stationsApi } from "../../../api/stationsApi";
 import { lockersApi } from "../../../api/lockersApi";
 
-import type { LockerBox, LockerStatus, LockerStation } from "../../../types/index";
+import type { LockerBox, LockerTechnicalStatus, LockerStation } from "../../../types/index";
+
 import {
     Box,
     Typography,
@@ -13,26 +14,16 @@ import {
 } from "@mui/material";
 import Grid from "@mui/material/GridLegacy";
 
-import {
-    getTechnicalStatus
-} from "../../../types/index";
+import { getTechnicalStatus } from "../../../types/index";
 
-const getChipColor = (status: LockerStatus): "default" | "success" | "warning" | "info" | "error" => {
-    // ❗ показываем ТОЛЬКО техническую часть
-    const tech = getTechnicalStatus(status);
-
-    switch (tech) {
-        case "ACTIVE":
-            return "success";
-        case "READY":
-            return "info";
-        case "INACTIVE":
-            return "default";
+const getChipColor = (status: string) => {
+    switch (status) {
+        case "ACTIVE": return "success";
+        case "READY": return "info";
+        case "INACTIVE": return "default";
         case "MAINTENANCE":
-        case "FAULTY":
-            return "error";
-        default:
-            return "default";
+        case "FAULTY": return "error";
+        default: return "default";
     }
 };
 
@@ -46,11 +37,14 @@ export default function OperatorStationDetailsPage() {
     });
 
     const { data: lockers = [] } = useQuery<LockerBox[]>({
-        queryKey: ["operator-lockers", stationId],
+        queryKey: ["operator-lockers"],
         queryFn: () => lockersApi.getAdminLockers()
     });
 
-    const handleLockerStatus = async (lockerId: string, status: LockerStatus) => {
+    const handleLockerStatus = async (
+        lockerId: string,
+        status: LockerTechnicalStatus
+    ) => {
         await lockersApi.updateLockerStatus(lockerId, status);
     };
 
@@ -60,66 +54,60 @@ export default function OperatorStationDetailsPage() {
                 Station Details
             </Typography>
 
-            <Typography color="text.secondary" sx={{ mb: 3 }}>
+            <Typography sx={{ mb: 3 }}>
                 {station?.address}
             </Typography>
 
             <Grid container spacing={2}>
                 {lockers
                     .filter((l) => l.stationId === stationId)
-                    .map((locker) => (
-                        <Grid item xs={12} sm={6} md={3} key={locker.lockerBoxId}>
-                            <Paper sx={{ p: 2, borderRadius: 2 }}>
-                                <Typography fontWeight={700}>
-                                    Box #{locker.code}
-                                </Typography>
+                    .map((locker) => {
+                        const tech = getTechnicalStatus(locker.status);
 
-                                {/* 🔥 ТЕХНИЧЕСКИЙ СТАТУС */}
-                                <Chip
-                                    label={getTechnicalStatus(locker.status)}
-                                    size="small"
-                                    sx={{ mt: 1 }}
-                                    color={getChipColor(locker.status)}
-                                />
+                        return (
+                            <Grid item xs={12} sm={6} md={3} key={locker.lockerBoxId}>
+                                <Paper sx={{ p: 2 }}>
+                                    <Typography fontWeight={700}>
+                                        Box #{locker.code}
+                                    </Typography>
 
-                                <Box sx={{ mt: 2, display: "flex", gap: 1 }}>
-                                    {/* OPERATOR FLOW */}
-                                    {locker.status === "INACTIVE" && (
-                                        <Button
-                                            size="small"
-                                            variant="contained"
-                                            onClick={() =>
-                                                handleLockerStatus(
-                                                    locker.lockerBoxId,
-                                                    "READY"
-                                                )
-                                            }
-                                        >
-                                            Prepare
-                                        </Button>
-                                    )}
+                                    <Chip
+                                        label={tech}
+                                        color={getChipColor(tech)}
+                                        size="small"
+                                        sx={{ mt: 1 }}
+                                    />
 
-                                    {locker.status === "MAINTENANCE" && (
-                                        <Button
-                                            size="small"
-                                            variant="contained"
-                                            color="success"
-                                            onClick={() =>
-                                                handleLockerStatus(
-                                                    locker.lockerBoxId,
-                                                    "READY"
-                                                )
-                                            }
-                                        >
-                                            Fix & Ready
-                                        </Button>
-                                    )}
+                                    <Box sx={{ mt: 2, display: "flex", gap: 1 }}>
+                                        {tech === "INACTIVE" && (
+                                            <Button
+                                                size="small"
+                                                variant="contained"
+                                                onClick={() =>
+                                                    handleLockerStatus(locker.lockerBoxId, "READY")
+                                                }
+                                            >
+                                                Prepare
+                                            </Button>
+                                        )}
 
-                                    {/* ❗ USER STATUSES НЕ ПОКАЗЫВАЕМ В ОПЕРАТОРЕ */}
-                                </Box>
-                            </Paper>
-                        </Grid>
-                    ))}
+                                        {tech === "MAINTENANCE" && (
+                                            <Button
+                                                size="small"
+                                                variant="contained"
+                                                color="success"
+                                                onClick={() =>
+                                                    handleLockerStatus(locker.lockerBoxId, "READY")
+                                                }
+                                            >
+                                                Fix & Ready
+                                            </Button>
+                                        )}
+                                    </Box>
+                                </Paper>
+                            </Grid>
+                        );
+                    })}
             </Grid>
         </Box>
     );

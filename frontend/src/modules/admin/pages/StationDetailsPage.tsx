@@ -14,15 +14,16 @@ import { useAuth } from '../../../hooks/useAuth';
 import { ROLES } from '../../../config/roles/roles';
 import { useLockers } from '../../../hooks/useLockers';
 import type { LockerStation } from '../../../types/index';
+import { getTechnicalStatus } from "../../../types/index";
 
 const getChipColor = (status: string): "success" | "warning" | "default" | "error" => {
     switch (status) {
-        case "ACTIVE":      return "success";
-        case "READY":       return "warning";
-        case "MAINTENANCE": return "error";
-        case "FAULTY":      return "error";
-        case "INACTIVE":    return "default";
-        default:            return "default";
+        case "ACTIVE": return "success";
+        case "READY": return "warning";
+        case "MAINTENANCE":
+        case "FAULTY": return "error";
+        case "INACTIVE": return "default";
+        default: return "default";
     }
 };
 
@@ -45,9 +46,6 @@ export default function StationDetailsPage() {
         enabled: !!stationId
     });
 
-    console.log("STATION DATA:", station);
-    console.log("LOCKERS:", station?.lockers);
-
     const handleAdd = async () => {
         if (!stationId || !lockerData.code) return;
         await stationsApi.addLocker({
@@ -68,90 +66,88 @@ export default function StationDetailsPage() {
                 BACK
             </Button>
 
-            <Box display="flex" alignItems="center" justifyContent="space-between" mt={2}>
+            <Box display="flex" justifyContent="space-between" mt={2}>
                 <Typography variant="h4" fontWeight={900}>
                     {station?.address}
                 </Typography>
 
                 {user?.role === ROLES.ADMIN && (
-                    <Button
-                        variant="contained"
-                        startIcon={<AddIcon />}
-                        onClick={() => setOpen(true)}
-                    >
+                    <Button variant="contained" startIcon={<AddIcon />} onClick={() => setOpen(true)}>
                         Add Locker
                     </Button>
                 )}
             </Box>
 
             <Grid container spacing={2} mt={2}>
-                {station?.lockers?.map((locker) => (
-                    <Grid item xs={12} sm={6} md={3} key={locker.lockerBoxId}>
-                        <Paper sx={{ p: 2 }}>
-                            <Typography fontWeight={700}>
-                                Box #{locker.code}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                Size: {locker.size}
-                            </Typography>
+                {station?.lockers?.map((locker) => {
+                    const tech = getTechnicalStatus(locker.status);
 
-                            <Chip
-                                label={locker.status}
-                                color={getChipColor(locker.status)}
-                                sx={{ mt: 1 }}
-                                size="small"
-                            />
+                    return (
+                        <Grid item xs={12} sm={6} md={3} key={locker.lockerBoxId}>
+                            <Paper sx={{ p: 2 }}>
+                                <Typography fontWeight={700}>
+                                    Box #{locker.code}
+                                </Typography>
 
-                            {user?.role === ROLES.ADMIN && (
-                                <Box mt={2} display="flex" flexDirection="column" gap={1}>
-                                    {/* READY → ACTIVE */}
-                                    {locker.status === "READY" && (
-                                        <Button
-                                            variant="contained"
-                                            color="success"
-                                            size="small"
-                                            onClick={() => changeLockerStatus({
-                                                lockerBoxId: locker.lockerBoxId,
-                                                status: "ACTIVE"
-                                            })}
-                                        >
-                                            Activate
-                                        </Button>
-                                    )}
+                                <Chip
+                                    label={tech}
+                                    color={getChipColor(tech)}
+                                    sx={{ mt: 1 }}
+                                    size="small"
+                                />
 
-                                    {/* ACTIVE → MAINTENANCE */}
-                                    {locker.status === "ACTIVE" && (
-                                        <Button
-                                            variant="contained"
-                                            color="error"
-                                            size="small"
-                                            onClick={() => changeLockerStatus({
-                                                lockerBoxId: locker.lockerBoxId,
-                                                status: "MAINTENANCE"
-                                            })}
-                                        >
-                                            → Maintenance
-                                        </Button>
-                                    )}
+                                {user?.role === ROLES.ADMIN && (
+                                    <Box mt={2} display="flex" flexDirection="column" gap={1}>
 
-                                    {/* INACTIVE — ждём оператора */}
-                                    {locker.status === "INACTIVE" && (
-                                        <Typography variant="caption" color="text.secondary">
-                                            Awaiting operator activation
-                                        </Typography>
-                                    )}
+                                        {tech === "READY" && (
+                                            <Button
+                                                variant="contained"
+                                                color="success"
+                                                size="small"
+                                                onClick={() =>
+                                                    changeLockerStatus({
+                                                        lockerBoxId: locker.lockerBoxId,
+                                                        status: "ACTIVE"
+                                                    })
+                                                }
+                                            >
+                                                Activate
+                                            </Button>
+                                        )}
 
-                                    {/* MAINTENANCE — ждём оператора */}
-                                    {locker.status === "MAINTENANCE" && (
-                                        <Typography variant="caption" color="text.secondary">
-                                            Awaiting operator repair
-                                        </Typography>
-                                    )}
-                                </Box>
-                            )}
-                        </Paper>
-                    </Grid>
-                ))}
+                                        {tech === "ACTIVE" && (
+                                            <Button
+                                                variant="contained"
+                                                color="error"
+                                                size="small"
+                                                onClick={() =>
+                                                    changeLockerStatus({
+                                                        lockerBoxId: locker.lockerBoxId,
+                                                        status: "MAINTENANCE"
+                                                    })
+                                                }
+                                            >
+                                                → Maintenance
+                                            </Button>
+                                        )}
+
+                                        {tech === "INACTIVE" && (
+                                            <Typography variant="caption">
+                                                Awaiting operator activation
+                                            </Typography>
+                                        )}
+
+                                        {tech === "MAINTENANCE" && (
+                                            <Typography variant="caption">
+                                                Awaiting operator repair
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                )}
+                            </Paper>
+                        </Grid>
+                    );
+                })}
             </Grid>
 
             <Dialog open={open} onClose={() => setOpen(false)}>
@@ -159,32 +155,33 @@ export default function StationDetailsPage() {
                 <DialogContent>
                     <Stack spacing={2} sx={{ mt: 1 }}>
                         <TextField
-                            label="Code (e.g. A-101)"
+                            label="Code"
                             value={lockerData.code}
-                            onChange={(e) => setLockerData({ ...lockerData, code: e.target.value })}
+                            onChange={(e) =>
+                                setLockerData({ ...lockerData, code: e.target.value })
+                            }
                             fullWidth
-                            required
                         />
                         <TextField
                             select
                             label="Size"
                             value={lockerData.size}
-                            onChange={(e) => setLockerData({ ...lockerData, size: e.target.value as 'S' | 'M' | 'L' })}
-                            fullWidth
+                            onChange={(e) =>
+                                setLockerData({
+                                    ...lockerData,
+                                    size: e.target.value as 'S' | 'M' | 'L'
+                                })
+                            }
                         >
-                            <MenuItem value="S">Small (S)</MenuItem>
-                            <MenuItem value="M">Medium (M)</MenuItem>
-                            <MenuItem value="L">Large (L)</MenuItem>
+                            <MenuItem value="S">S</MenuItem>
+                            <MenuItem value="M">M</MenuItem>
+                            <MenuItem value="L">L</MenuItem>
                         </TextField>
                     </Stack>
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setOpen(false)}>Cancel</Button>
-                    <Button
-                        onClick={handleAdd}
-                        variant="contained"
-                        disabled={!lockerData.code}
-                    >
+                    <Button onClick={handleAdd} variant="contained">
                         Add
                     </Button>
                 </DialogActions>
