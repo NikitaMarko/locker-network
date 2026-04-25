@@ -43,4 +43,28 @@ export class AdminActions {
             role: updatedUser.role,
         });
     }
+
+    //--------------------getAllUsers
+
+    static async getAllUsers(req: Request, res: Response) {
+        const users = await prismaService.user.findMany({
+            where: {
+                isDeleted: false,
+            },
+            select: {
+                userId: true,
+                name: true,
+                email: true,
+                phone: true,
+                role: true,
+                createdAt: true,
+                updatedAt: true,
+            },
+            orderBy: {
+                createdAt: "desc",
+            },
+        });
+
+        return res.status(200).json(users);
+    }
 }
