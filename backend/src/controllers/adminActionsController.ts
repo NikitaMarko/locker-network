@@ -9,3 +9,11 @@ export const changeRole = async (req: Request, res: Response, next: NextFunction
         next(e);
     }
 };
+
+export const getAllUsers = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return await AdminActions.changeRole(req, res);
+    } catch (e) {
+        next(e);
+    }
+};
