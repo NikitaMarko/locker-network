@@ -103,6 +103,7 @@ export const handlePaymentConfirm = async (command: PaymentConfirmCommand): Prom
   await updateOperationWithResult(operationId, OperationStatus.SUCCESS, {
     bookingId,
     lockerBoxId: booking.lockerBoxId,
+    type: 'PAYMENT_CONFIRM',
     result,
   });
  

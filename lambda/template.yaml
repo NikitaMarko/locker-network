@@ -139,6 +139,8 @@ Resources:
       TimeToLiveSpecification:
         AttributeName: ttl
         Enabled: true
+      StreamSpecification:
+        StreamViewType: OLD_IMAGE
  
   # ── Cache Projection Handler Lambda ──
   CacheProjectionHandlerFunction:
@@ -160,6 +162,31 @@ Resources:
           Properties:
             Queue: !GetAtt CacheProjectionQueue.Arn
             BatchSize: 10
+  
+   # ── Booking TTL Cleanup Lambda ──
+  BookingTtlCleanupFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub locker-${Environment}-booking-ttl-cleanup
+      Handler: dist/functions/booking/bookingTtlCleanup.handler
+      CodeUri: .
+      Description: Releases locker when unpaid booking expires
+      Environment:
+        Variables:
+          LOCKER_CACHE_TABLE: !Ref LockerCacheTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref LockerCacheTable
+      Events:
+        DynamoDBStream:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt BookingTable.StreamArn
+            StartingPosition: TRIM_HORIZON
+            BatchSize: 10
+            FilterCriteria:
+              Filters:
+                - Pattern: '{"eventName":["REMOVE"]}'
  
 Outputs:
   HealthCheckApi:
