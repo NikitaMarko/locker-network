@@ -32,6 +32,8 @@ import OperatorStationDetailsPage from "../modules/operator/pages/OperatorStatio
 
 // ADMIN USERS PAGE
 import AdminUsersTables from "../modules/admin/pages/AdminUsersTables.tsx";
+import {PaymentSuccess} from "../modules/user/pages/PaymentSuccess.tsx";
+import {PaymentCancel} from "../modules/user/pages/PaymentCancel.tsx";
 
 export function AppRoutes() {
     return (
@@ -98,6 +100,8 @@ export function AppRoutes() {
                 <Route index element={<UserDashboardPage />} />
                 <Route path="my-bookings" element={<MyBookingsPage />} />
                 <Route path="stations/:id" element={<UserStationDetailsPage />} />
+                <Route path="payment/success" element={<PaymentSuccess />} />
+                <Route path="payment/cancel" element={<PaymentCancel />} />
                 <Route path="*" element={<Navigate to={Paths.USER} />} />
             </Route>
 

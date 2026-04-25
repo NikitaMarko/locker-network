@@ -1,6 +1,6 @@
 import axios, { AxiosError } from "axios";
 import { SERVER_URL } from "../config/env/env.ts";
-import {logoutApi, refreshTokenRequest} from "./authApi.ts";
+import { logoutApi, refreshTokenRequest } from "./authApi.ts";
 
 let isRefreshing = false;
 let failedQueue: Array<{
@@ -45,33 +45,30 @@ apiClient.interceptors.response.use(
 
         if (originalRequest._skipInterceptor) {
             return Promise.reject(error);
-            }
-
-
+        }
         const backendMessage = error.response?.data?.error?.message;
         const legacyMessage = error.response?.data?.message;
 
         if (backendMessage || legacyMessage) {
-
             error.message = (backendMessage || legacyMessage) as string;
         }
-        // ==========================================
 
-        if (originalRequest.url?.includes('/auth/refresh')) {
+        if ((error.response?.status === 401 || error.response?.status === 403) && originalRequest.url?.includes('/auth/refresh')) {
             localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
 
-            try{
+            try {
                 await logoutApi();
-            }catch(e){
-                // логируем
-            }finally {
+            } catch(e) {
+                console.warn("Forced logout: backend session invalidation failed", e);
+            } finally {
                 window.location.href = '/login?expired=true';
             }
             return Promise.reject(error);
-
         }
 
         if (error.response?.status === 401 && !originalRequest._retry) {
+
             if (isRefreshing) {
                 return new Promise((resolve, reject) => {
                     failedQueue.push({ resolve, reject });
@@ -89,8 +86,8 @@ apiClient.interceptors.response.use(
             try {
                 const newToken = await refreshTokenRequest();
                 localStorage.setItem('access_token', newToken);
-
                 processQueue(null, newToken);
+
                 if (originalRequest.headers) {
                     originalRequest.headers.Authorization = `Bearer ${newToken}`;
                 }
@@ -102,7 +99,6 @@ apiClient.interceptors.response.use(
                 isRefreshing = false;
             }
         }
-
 
         return Promise.reject(error);
     }

@@ -1,27 +1,17 @@
 import { Box, Typography, Button, Stack, Paper, CircularProgress } from "@mui/material";
-import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import SentimentDissatisfiedIcon from '@mui/icons-material/SentimentDissatisfied';
-import { lockersApi } from "../../../api/lockersApi";
 import { ActiveLockerCard } from "./ActiveLockerCard.tsx";
-import type { LockerBox } from "../../../types/index"; // Обновили путь к типу
 import {Paths} from "../../../config/paths/paths.ts";
+import {useMyBookings} from "../../../hooks/useMyBookings.ts";
 
 export default function MyBookingsPage() {
     const navigate = useNavigate();
+    const {data: bookings = [], isLoading} = useMyBookings();
 
-    const { data: lockers = [], isLoading } = useQuery<LockerBox[]>({
-        queryKey: ['my-bookings'],
-        // Обернули в стрелочную функцию, чтобы починить ошибку No overload matches this call
-        queryFn: () => lockersApi.getLockers()
-    });
-
-    // Защита для TypeScript, чтобы метод .filter гарантированно работал
-    const safeLockers = Array.isArray(lockers) ? lockers : [];
-
-    // Статусы пока не трогаем, логика сохранена полностью
-    const reservedLockers = safeLockers.filter(
-        (l) => l.status === "OCCUPIED" || (l as any).status === "RESERVED"
+    const safeBookings = Array.isArray(bookings) ? bookings : [];
+    const activeBookings = safeBookings.filter(
+        (l) => l.status === "ACTIVE" || (l as any).status === "PENDING"
     );
 
     if (isLoading) {
@@ -36,10 +26,10 @@ export default function MyBookingsPage() {
         <Box sx={{ pt: '100px', px: 4, maxWidth: '900px', margin: '0 auto', pb: 10 }}>
             <Typography variant="h3" fontWeight={900} mb={5}>My Bookings</Typography>
 
-            {reservedLockers.length > 0 ? (
+            {activeBookings.length > 0 ? (
                 <Stack spacing={2}>
-                    {reservedLockers.map((locker) => (
-                        <ActiveLockerCard key={locker.lockerBoxId} locker={locker} />
+                    {activeBookings.map((bookings) => (
+                        <ActiveLockerCard key={bookings.bookingId || bookings.id} locker={bookings} />
                     ))}
                 </Stack>
             ) : (

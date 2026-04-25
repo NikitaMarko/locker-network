@@ -17,7 +17,7 @@ export function useBooking() {
         setError(null);
         try {
             const response = await apiClient.post('/bookings/init', payload);
-            return response.data;
+            return response.data.data;
         } catch (err: any) {
             setError(err.response?.data?.message || 'Failed to initialize booking');
             setIsLoading(false);
