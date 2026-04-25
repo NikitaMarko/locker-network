@@ -9,3 +9,5 @@ export const adminRoutes = express.Router();
 // ---admin only routes---
 
 adminRoutes.patch('/:id',auth.protect,authorize(Role.ADMIN),adminActionsController.changeRole);
+
+adminRoutes.get('/:id',auth.protect,authorize(Role.ADMIN),adminActionsController.getAllUsers);
