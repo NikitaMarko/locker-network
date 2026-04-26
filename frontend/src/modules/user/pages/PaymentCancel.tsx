@@ -1,42 +1,57 @@
-import { Box, Typography, Button, Paper } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate } from "react-router-dom";
+import { Box, Typography, Button, Paper, Stack } from "@mui/material";
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
-import { Paths } from '../../../config/paths/paths';
+import { Paths } from "../../../config/paths/paths.ts";
 
 export function PaymentCancel() {
+    const [searchParams] = useSearchParams();
     const navigate = useNavigate();
+    const bookingId = searchParams.get('bookingId');
 
     return (
-        <Box sx={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', p: 3, bgcolor: '#f8fafc' }}>
-            <Paper elevation={0} sx={{ p: { xs: 4, md: 6 }, borderRadius: 4, maxWidth: 450, width: '100%', textAlign: 'center', border: '1px solid #e2e8f0', boxShadow: '0 20px 40px rgba(0,0,0,0.04)' }}>
-                <CancelOutlinedIcon sx={{ fontSize: 88, color: '#94a3b8', mb: 2 }} />
+        <Box sx={{ pt: '100px', display: 'flex', justifyContent: 'center', px: 2 }}>
+            <Paper sx={{ p: 6, borderRadius: 4, textAlign: 'center', maxWidth: 500, width: '100%' }}>
+                <Stack alignItems="center" spacing={2}>
+                    <CancelOutlinedIcon sx={{ fontSize: 80, color: '#f97316' }} />
 
-                <Typography variant="h4" fontWeight={900} mb={2} color="#1e293b">
-                    Payment Cancelled
-                </Typography>
+                    <Typography variant="h4" fontWeight={900}>
+                        Payment Cancelled
+                    </Typography>
 
-                <Typography color="text.secondary" mb={5} fontWeight={500}>
-                    Your transaction was cancelled and you haven't been charged. You can try booking again whenever you're ready.
-                </Typography>
+                    <Typography color="text.secondary">
+                        You have cancelled the payment process. No charges were made, and your locker booking has not been confirmed.
+                    </Typography>
 
-                <Button
-                    variant="contained"
-                    size="large"
-                    fullWidth
-                    disableElevation
-                    onClick={() => navigate(Paths.USER)}
-                    sx={{
-                        bgcolor: '#6baf5c',
-                        py: 1.5,
-                        fontSize: '1.1rem',
-                        fontWeight: 700,
-                        borderRadius: 3,
-                        textTransform: 'none',
-                        '&:hover': { bgcolor: '#5a994c' }
-                    }}
-                >
-                    Find Another Locker
-                </Button>
+                    {bookingId && (
+                        <Box sx={{ bgcolor: '#fffbeb', p: 2, borderRadius: 2, width: '100%', mt: 2 }}>
+                            <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                                Booking Reference:
+                            </Typography>
+                            <Typography variant="body2" fontWeight={800} color="#b45309">
+                                {bookingId}
+                            </Typography>
+                        </Box>
+                    )}
+
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} width="100%" sx={{ mt: 4 }}>
+                        <Button
+                            variant="outlined"
+                            fullWidth
+                            onClick={() => navigate(Paths.USER)}
+                            sx={{ fontWeight: 700, py: 1.5, borderRadius: 2, color: 'text.primary', borderColor: 'divider' }}
+                        >
+                            Return Home
+                        </Button>
+                        <Button
+                            variant="contained"
+                            fullWidth
+                            onClick={() => navigate(Paths.USER)} // Можно поменять на роут выбора станций, если он отличается
+                            sx={{ bgcolor: '#f97316', fontWeight: 700, py: 1.5, borderRadius: 2, '&:hover': { bgcolor: '#ea580c' } }}
+                        >
+                            Try Again
+                        </Button>
+                    </Stack>
+                </Stack>
             </Paper>
         </Box>
     );
