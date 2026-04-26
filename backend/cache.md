@@ -26,7 +26,7 @@ Canonical cache details are split by concern:
 - station create keeps Redis refresh deferred
 - station status and delete can require dependent locker cache updates
 - locker create, status change, and delete update locker cache projection flow
-- `resync-cache` and `cache/reconcile` are manual recovery endpoints
+- `resync-cache`, `hard-resync-cache`, `cache/reconcile`, and `cache/hard-refresh` are manual recovery endpoints
 
 ### When to read other docs
 

@@ -199,7 +199,7 @@ with zipfile.ZipFile(pathlib.Path("/tmp/operations-handler.zip"), "a", zipfile.Z
             if relative_str.endswith(".map"):
                 continue
 
-                zf.write(path, relative)
+            zf.write(path, relative)
 PY
 
 echo "[localstack-init] creating operations lambda function"

@@ -265,7 +265,7 @@ Example `200 OK` body:
     "city": "HFA"
   },
   "meta": {
-    "stationCacheStatus": "DEFERRED"
+    "stationCacheStatus": "SYNCED"
   }
 }
 ```
@@ -320,8 +320,8 @@ Example `200 OK` body:
     "status": "INACTIVE"
   },
   "meta": {
-    "stationCacheStatus": "DEFERRED",
-    "lockerCacheStatus": "SYNCED"
+    "stationCacheStatus": "SYNCED",
+    "lockerCacheStatus": "DEFERRED"
   }
 }
 ```
@@ -354,6 +354,7 @@ Responses:
 - Roles: admin
 - Rebuilds one station projection from RDS
 - Writes station cache directly to Redis
+- Enqueues dependent locker cache upserts to the cache projection queue
 
 Example `202 Accepted` body:
 
@@ -379,13 +380,51 @@ Responses:
 - `404 Not Found` - station not found
 - `500 Internal Server Error` - cache/projection/service failure
 
+#### POST /api/v1/lockers/admin/stations/:id/hard-resync-cache
+
+- Roles: admin
+- Rebuilds one station projection from RDS
+- Writes station cache directly to Redis
+- Forces dependent locker cache projection versions above current cached versions
+- Enqueues dependent locker cache upserts/deletes to the cache projection queue
+
+Example `202 Accepted` body:
+
+```json
+{
+  "success": true,
+  "correlationId": "58ec4dc6-27cf-4a52-ba88-e3cbf6f37777",
+  "data": {
+    "stationId": "0486833f-d187-4af2-9b73-e7d661ca6104",
+    "lockers": {
+      "queuedCount": 12,
+      "deleteQueuedCount": 1
+    }
+  },
+  "meta": {
+    "stationCacheStatus": "SYNCED",
+    "lockerCacheStatus": "DEFERRED"
+  }
+}
+```
+
+Responses:
+
+- `202 Accepted` - station cache hard refresh queued/completed
+- `400 Bad Request` - `id` is not a UUID
+- `401 Unauthorized` - missing bearer token or invalid token
+- `403 Forbidden` - authenticated user does not have role `ADMIN`
+- `404 Not Found` - station not found
+- `500 Internal Server Error` - cache/projection/service failure
+
 #### POST /api/v1/lockers/admin/cache/reconcile
 
 - Roles: admin
 - Administrative endpoint reserved for unscheduled cache reconcile / refresh flow
 - Compares RDS station projections with Redis station cache
 - Compares RDS locker projections with DynamoDB locker cache
-- Upserts and deletes cache records directly
+- Upserts and deletes station cache records directly in Redis
+- Enqueues locker cache upserts/deletes to the cache projection queue
 - Does not delete stations that are only `INACTIVE`
 
 Example `202 Accepted` body:
@@ -424,6 +463,50 @@ Responses:
 - `403 Forbidden` - authenticated user does not have role `ADMIN`
 - `500 Internal Server Error` - unexpected projection/cache/service failure
 
+#### POST /api/v1/lockers/admin/cache/hard-refresh
+
+- Roles: admin
+- Rebuilds the full station and locker catalog from RDS source of truth
+- Writes station cache records directly to Redis
+- Forces locker cache projection versions above current cached versions
+- Enqueues locker cache upserts/deletes to the cache projection queue
+
+Example `202 Accepted` body:
+
+```json
+{
+  "success": true,
+  "correlationId": "57879d32-c68f-47d8-a7c9-73b843a08888",
+  "data": {
+    "mode": {
+      "stations": "compare-and-fill",
+      "lockers": "compare-and-fill"
+    },
+    "stations": {
+      "sourceCount": 12,
+      "queuedCount": 12,
+      "deleteQueuedCount": 1
+    },
+    "lockers": {
+      "sourceCount": 120,
+      "queuedCount": 120,
+      "deleteQueuedCount": 3
+    }
+  },
+  "meta": {
+    "stationCacheStatus": "SYNCED",
+    "lockerCacheStatus": "SYNCED"
+  }
+}
+```
+
+Responses:
+
+- `202 Accepted` - hard refresh started/completed and cache updates were applied or queued
+- `401 Unauthorized` - missing bearer token or invalid token
+- `403 Forbidden` - authenticated user does not have role `ADMIN`
+- `500 Internal Server Error` - unexpected projection/cache/service failure
+
 #### PATCH /api/v1/lockers/oper/stations/:id/delete
 
 - Roles: operator
@@ -443,8 +526,8 @@ Example `200 OK` body:
     "stationId": "0486833f-d187-4af2-9b73-e7d661ca6104"
   },
   "meta": {
-    "stationCacheStatus": "DEFERRED",
-    "lockerCacheStatus": "SYNCED"
+    "stationCacheStatus": "SYNCED",
+    "lockerCacheStatus": "DEFERRED"
   }
 }
 ```

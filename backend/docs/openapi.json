@@ -1606,8 +1606,43 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Cache sync request completed",
+          "202": {
+            "description": "Cache sync queued or completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/boxes/{id}/hard-resync-cache": {
+      "post": {
+        "tags": [
+          "Lockers",
+          "Admin"
+        ],
+        "summary": "Hard refresh one locker box cache entry",
+        "description": "Rebuilds the locker projection from RDS and enqueues it with a forced cache version.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Cache hard refresh queued or completed",
             "content": {
               "application/json": {
                 "schema": {
@@ -1780,8 +1815,43 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Cache sync request completed",
+          "202": {
+            "description": "Cache sync queued or completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/stations/{id}/hard-resync-cache": {
+      "post": {
+        "tags": [
+          "Stations",
+          "Admin"
+        ],
+        "summary": "Hard refresh one station cache entry",
+        "description": "Rebuilds the station projection from RDS, writes Redis station cache, and enqueues dependent locker projections with forced cache versions.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UuidPathId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Cache hard refresh queued or completed",
             "content": {
               "application/json": {
                 "schema": {
@@ -1811,8 +1881,41 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Reconciliation result",
+          "202": {
+            "description": "Reconciliation applied or queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lockers/admin/cache/hard-refresh": {
+      "post": {
+        "tags": [
+          "Stations",
+          "Lockers",
+          "Admin"
+        ],
+        "summary": "Hard refresh station and locker caches",
+        "description": "Clears and rebuilds all station Redis cache entries and locker DynamoDB cache entries from RDS projections.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Cache hard refresh applied or queued",
             "content": {
               "application/json": {
                 "schema": {

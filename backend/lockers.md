@@ -216,7 +216,7 @@ Responses:
 
 - Roles: operator, admin
 - Writes locker to RDS
-- Writes locker cache directly to DynamoDB
+- Enqueues locker cache upsert to the cache projection queue
 
 Request body:
 
@@ -239,8 +239,8 @@ Example `200 OK` body:
     "stationId": "0486833f-d187-4af2-9b73-e7d661ca6104"
   },
   "meta": {
-    "stationCacheStatus": "DEFERRED",
-    "lockerCacheStatus": "SYNCED"
+    "stationCacheStatus": "SYNCED",
+    "lockerCacheStatus": "DEFERRED"
   }
 }
 ```
@@ -272,7 +272,7 @@ Responses:
 
 - Roles: operator, admin
 - Updates RDS first
-- Writes updated locker projection directly to DynamoDB
+- Enqueues updated locker projection to the cache projection queue
 - Current route is a generic status change endpoint, not a concurrency-safe booking endpoint
 - Concurrent requests for the same locker are not guarded by atomic booking logic yet
 
@@ -296,8 +296,8 @@ Example `200 OK` body:
     "status": "RESERVED"
   },
   "meta": {
-    "stationCacheStatus": "DEFERRED",
-    "lockerCacheStatus": "SYNCED"
+    "stationCacheStatus": "SYNCED",
+    "lockerCacheStatus": "DEFERRED"
   }
 }
 ```
@@ -329,7 +329,7 @@ Responses:
 
 - Roles: admin
 - Rebuilds one locker projection from backend state
-- Writes locker cache directly to DynamoDB
+- Enqueues locker cache upsert to the cache projection queue
 
 Example `202 Accepted` body:
 
@@ -341,7 +341,7 @@ Example `202 Accepted` body:
     "lockerBoxId": "8d6d1d7e-27df-4d8d-9aaf-c6924d275111"
   },
   "meta": {
-    "lockerCacheStatus": "SYNCED"
+    "lockerCacheStatus": "DEFERRED"
   }
 }
 ```
@@ -355,11 +355,43 @@ Responses:
 - `404 Not Found` - locker not found
 - `500 Internal Server Error` - cache/projection/service failure
 
+#### POST /api/v1/lockers/admin/boxes/:id/hard-resync-cache
+
+- Roles: admin
+- Rebuilds one locker projection from backend state
+- Forces a cache projection version greater than the current cached version
+- Enqueues locker cache upsert to the cache projection queue
+
+Example `202 Accepted` body:
+
+```json
+{
+  "success": true,
+  "correlationId": "57ae3fa7-f2ff-4f4c-9bdd-420a2fd57777",
+  "data": {
+    "lockerBoxId": "8d6d1d7e-27df-4d8d-9aaf-c6924d275111",
+    "queuedVersion": 14
+  },
+  "meta": {
+    "lockerCacheStatus": "DEFERRED"
+  }
+}
+```
+
+Responses:
+
+- `202 Accepted` - locker cache hard refresh queued
+- `400 Bad Request` - `id` is not a UUID
+- `401 Unauthorized` - missing bearer token or invalid token
+- `403 Forbidden` - authenticated user does not have role `ADMIN`
+- `404 Not Found` - locker not found
+- `500 Internal Server Error` - cache/projection/service failure
+
 #### PATCH /api/v1/lockers/oper/boxes/:id/delete
 
 - Roles: operator
 - Soft-deletes in RDS
-- Deletes locker cache directly from DynamoDB
+- Enqueues locker cache delete to the cache projection queue
 
 Example `200 OK` body:
 
@@ -373,8 +405,8 @@ Example `200 OK` body:
     "stationId": "0486833f-d187-4af2-9b73-e7d661ca6104"
   },
   "meta": {
-    "stationCacheStatus": "DEFERRED",
-    "lockerCacheStatus": "SYNCED"
+    "stationCacheStatus": "SYNCED",
+    "lockerCacheStatus": "DEFERRED"
   }
 }
 ```

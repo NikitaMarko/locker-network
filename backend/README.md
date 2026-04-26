@@ -198,10 +198,11 @@ AWS_ENDPOINT_URL=                       # Optional: shared endpoint override
 REDIS_URL=redis://localhost:6379
 REDIS_STATION_CACHE_PREFIX=station-cache:
 REDIS_STATION_CACHE_TTL_SECONDS=300
-DYNAMO_LOCKER_CACHE_TABLE_NAME=locker-dev-locker-cache
 DYNAMO_ROLE_ARN=                        # Optional: assume-role ARN for DynamoDB/SQS access
 DYNAMO_ROLE_SESSION_NAME=locker-backend-dynamo
 DYNAMO_TABLE_NAME=locker-dev-operations-dynamodb
+DYNAMO_BOOKINGS_TABLE_NAME=locker-dev-bookings-dynamodb
+DYNAMO_LOCKER_CACHE_TABLE_NAME=locker-dev-locker-cache
 OPERATIONS_QUEUE_URL=https://sqs.eu-west-1.amazonaws.com/131904957044/locker-dev-operations-queue
 CACHE_PROJECTION_QUEUE_URL=https://sqs.eu-west-1.amazonaws.com/131904957044/locker-dev-cache-projection
 SQS_URL=https://sqs.eu-west-1.amazonaws.com/131904957044/locker-dev-operations-queue
@@ -332,7 +333,10 @@ Primary route groups:
 - `GET /api/v1/lockers/stations`
 - `POST /api/v1/bookings/init`
 - `GET /api/v1/bookings/:id`
-- admin/operator locker and station routes under `/api/v1/lockers/admin/*` and `/api/v1/lockers/oper/*`
+- `POST /api/v1/bookings/:id/extend`
+- `POST /api/v1/bookings/:id/cancel`
+- `POST /api/v1/payments/webhook`
+- admin/operator locker, station, booking, and cache maintenance routes under `/api/v1/*/admin/*` and `/api/v1/lockers/oper/*`
 
 Then start infrastructure:
 
@@ -364,13 +368,12 @@ What LocalStack bootstraps automatically:
   - `locker-command-handler`
 - Local cache projection Lambda:
   - `locker-cache-projection-handler`
- - Local payment webhook Lambda:
-   - `locker-payment-webhook`
 
 Current locker cache write path:
 
 `backend -> locker-dev-cache-projection -> locker-cache-projection-handler -> locker-dev-locker-cache`
 
+Booking init, extension, cancellation, and payment confirmation stage booking state in `locker-dev-bookings-dynamodb`.
 Station cache is not handled by this lambda flow. Stations remain backend-owned via Redis cache with RDS fallback.
 
 Bootstrap files:
@@ -379,7 +382,6 @@ Bootstrap files:
 - TS Lambda source module: [lambda/package.json](/Users/dmitrii/Desktop/BackEnd/locker-network-repository/locker-network-repository/lambda/package.json:1)
 - operations handler: [commandHandler.ts](/Users/dmitrii/Desktop/BackEnd/locker-network-repository/locker-network-repository/lambda/src/functions/operations/commandHandler.ts:1)
 - cache projection handler: [cacheProjectionHandler.ts](/Users/dmitrii/Desktop/BackEnd/locker-network-repository/locker-network-repository/lambda/src/functions/cache/cacheProjectionHandler.ts:1)
-- payment webhook handler: [paymentWebhook.ts](/Users/dmitrii/Desktop/BackEnd/locker-network-repository/locker-network-repository/lambda/src/functions/bookings/paymentWebhook.ts:1)
 
 Before starting LocalStack-backed Docker flow, make sure Lambda TS artifacts exist:
 
