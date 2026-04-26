@@ -38,7 +38,11 @@ type AuditAction =
     | 'BOOKING_UPDATE_STATUS'
     | 'BOOKING_UPDATE_STATUS_FAILED'
     | "CITY_CREATE"
-    | 'CITY_CREATE_FAILED';
+    | 'CITY_CREATE_FAILED'
+    | 'PRICE_CREATE'
+    | 'PRICE_CREATE_FAILED'
+    | 'PRICE_UPDATE'
+    | 'PRICE_UPDATE_FAILED';
 
 interface AuditParams {
     req: Request;
