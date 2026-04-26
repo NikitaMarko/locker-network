@@ -1,7 +1,6 @@
 import {Link, useNavigate} from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import {useRef, useState} from 'react';
-import bg from '/smart-locker-project.jpeg';
 import { Paths } from "../../../config/paths/paths.ts";
 import {Button} from "@mui/material";
 import {ROLES} from "../../../config/roles/roles.ts";
@@ -190,7 +189,7 @@ export function HomePage() {
                 height: "100vh",
                 width: "100%",
                 overflow: "hidden",
-                backgroundImage: `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url(${bg})`,
+                backgroundImage: `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url("/smart-locker-project.jpeg")`,
                 backgroundSize: "cover",
                 backgroundPosition: "center",
                 backgroundRepeat: "no-repeat",
