@@ -10,4 +10,12 @@ export const adminRoutes = express.Router();
 
 adminRoutes.patch('/:id',auth.protect,authorize(Role.ADMIN),adminActionsController.changeRole);
 
-adminRoutes.get('/:id',auth.protect,authorize(Role.ADMIN),adminActionsController.getAllUsers);
+adminRoutes.get('/',auth.protect,authorize(Role.ADMIN),adminActionsController.getAllUsers);
+
+
+//adminRoutes.get('/city',auth.protect,authorize(Role.ADMIN),adminActionsController.getAllUsers);
+//adminRoutes.patch('/city',auth.protect,authorize(Role.ADMIN),adminActionsController.getAllUsers);
+//adminRoutes.delete('/city',auth.protect,authorize(Role.ADMIN),adminActionsController.getAllUsers);
+//adminRoutes.get('/city',auth.protect,authorize(Role.ADMIN),adminActionsController.getAllUsers);
+
+
