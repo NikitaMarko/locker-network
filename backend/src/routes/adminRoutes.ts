@@ -13,7 +13,7 @@ adminRoutes.patch('/:id',auth.protect,authorize(Role.ADMIN),adminActionsControll
 adminRoutes.get('/',auth.protect,authorize(Role.ADMIN),adminActionsController.getAllUsers);
 
 
-//adminRoutes.get('/city',auth.protect,authorize(Role.ADMIN),adminActionsController.getAllUsers);
+adminRoutes.get('/city',auth.protect,authorize(Role.ADMIN),adminActionsController.getAllUsers);
 //adminRoutes.patch('/city',auth.protect,authorize(Role.ADMIN),adminActionsController.getAllUsers);
 //adminRoutes.delete('/city',auth.protect,authorize(Role.ADMIN),adminActionsController.getAllUsers);
 //adminRoutes.get('/city',auth.protect,authorize(Role.ADMIN),adminActionsController.getAllUsers);

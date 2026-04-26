@@ -5,6 +5,9 @@ import { prismaService } from "./prismaService";
 import { HttpError } from "../errorHandler/HttpError";
 
 export class AdminActions {
+
+    //-------------change role
+
     static async changeRole(req: Request, res: Response) {
         const rawTargetUserId = req.params.id;
         const targetUserId = Array.isArray(rawTargetUserId)

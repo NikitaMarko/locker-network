@@ -12,7 +12,7 @@ export const changeRole = async (req: Request, res: Response, next: NextFunction
 
 export const getAllUsers = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        return await AdminActions.changeRole(req, res);
+        return await AdminActions.getAllUsers(req, res);
     } catch (e) {
         next(e);
     }
