@@ -28,6 +28,12 @@ export interface StationCacheDto {
     lockers: StationCacheLockerDto[];
 }
 
+export interface CityCacheDto {
+    cityId: string;
+    code: string;
+    name: string;
+}
+
 export interface LockerCacheStationDto {
     address: string | null;
     latitude: number;

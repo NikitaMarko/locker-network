@@ -1,25 +1,30 @@
-import { LockerStatus, Prisma, TechnicalStatus } from "@prisma/client";
+import {LockerStatus, Prisma, TechnicalStatus} from "@prisma/client";
 
 import {
+    CityCacheDto,
     LockerCacheDto,
     LockerResponseDto,
     StationCacheDto,
     StationCacheLockerDto,
     StationListItemDto
 } from "../../contracts/cache.dto";
-import { logger } from "../../Logger/winston";
-import { lockerCacheRepository } from "../cache/LockerCacheRepository";
-import { prismaService } from "../../services/prismaService";
-import { isDynamoAccessError } from "../../utils/awsErrors";
+import {logger} from "../../Logger/winston";
+import {lockerCacheRepository} from "../cache/LockerCacheRepository";
+import {prismaService} from "../../services/prismaService";
+import {isDynamoAccessError} from "../../utils/awsErrors";
 
-import { TransactionClient } from "./transactionClient";
+import {TransactionClient} from "./transactionClient";
 
 function decimalToString(value: Prisma.Decimal | null | undefined) {
     return value ? value.toString() : null;
 }
 
 function buildPricingMap(
-    pricing: Array<{ cityId: string; size: string; pricePerHour: Prisma.Decimal }>
+    pricing: Array<{
+        cityId: string;
+        size: string;
+        pricePerHour: Prisma.Decimal
+    }>
 ) {
     return new Map(pricing.map((item) => [`${item.cityId}-${item.size}`, item.pricePerHour.toString()]));
 }
@@ -59,7 +64,10 @@ function buildLockerProjectionFromRds(locker: {
         city: {
             code: string;
             name: string;
-            Pricing: Array<{ size: "S" | "M" | "L"; pricePerHour: Prisma.Decimal }>;
+            Pricing: Array<{
+                size: "S" | "M" | "L";
+                pricePerHour: Prisma.Decimal
+            }>;
         };
     };
 }): LockerCacheDto {
@@ -157,8 +165,12 @@ interface ILockerCatalogProjectionService {
     getStationAdminProjection(stationId: string): Promise<StationCacheDto | null>;
     getLockerAdminProjection(lockerBoxId: string): Promise<LockerCacheDto | null>;
     getLockerCacheProjectionsByStationId(stationId: string): Promise<LockerCacheDto[]>;
+    getStationCacheProjectionsByCityId(cityId: string): Promise<StationCacheDto[]>;
+    getLockerCacheProjectionsByCityIdAndSize(cityId: string, size: "S" | "M" | "L"): Promise<LockerCacheDto[]>;
     getAllStationCacheProjections(): Promise<StationCacheDto[]>;
     getAllLockerCacheProjections(): Promise<LockerCacheDto[]>;
+    getAllCityCacheProjections(): Promise<CityCacheDto[]>;
+    getCityCacheProjection(cityId: string): Promise<CityCacheDto | null>;
     getAllStationsAdminView(): Promise<StationListItemDto[]>;
     getAllLockersAdminView(): Promise<LockerResponseDto[]>;
     getLockerIdsByStationId(stationId: string): Promise<string[]>;
@@ -167,7 +179,7 @@ interface ILockerCatalogProjectionService {
 class LockerCatalogProjectionService implements ILockerCatalogProjectionService {
     async getStationCacheProjection(stationId: string, tx: TransactionClient | typeof prismaService = prismaService): Promise<StationCacheDto | null> {
         const station = await tx.lockerStation.findUnique({
-            where: { stationId },
+            where: {stationId},
             include: {
                 city: {
                     select: {
@@ -177,8 +189,8 @@ class LockerCatalogProjectionService implements ILockerCatalogProjectionService 
                     }
                 },
                 lockers: {
-                    where: { isDeleted: false },
-                    orderBy: { createdAt: "asc" },
+                    where: {isDeleted: false},
+                    orderBy: {createdAt: "asc"},
                 },
             },
         });
@@ -237,7 +249,7 @@ class LockerCatalogProjectionService implements ILockerCatalogProjectionService 
 
     async getLockerCacheProjection(lockerBoxId: string, tx: TransactionClient | typeof prismaService = prismaService): Promise<LockerCacheDto | null> {
         const locker = await tx.lockerBox.findUnique({
-            where: { lockerBoxId },
+            where: {lockerBoxId},
             include: {
                 station: {
                     include: {
@@ -297,16 +309,50 @@ class LockerCatalogProjectionService implements ILockerCatalogProjectionService 
                     isDeleted: false,
                 },
             },
-            select: { lockerBoxId: true },
+            select: {lockerBoxId: true},
         });
 
-        const projections = await Promise.all(lockers.map(({ lockerBoxId }) => this.getLockerCacheProjection(lockerBoxId, tx)));
+        const projections = await Promise.all(lockers.map(({lockerBoxId}) => this.getLockerCacheProjection(lockerBoxId, tx)));
+        return projections.filter((item): item is LockerCacheDto => item !== null);
+    }
+
+    async getStationCacheProjectionsByCityId(cityId: string, tx: TransactionClient | typeof prismaService = prismaService): Promise<StationCacheDto[]> {
+        const stations = await tx.lockerStation.findMany({
+            where: {
+                cityId,
+                isDeleted: false,
+            },
+            select: {stationId: true},
+        });
+
+        const projections = await Promise.all(stations.map(({stationId}) => this.getStationCacheProjection(stationId, tx)));
+        return projections.filter((item): item is StationCacheDto => item !== null);
+    }
+
+    async getLockerCacheProjectionsByCityIdAndSize(
+        cityId: string,
+        size: "S" | "M" | "L",
+        tx: TransactionClient | typeof prismaService = prismaService
+    ): Promise<LockerCacheDto[]> {
+        const lockers = await tx.lockerBox.findMany({
+            where: {
+                size,
+                isDeleted: false,
+                station: {
+                    cityId,
+                    isDeleted: false,
+                },
+            },
+            select: {lockerBoxId: true},
+        });
+
+        const projections = await Promise.all(lockers.map(({lockerBoxId}) => this.getLockerCacheProjection(lockerBoxId, tx)));
         return projections.filter((item): item is LockerCacheDto => item !== null);
     }
 
     async getStationAdminProjection(stationId: string, tx: TransactionClient | typeof prismaService = prismaService): Promise<StationCacheDto | null> {
         const station = await tx.lockerStation.findUnique({
-            where: { stationId },
+            where: {stationId},
             include: {
                 city: {
                     select: {
@@ -316,8 +362,8 @@ class LockerCatalogProjectionService implements ILockerCatalogProjectionService 
                     }
                 },
                 lockers: {
-                    where: { isDeleted: false },
-                    orderBy: { createdAt: "asc" },
+                    where: {isDeleted: false},
+                    orderBy: {createdAt: "asc"},
                 },
             },
         });
@@ -390,7 +436,7 @@ class LockerCatalogProjectionService implements ILockerCatalogProjectionService 
 
     async getAllStationCacheProjections(tx: TransactionClient | typeof prismaService = prismaService): Promise<StationCacheDto[]> {
         const stations = await tx.lockerStation.findMany({
-            where: { isDeleted: false },
+            where: {isDeleted: false},
             include: {
                 city: {
                     select: {
@@ -400,8 +446,8 @@ class LockerCatalogProjectionService implements ILockerCatalogProjectionService 
                     }
                 },
                 lockers: {
-                    where: { isDeleted: false },
-                    orderBy: { createdAt: "asc" },
+                    where: {isDeleted: false},
+                    orderBy: {createdAt: "asc"},
                 },
             },
         });
@@ -511,7 +557,7 @@ class LockerCatalogProjectionService implements ILockerCatalogProjectionService 
 
     async getAllStationsAdminView(tx: TransactionClient | typeof prismaService = prismaService): Promise<StationListItemDto[]> {
         const stations = await tx.lockerStation.findMany({
-            where: { isDeleted: false },
+            where: {isDeleted: false},
             include: {
                 city: {
                     select: {
@@ -522,7 +568,7 @@ class LockerCatalogProjectionService implements ILockerCatalogProjectionService 
                 _count: {
                     select: {
                         lockers: {
-                            where: { isDeleted: false },
+                            where: {isDeleted: false},
                         },
                     },
                 },
@@ -599,6 +645,45 @@ class LockerCatalogProjectionService implements ILockerCatalogProjectionService 
 
         return lockers.map((locker) => locker.lockerBoxId);
     }
+
+    async getAllCityCacheProjections(tx: TransactionClient | typeof prismaService = prismaService): Promise<CityCacheDto[]> {
+        const cities = await tx.city.findMany({
+            where: {
+                isActive: true,
+            },
+            select: {
+                cityId: true,
+                code: true,
+                name: true,
+            }
+        });
+
+         return cities;
+
+    }
+
+    async getCityCacheProjection(cityId: string, tx: TransactionClient | typeof prismaService = prismaService): Promise<CityCacheDto | null> {
+    const city = await tx.city.findUnique({
+        where: {cityId},
+        select: {
+            cityId: true,
+            code: true,
+            name: true,
+            isActive: true,
+        }
+    });
+
+    if (!city || !city.isActive) {
+        return null;
+    }
+
+    return {
+        cityId: city.cityId,
+        code: city.code,
+        name: city.name,
+    };
+
+}
 }
 
 export const lockerCatalogProjectionService = new LockerCatalogProjectionService();

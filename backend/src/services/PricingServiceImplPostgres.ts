@@ -1,14 +1,63 @@
 import {Request, Response} from "express";
 
 import {HttpError} from "../errorHandler/HttpError";
+import {lockerCatalogProjectionService} from "../repositories/prisma/LockerCatalogProjectionService";
 import {logAudit} from "../utils/audit";
 
 import {prismaService} from "./prismaService";
 import {idempotencyService} from "./IdempotencyService";
 import {ActionType} from "./dto/operationDto";
+import {enqueueLockerProjectionUpsert} from "./sqsService";
+import {syncStationProjection} from "./lockerStation/lockerStationService.helpers";
 
+type LockerSize = "S" | "M" | "L";
 
 export class PricingServiceImplPostgres {
+    private resolveCacheStatus(results: Array<"SYNCED" | "DEFERRED" | "FAILED">) {
+        return results.every((result) => result !== "FAILED")
+            ? "SYNCED" as const
+            : "FAILED" as const;
+    }
+
+    private async syncCatalogCacheAfterPriceChange(
+        cityId: string,
+        size: LockerSize,
+        correlationId?: string,
+        actorId?: string | null
+    ) {
+        const [stationProjections, lockerProjections] = await Promise.all([
+            lockerCatalogProjectionService.getStationCacheProjectionsByCityId(cityId),
+            lockerCatalogProjectionService.getLockerCacheProjectionsByCityIdAndSize(cityId, size),
+        ]);
+
+        const stationResults = await Promise.all(
+            stationProjections.map((projection) => syncStationProjection(projection))
+        );
+
+        const lockerResults = await Promise.allSettled(
+            lockerProjections.map((projection) =>
+                enqueueLockerProjectionUpsert(
+                    projection,
+                    correlationId,
+                    actorId,
+                    projection.version + 1,
+                )
+            )
+        );
+
+        const lockerCacheStatus = lockerProjections.length === 0
+            ? "SYNCED" as const
+            : lockerResults.every((result) => result.status === "fulfilled")
+            ? "DEFERRED" as const
+            : "FAILED" as const;
+
+        return {
+            stationCacheStatus: this.resolveCacheStatus(stationResults),
+            lockerCacheStatus,
+            affectedStations: stationProjections.length,
+            affectedLockers: lockerProjections.length,
+        };
+    }
 
 
     async getAllPrices(req: Request, res: Response) {
@@ -48,12 +97,20 @@ export class PricingServiceImplPostgres {
                                     size
                                 },
                                 select: {
-                                    priceId: true
+                                    priceId: true,
+                                    cityId: true,
+                                    size: true,
                                 }
                             }
                         )
                         return {price};
                     });
+                    const cacheSync = await this.syncCatalogCacheAfterPriceChange(
+                        result.price.cityId,
+                        result.price.size,
+                        req.correlationId,
+                        req.user?.userId,
+                    );
                     await logAudit({
                         req,
                         action: ActionType.PRICE_CREATE,
@@ -63,7 +120,8 @@ export class PricingServiceImplPostgres {
                     });
                     return {
                         statusCode: 201,
-                        body: {id: result.price.priceId }
+                        body: {id: result.price.priceId },
+                        meta: cacheSync,
                     };
                 } catch (e) {
                     await logAudit({
@@ -111,6 +169,7 @@ export class PricingServiceImplPostgres {
                                 },
                                 select: {
                                     priceId: true,
+                                    cityId: true,
                                     size: true,
                                     pricePerHour: true
                                 }
@@ -118,6 +177,12 @@ export class PricingServiceImplPostgres {
                         )
                         return {price};
                     });
+                    const cacheSync = await this.syncCatalogCacheAfterPriceChange(
+                        result.price.cityId,
+                        result.price.size,
+                        req.correlationId,
+                        req.user?.userId,
+                    );
                     await logAudit({
                         req,
                         action: ActionType.PRICE_UPDATE,
@@ -127,7 +192,8 @@ export class PricingServiceImplPostgres {
                     });
                     return {
                         statusCode: 200,
-                        body: {newPrice: result.price }
+                        body: {newPrice: result.price },
+                        meta: cacheSync,
                     };
                 } catch (e) {
                     await logAudit({
