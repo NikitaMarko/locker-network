@@ -43,6 +43,8 @@ const envSchema = z.object({
     REDIS_URL: optionalUrl,
     REDIS_STATION_CACHE_PREFIX: z.string().default("station-cache:"),
     REDIS_STATION_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(300),
+    REDIS_CITY_CACHE_PREFIX: z.string().default("city-cache:"),
+    REDIS_CITY_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(300),
     SQS_ROLE_ARN: z.string().optional(),
     SQS_ROLE_SESSION_NAME: z.string().optional(),
     SQS_ENDPOINT_URL: optionalUrl,

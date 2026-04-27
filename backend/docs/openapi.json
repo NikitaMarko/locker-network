@@ -405,7 +405,6 @@
           "AVAILABLE",
           "RESERVED",
           "OCCUPIED",
-          "FAULTY",
           "EXPIRED"
         ]
       },
@@ -605,17 +604,6 @@
           },
           "size": {
             "$ref": "#/components/schemas/LockerSize"
-          }
-        }
-      },
-      "ChangeLockerStatusRequest": {
-        "type": "object",
-        "required": [
-          "status"
-        ],
-        "properties": {
-          "status": {
-            "$ref": "#/components/schemas/LockerStatus"
           }
         }
       },
@@ -1497,50 +1485,6 @@
         }
       }
     },
-    "/api/v1/lockers/admin/boxes/{id}/status": {
-      "patch": {
-        "tags": [
-          "Lockers",
-          "Admin"
-        ],
-        "summary": "Change locker business status",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/UuidPathId"
-          },
-          {
-            "$ref": "#/components/parameters/IdempotencyKeyHeader"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ChangeLockerStatusRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Locker status changed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiSuccess"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/lockers/admin/boxes/{id}/tech-status": {
       "patch": {
         "tags": [
@@ -1578,6 +1522,20 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiSuccess"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid technical status transition",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "INVALID_STATUS_TRANSITION",
+                    "message": "Cannot change from INACTIVE to ACTIVE"
+                  }
                 }
               }
             }

@@ -1,10 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { lockersApi } from "../api/lockersApi";
-import type { LockerTechnicalStatus } from "../types/index";
+import type { LockertechStatus } from "../types/index";
 
 interface ChangeLockerStatusPayload {
     lockerBoxId: string;
-    status: LockerTechnicalStatus;
+    techStatus: LockertechStatus;
 }
 
 export function useLockers() {
@@ -17,37 +17,42 @@ export function useLockers() {
     };
 
     const changeStatus = useMutation({
-        mutationFn: ({ lockerBoxId, status }: ChangeLockerStatusPayload) =>
-            lockersApi.updateLockerStatus(lockerBoxId, status),
-        onSuccess: invalidateAll
+        mutationFn: ({ lockerBoxId, techStatus }: ChangeLockerStatusPayload) =>
+            lockersApi.updateLockertechStatus(lockerBoxId, techStatus),
+
+        onSuccess: invalidateAll,
+
+        onError: (error) => {
+            console.error("Locker status update failed", error);
+        }
     });
 
     const setReady = (id: string) =>
-        changeStatus.mutateAsync({ lockerBoxId: id, status: "READY" });
+        changeStatus.mutateAsync({ lockerBoxId: id, techStatus: "READY" });
 
     const activate = (id: string) =>
-        changeStatus.mutateAsync({ lockerBoxId: id, status: "ACTIVE" });
+        changeStatus.mutateAsync({ lockerBoxId: id, techStatus: "ACTIVE" });
 
     const setMaintenance = (id: string) =>
-        changeStatus.mutateAsync({ lockerBoxId: id, status: "MAINTENANCE" });
+        changeStatus.mutateAsync({ lockerBoxId: id, techStatus: "MAINTENANCE" });
 
     const setFaulty = (id: string) =>
-        changeStatus.mutateAsync({ lockerBoxId: id, status: "FAULTY" });
+        changeStatus.mutateAsync({ lockerBoxId: id, techStatus: "FAULTY" });
 
     const cancelBookingMutation = useMutation({
         mutationFn: (id: string) => lockersApi.cancelBooking(id),
-        onSuccess: invalidateAll
+        onSuccess: invalidateAll,
+        onError: (e) => console.error("Cancel booking failed", e)
     });
 
-    const cancelBooking = (id: string) =>
-        cancelBookingMutation.mutateAsync(id);
-
     return {
-        changeLockerStatus: changeStatus.mutateAsync,
+        changeLockertechStatus: changeStatus.mutateAsync,
+        isUpdating: changeStatus.isPending,
+
         setReady,
         activate,
         setMaintenance,
         setFaulty,
-        cancelBooking
+        cancelBooking: cancelBookingMutation.mutateAsync
     };
 }

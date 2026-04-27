@@ -4,7 +4,6 @@ export const LockerStatusEnum = z.enum([
     "AVAILABLE",
     "RESERVED",
     "OCCUPIED",
-    "FAULTY",
     "EXPIRED"
 ]);
 

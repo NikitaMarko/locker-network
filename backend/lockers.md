@@ -68,7 +68,7 @@ Responses:
 
 - `200 OK` - locker list returned, including empty array
 - `400 Bad Request` - invalid query params:
-  `stationId` is not a UUID, `size` is not one of `S|M|L`, or `status` is not one of `AVAILABLE|RESERVED|OCCUPIED|FAULTY|EXPIRED`
+  `stationId` is not a UUID, `size` is not one of `S|M|L`, or `status` is not one of `AVAILABLE|RESERVED|OCCUPIED|EXPIRED`
 - `500 Internal Server Error` - unexpected cache/repository/service failure
 
 #### GET /api/v1/lockers/boxes/:id
@@ -217,6 +217,7 @@ Responses:
 - Roles: operator, admin
 - Writes locker to RDS
 - Enqueues locker cache upsert to the cache projection queue
+- Backend sets `techStatus = "INACTIVE"` and `status = null`; frontend sends only `stationId`, `code`, and `size`
 
 Request body:
 
@@ -268,21 +269,28 @@ Responses:
 - `409 Conflict` - idempotency conflict when `Idempotency-Key` is reused incorrectly or request is still in progress
 - `500 Internal Server Error` - projection build failed or unexpected repository/service failure
 
-#### PATCH /api/v1/lockers/admin/boxes/:id/status
+#### PATCH /api/v1/lockers/admin/boxes/:id/tech-status
 
 - Roles: operator, admin
-- Updates RDS first
-- Enqueues updated locker projection to the cache projection queue
-- Current route is a generic status change endpoint, not a concurrency-safe booking endpoint
-- Concurrent requests for the same locker are not guarded by atomic booking logic yet
+- Updates locker technical lifecycle state in RDS
+- Keeps `techStatus` field name in the request and response
+- Enqueues updated locker projection to the cache projection queue after the RDS update
+- If `techStatus !== "ACTIVE"`, backend sets `status = null`
+- If `techStatus === "ACTIVE"` and `status == null`, backend sets `status = "AVAILABLE"`
+- The old admin/operator `PATCH /api/v1/lockers/admin/boxes/:id/status` route is no longer published; user runtime status changes are driven by booking flows
 
 Request body:
 
 ```json
 {
-  "status": "RESERVED"
+  "techStatus": "READY"
 }
 ```
+
+Allowed transitions:
+
+- `OPERATOR`: `INACTIVE -> READY`, `MAINTENANCE -> READY`
+- `ADMIN`: `READY -> ACTIVE`, `ACTIVE -> MAINTENANCE`, `ACTIVE -> FAULTY`
 
 Example `200 OK` body:
 
@@ -293,7 +301,10 @@ Example `200 OK` body:
   "data": {
     "lockerBoxId": "8d6d1d7e-27df-4d8d-9aaf-c6924d275111",
     "stationId": "0486833f-d187-4af2-9b73-e7d661ca6104",
-    "status": "RESERVED"
+    "code": "A007",
+    "size": "L",
+    "status": "AVAILABLE",
+    "techStatus": "ACTIVE"
   },
   "meta": {
     "stationCacheStatus": "SYNCED",
@@ -309,16 +320,16 @@ Example `400 Bad Request` body:
   "success": false,
   "correlationId": "cf0a4d6d-4dda-455c-b23d-f5ee7c666666",
   "error": {
-    "code": "HTTP_ERROR",
-    "message": "Locker is already RESERVED"
+    "code": "INVALID_STATUS_TRANSITION",
+    "message": "Cannot change from INACTIVE to ACTIVE"
   }
 }
 ```
 
 Responses:
 
-- `200 OK` - locker status changed
-- `400 Bad Request` - invalid UUID, invalid status, locker already has requested status, or locker is deleted
+- `200 OK` - locker technical status changed
+- `400 Bad Request` - invalid UUID, invalid technical status, invalid transition, same status, or locker is deleted
 - `401 Unauthorized` - missing bearer token or invalid token
 - `403 Forbidden` - authenticated user does not have role `OPERATOR` or `ADMIN`
 - `404 Not Found` - locker does not exist

@@ -1,6 +1,6 @@
 // --- CORE STATUSES ---
 
-export type LockerTechnicalStatus =
+export type LockertechStatus =
     | 'INACTIVE'
     | 'READY'
     | 'ACTIVE'
@@ -15,7 +15,7 @@ export type LockerAvailabilityStatus =
 
 // итоговый статус (приходит с бэка)
 export type LockerStatus =
-    | LockerTechnicalStatus
+    | LockertechStatus
     | LockerAvailabilityStatus;
 
 // --- OTHER TYPES ---
@@ -53,7 +53,7 @@ export interface LockerBox {
     size: LockerSize;
 
     // ключевое изменение
-    technicalStatus: LockerTechnicalStatus;
+    techStatus: LockertechStatus;
     availabilityStatus?: LockerAvailabilityStatus;
 
     // временно оставим для совместимости

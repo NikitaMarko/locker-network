@@ -2,28 +2,23 @@ import {Request, Response} from "express";
 
 import {HttpError} from "../errorHandler/HttpError";
 import {logAudit} from "../utils/audit";
+import {sendSuccess} from "../utils/response";
+import {lockerCatalogProjectionService} from "../repositories/prisma/LockerCatalogProjectionService";
 
 import {prismaService} from "./prismaService";
 import {idempotencyService} from "./IdempotencyService";
 import {ActionType} from "./dto/operationDto";
+import {
+    loadCitiesWithFallback,
+    syncCityProjection
+} from "./lockerCities/lockerCitiesService.helpers";
 
 
 export class CitiesServiceImplPostgres {
 
     async getAllCities(req: Request, res: Response) {
-        const cities = await prismaService.city.findMany({
-            where: {
-                isActive: true,
-            },
-            select: {
-                cityId: true,
-                code: true,
-                name: true
-            },
-        });
-
-
-        return res.json(cities);
+        const cities = await loadCitiesWithFallback();
+        return sendSuccess(res, cities);
     }
 
     async createCities(req: Request, res: Response) {
@@ -63,6 +58,11 @@ export class CitiesServiceImplPostgres {
                         )
                        return {city};
                 });
+                    const cityProjection = await lockerCatalogProjectionService.getCityCacheProjection(result.city.cityId);
+                    const cityCacheStatus = cityProjection
+                        ? await syncCityProjection(cityProjection)
+                        : "FAILED";
+
                     await logAudit({
                         req,
                         action: ActionType.CITY_CREATE,
@@ -72,7 +72,8 @@ export class CitiesServiceImplPostgres {
                     });
                     return {
                         statusCode: 201,
-                        body: {id: result.city.cityId }
+                        body: {id: result.city.cityId },
+                        meta: {cityCacheStatus},
                     };
                 } catch (e) {
                     await logAudit({
