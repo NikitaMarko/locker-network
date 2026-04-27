@@ -292,6 +292,7 @@ For local verification of the current cache setup, [docker-compose.yml](/Users/d
 - PostgreSQL with PostGIS
 - Redis as station cache read source
 - LocalStack for DynamoDB, SQS, Lambda, IAM and logs
+- DynamoDB Admin web UI for browsing LocalStack DynamoDB tables
 - backend service wired to those local dependencies
 - cache projection queue and lambda for locker cache updates
 
@@ -314,6 +315,7 @@ Compose-exposed ports:
 - PostgreSQL: `localhost:5433`
 - Redis: `localhost:6379`
 - LocalStack edge: `http://localhost:4566`
+- DynamoDB Admin: `http://localhost:8002`
 
 ## 🔎 Route Summary
 
@@ -407,15 +409,13 @@ aws --endpoint-url=http://localhost:4566 lambda list-functions --region eu-west-
 aws --endpoint-url=http://localhost:4566 lambda list-event-source-mappings --region eu-west-1
 ```
 
-Browse LocalStack DynamoDB tables with `dynamodb-admin`:
+Browse LocalStack DynamoDB tables in the browser:
 
 ```bash
-npm install -g dynamodb-admin
-
-AWS_REGION=eu-west-1 dynamodb-admin --dynamo-endpoint=http://localhost:4566
+docker compose up -d dynamodb-admin
 ```
 
-Then open the URL printed by `dynamodb-admin` in your browser.
+Then open `http://localhost:8002`.
 
 ### Ports
 
@@ -423,6 +423,9 @@ Then open the URL printed by `dynamodb-admin` in your browser.
 |---------|-----------|----------------|
 | Backend | 3555 | 3555 |
 | PostgreSQL | 5433 | 5432 |
+| Redis | 6379 | 6379 |
+| LocalStack | 4566 | 4566 |
+| DynamoDB Admin | 8002 | 8001 |
 
 ### Manual Docker build
 

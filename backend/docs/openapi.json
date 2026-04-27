@@ -501,7 +501,12 @@
             "$ref": "#/components/schemas/LockerSize"
           },
           "status": {
-            "$ref": "#/components/schemas/LockerStatus"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LockerStatus"
+              }
+            ],
+            "nullable": true
           },
           "techStatus": {
             "$ref": "#/components/schemas/TechnicalStatus"
@@ -561,7 +566,12 @@
             "$ref": "#/components/schemas/LockerSize"
           },
           "status": {
-            "$ref": "#/components/schemas/LockerStatus"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LockerStatus"
+              }
+            ],
+            "nullable": true
           },
           "techStatus": {
             "$ref": "#/components/schemas/TechnicalStatus"
@@ -1430,6 +1440,11 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/CreateLockerRequest"
+              },
+              "example": {
+                "stationId": "0486833f-d187-4af2-9b73-e7d661ca6104",
+                "code": "A-101",
+                "size": "M"
               }
             }
           }
@@ -1441,6 +1456,17 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiSuccess"
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "id": "8d6d1d7e-27df-4d8d-9aaf-c6924d275111",
+                    "stationId": "0486833f-d187-4af2-9b73-e7d661ca6104"
+                  },
+                  "meta": {
+                    "stationCacheStatus": "SYNCED",
+                    "lockerCacheStatus": "DEFERRED"
+                  }
                 }
               }
             }
@@ -1511,6 +1537,9 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ChangeLockerTechStatusRequest"
+              },
+              "example": {
+                "techStatus": "READY"
               }
             }
           }
@@ -1522,6 +1551,44 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiSuccess"
+                },
+                "examples": {
+                  "active": {
+                    "summary": "ACTIVE sets user status when null",
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "lockerBoxId": "8d6d1d7e-27df-4d8d-9aaf-c6924d275111",
+                        "stationId": "0486833f-d187-4af2-9b73-e7d661ca6104",
+                        "code": "A-101",
+                        "size": "M",
+                        "status": "AVAILABLE",
+                        "techStatus": "ACTIVE"
+                      },
+                      "meta": {
+                        "stationCacheStatus": "SYNCED",
+                        "lockerCacheStatus": "DEFERRED"
+                      }
+                    }
+                  },
+                  "maintenance": {
+                    "summary": "Non-ACTIVE clears user status",
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "lockerBoxId": "8d6d1d7e-27df-4d8d-9aaf-c6924d275111",
+                        "stationId": "0486833f-d187-4af2-9b73-e7d661ca6104",
+                        "code": "A-101",
+                        "size": "M",
+                        "status": null,
+                        "techStatus": "MAINTENANCE"
+                      },
+                      "meta": {
+                        "stationCacheStatus": "SYNCED",
+                        "lockerCacheStatus": "DEFERRED"
+                      }
+                    }
+                  }
                 }
               }
             }

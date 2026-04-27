@@ -3,12 +3,16 @@
     "_postman_id": "9f9e1df0-3f3d-4f89-8426-a1be5b6cb9c1",
     "name": "Locker Backend Local",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Updated collection matching the routes currently mounted by the backend."
+    "description": "Updated collection matching the routes currently mounted by the backend. Locker lifecycle uses techStatus, and DynamoDB Admin is exposed at {{dynamodbAdminUrl}}."
   },
   "variable": [
     {
       "key": "baseUrl",
       "value": "http://localhost:3555"
+    },
+    {
+      "key": "dynamodbAdminUrl",
+      "value": "http://localhost:8002"
     },
     {
       "key": "accessToken",
@@ -509,6 +513,20 @@
         },
         {
           "name": "POST /api/v1/lockers/admin/boxes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.id) {",
+                  "  pm.collectionVariables.set('lockerBoxId', json.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -545,7 +563,7 @@
           }
         },
         {
-          "name": "PATCH /api/v1/lockers/admin/boxes/:id/status",
+          "name": "PATCH /api/v1/lockers/admin/boxes/:id/tech-status READY",
           "request": {
             "method": "PATCH",
             "header": [
@@ -555,7 +573,7 @@
               },
               {
                 "key": "Idempotency-Key",
-                "value": "{{idempotencyKey}}-box-status"
+                "value": "{{idempotencyKey}}-box-tech-ready"
               },
               {
                 "key": "Content-Type",
@@ -564,10 +582,10 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"status\": \"RESERVED\"\n}"
+              "raw": "{\n  \"techStatus\": \"READY\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/lockers/admin/boxes/{{lockerBoxId}}/status",
+              "raw": "{{baseUrl}}/api/v1/lockers/admin/boxes/{{lockerBoxId}}/tech-status",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -578,13 +596,13 @@
                 "admin",
                 "boxes",
                 "{{lockerBoxId}}",
-                "status"
+                "tech-status"
               ]
             }
           }
         },
         {
-          "name": "PATCH /api/v1/lockers/admin/boxes/:id/tech-status",
+          "name": "PATCH /api/v1/lockers/admin/boxes/:id/tech-status ACTIVE",
           "request": {
             "method": "PATCH",
             "header": [
@@ -594,7 +612,46 @@
               },
               {
                 "key": "Idempotency-Key",
-                "value": "{{idempotencyKey}}-box-tech-status"
+                "value": "{{idempotencyKey}}-box-tech-active"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"techStatus\": \"ACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/lockers/admin/boxes/{{lockerBoxId}}/tech-status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "lockers",
+                "admin",
+                "boxes",
+                "{{lockerBoxId}}",
+                "tech-status"
+              ]
+            }
+          }
+        },
+        {
+          "name": "PATCH /api/v1/lockers/admin/boxes/:id/tech-status MAINTENANCE",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-box-tech-maintenance"
               },
               {
                 "key": "Content-Type",
@@ -604,6 +661,45 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"techStatus\": \"MAINTENANCE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/lockers/admin/boxes/{{lockerBoxId}}/tech-status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "lockers",
+                "admin",
+                "boxes",
+                "{{lockerBoxId}}",
+                "tech-status"
+              ]
+            }
+          }
+        },
+        {
+          "name": "PATCH /api/v1/lockers/admin/boxes/:id/tech-status FAULTY",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}-box-tech-faulty"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"techStatus\": \"FAULTY\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/lockers/admin/boxes/{{lockerBoxId}}/tech-status",
@@ -706,6 +802,21 @@
         },
         {
           "name": "POST /api/v1/lockers/admin/stations",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const stationId = json?.data?.stationId || json?.data?.id;",
+                  "if (stationId) {",
+                  "  pm.collectionVariables.set('stationId', stationId);",
+                  "}"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [

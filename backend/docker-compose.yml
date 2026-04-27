@@ -41,6 +41,21 @@ services:
       timeout: 5s
       retries: 20
 
+  dynamodb-admin:
+    image: aaronshaf/dynamodb-admin:latest
+    container_name: locker-dynamodb-admin
+    restart: always
+    environment:
+      DYNAMO_ENDPOINT: http://localstack:4566
+      AWS_REGION: eu-west-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+    ports:
+      - "8002:8001"
+    depends_on:
+      localstack:
+        condition: service_healthy
+
   redis:
     image: redis:7-alpine
     container_name: locker-redis
