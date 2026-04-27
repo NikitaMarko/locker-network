@@ -19,6 +19,11 @@ const processQueue = (error: unknown, token: string | null = null) => {
     failedQueue = [];
 };
 
+const forceLogout = () => {
+    localStorage.removeItem("access_token");
+    window.location.href = "/login?expired=true";
+};
+
 export const apiClient = axios.create({
     baseURL: SERVER_URL,
     withCredentials: true,
@@ -46,32 +51,28 @@ apiClient.interceptors.response.use(
     async (error: AxiosError<any>) => {
         const originalRequest = error.config as any;
 
-        if (originalRequest._skipInterceptor) {
-            return Promise.reject(error);
-        }
-        const backendMessage = error.response?.data?.error?.message;
-        const legacyMessage = error.response?.data?.message;
-
-        if (backendMessage || legacyMessage) {
-            error.message = (backendMessage || legacyMessage) as string;
-        }
-
-        if ((error.response?.status === 401 || error.response?.status === 403) && originalRequest.url?.includes('/auth/refresh')) {
-            localStorage.removeItem('access_token');
-            localStorage.removeItem('refresh_token');
-
-            try {
-                await logoutApi();
-            } catch(e) {
-                console.warn("Forced logout: backend session invalidation failed", e);
-            } finally {
-                window.location.href = '/login?expired=true';
-            }
+        if (originalRequest?._skipInterceptor) {
             return Promise.reject(error);
         }
 
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        const backendMessage =
+            error.response?.data?.error?.message ??
+            error.response?.data?.message;
+        if (backendMessage) {
+            error.message = backendMessage as string;
+        }
 
+        if (
+            (error.response?.status === 401 || error.response?.status === 403) &&
+            originalRequest?.url?.includes("/auth/refresh")
+        ) {
+            isRefreshing = false;
+            processQueue(error, null);
+            forceLogout();
+            return Promise.reject(error);
+        }
+
+        if (error.response?.status === 401 && !originalRequest?._retry) {
             if (isRefreshing) {
                 return new Promise((resolve, reject) => {
                     failedQueue.push({ resolve, reject });
@@ -80,7 +81,7 @@ apiClient.interceptors.response.use(
                         originalRequest.headers.Authorization = `Bearer ${token}`;
                     }
                     return apiClient(originalRequest);
-                });
+                }).catch((err) => Promise.reject(err));
             }
 
             originalRequest._retry = true;
@@ -88,7 +89,7 @@ apiClient.interceptors.response.use(
 
             try {
                 const newToken = await refreshTokenRequest();
-                localStorage.setItem('access_token', newToken);
+                localStorage.setItem("access_token", newToken);
                 processQueue(null, newToken);
 
                 if (originalRequest.headers) {
