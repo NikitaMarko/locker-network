@@ -10,6 +10,7 @@ import { ActionType } from "./dto/operationDto";
 import { idempotencyService } from "./IdempotencyService";
 import {
     assertValidLockerStatusTransition,
+    assertValidLockerTechStatusTransition,
     deleteLockerProjection,
     loadLockers,
     loadOneLocker,
@@ -51,6 +52,7 @@ export class LockerBoxServiceImplPostgres {
                                 code,
                                 size,
                                 status: null,
+                                techStatus: "INACTIVE",
                             },
                             select: {
                                 lockerBoxId: true,
@@ -261,22 +263,26 @@ export class LockerBoxServiceImplPostgres {
                     const result = await prismaService.$transaction(async (tx) => {
                         const locker = await tx.lockerBox.findUnique({
                             where: { lockerBoxId },
-                            include: {
-                                station: {
-                                    select: {
-                                        status: true,
-                                    },
-                                },
-                            },
                         });
                         if (!locker) throw new HttpError(404, "Locker doesn't exist");
                         if (locker.isDeleted) throw new HttpError(400, "Locker deleted");
-                        if (locker.techStatus === techStatus) throw new HttpError(400, "Locker tech status is already " + techStatus);
+                        if (locker.techStatus === techStatus) {
+                            throw new HttpError(
+                                400,
+                                `Cannot change from ${locker.techStatus} to ${techStatus}`,
+                                "INVALID_STATUS_TRANSITION"
+                            );
+                        }
+
+                        assertValidLockerTechStatusTransition({
+                            currentTechStatus: locker.techStatus,
+                            nextTechStatus: techStatus,
+                            role: req.user?.role,
+                        });
 
                         const runtimeState = resolveLockerStateForTechStatus({
                             currentStatus: locker.status,
                             nextTechStatus: techStatus,
-                            stationStatus: locker.station.status,
                         });
 
                         const updatedLocker = await tx.lockerBox.update({
@@ -293,6 +299,8 @@ export class LockerBoxServiceImplPostgres {
                             select: {
                                 lockerBoxId: true,
                                 stationId: true,
+                                code: true,
+                                size: true,
                                 status: true,
                                 techStatus: true,
                             },
@@ -308,9 +316,9 @@ export class LockerBoxServiceImplPostgres {
                         ...currentProjection,
                         status: result.status,
                         techStatus,
+                        version: currentProjection.version + 1,
                         ...(result.status !== currentProjection.status
                             ? {
-                                version: currentProjection.version + 1,
                                 lastStatusChangedAt: new Date().toISOString(),
                             }
                             : {}),
@@ -342,6 +350,8 @@ export class LockerBoxServiceImplPostgres {
                         body: {
                             lockerBoxId,
                             stationId: result.stationId,
+                            code: result.code,
+                            size: result.size,
                             status: result.status,
                             techStatus: result.techStatus
                         },

@@ -1,4 +1,4 @@
-import { LockerStatus, StationStatus, TechnicalStatus } from "@prisma/client";
+import { LockerStatus, Role, StationStatus, TechnicalStatus } from "@prisma/client";
 
 import { LockerCacheDto, LockerResponseDto } from "../../contracts/cache.dto";
 import { HttpError } from "../../errorHandler/HttpError";
@@ -11,7 +11,7 @@ import { enqueueLockerProjectionDelete, enqueueLockerProjectionUpsert } from "..
 export type LockerQuery = {
     stationId?: string;
     size?: "S" | "M" | "L";
-    status?: "AVAILABLE" | "RESERVED" | "OCCUPIED" | "FAULTY" | "EXPIRED";
+    status?: "AVAILABLE" | "RESERVED" | "OCCUPIED" | "EXPIRED";
 };
 
 export type StationCacheStatus = "SYNCED" | "FAILED" | "DEFERRED";
@@ -76,15 +76,10 @@ export function assertValidLockerStatusTransition(input: {
 export function resolveLockerStateForTechStatus(input: {
     currentStatus: LockerStatus | null;
     nextTechStatus: TechnicalStatus;
-    stationStatus: StationStatus;
 }) {
-    const { currentStatus, nextTechStatus, stationStatus } = input;
+    const { currentStatus, nextTechStatus } = input;
 
     if (nextTechStatus === "ACTIVE") {
-        if (stationStatus !== "ACTIVE") {
-            throw new HttpError(400, "Locker tech status can be ACTIVE only when station is ACTIVE");
-        }
-
         return {
             nextStatus: currentStatus ?? "AVAILABLE",
             statusChanged: currentStatus === null,
@@ -95,6 +90,30 @@ export function resolveLockerStateForTechStatus(input: {
         nextStatus: null,
         statusChanged: currentStatus !== null,
     };
+}
+
+export function assertValidLockerTechStatusTransition(input: {
+    currentTechStatus: TechnicalStatus;
+    nextTechStatus: TechnicalStatus;
+    role?: Role;
+}) {
+    const { currentTechStatus, nextTechStatus, role } = input;
+    const message = `Cannot change from ${currentTechStatus} to ${nextTechStatus}`;
+
+    if (role === Role.OPERATOR) {
+        if (currentTechStatus === "INACTIVE" && nextTechStatus === "READY") return;
+        if (currentTechStatus === "MAINTENANCE" && nextTechStatus === "READY") return;
+        throw new HttpError(400, message, "INVALID_STATUS_TRANSITION");
+    }
+
+    if (role === Role.ADMIN) {
+        if (currentTechStatus === "READY" && nextTechStatus === "ACTIVE") return;
+        if (currentTechStatus === "ACTIVE" && nextTechStatus === "MAINTENANCE") return;
+        if (currentTechStatus === "ACTIVE" && nextTechStatus === "FAULTY") return;
+        throw new HttpError(400, message, "INVALID_STATUS_TRANSITION");
+    }
+
+    throw new HttpError(400, message, "INVALID_STATUS_TRANSITION");
 }
 
 export function lockerMeta(stationCacheStatus: StationCacheStatus, lockerCacheStatus: LockerCacheStatus) {

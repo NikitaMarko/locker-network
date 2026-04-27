@@ -12,7 +12,6 @@ import {
     oneStationSchema
 } from "../validation/stationSchemas";
 import {
-    changeStatusLockerSchema,
     changeTechStatusLockerSchema,
     createLockerSchema,
     getLockersWithParamsSchema,
@@ -38,7 +37,6 @@ lockersRoutes.get('/stations/:id', authorize(Role.USER), validateRequest(oneStat
 lockersRoutes.get('/admin/boxes', authorize(Role.OPERATOR, Role.ADMIN), lockerBoxController.getAllBoxes);
 lockersRoutes.get('/admin/boxes/:id', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(oneLockerSchema), lockerBoxController.getOneBoxAdmin);
 lockersRoutes.post('/admin/boxes', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(createLockerSchema), lockerBoxController.createBox);
-lockersRoutes.patch('/admin/boxes/:id/status', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(changeStatusLockerSchema), lockerBoxController.changeBoxStatus);
 lockersRoutes.patch('/admin/boxes/:id/tech-status', authorize(Role.OPERATOR, Role.ADMIN), validateRequest(changeTechStatusLockerSchema), lockerBoxController.changeBoxTechStatus);
 lockersRoutes.post('/admin/boxes/:id/resync-cache', authorize(Role.ADMIN), validateRequest(oneLockerSchema), lockerBoxController.resyncLockerCache);
 lockersRoutes.post('/admin/boxes/:id/hard-resync-cache', authorize(Role.ADMIN), validateRequest(oneLockerSchema), lockerBoxController.hardResyncLockerCache);
