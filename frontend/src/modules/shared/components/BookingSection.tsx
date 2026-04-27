@@ -14,15 +14,21 @@ import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import { useBooking } from '../../../hooks/useBooking';
 
+
 interface BookingSectionProps {
     stationId: string;
+    initialSize?: "S" | "M" | "L";
 }
 
-export function BookingSection({ stationId }: BookingSectionProps) {
+export function BookingSection({ stationId, initialSize = "M" }: BookingSectionProps) {
     const { startBookingFlow, isLoading, error } = useBooking();
+    const [selectedSize, setSelectedSize] = useState(initialSize);
+    const [prevInitialSize, setPrevInitialSize] = useState(initialSize);
 
-    const [selectedSize, setSelectedSize] = useState('M');
-
+    if (initialSize !== prevInitialSize) {
+        setPrevInitialSize(initialSize);
+        setSelectedSize(initialSize);
+    }
 
     const [selectedDate, setSelectedDate] = useState(() => {
         const d = new Date();
@@ -74,7 +80,7 @@ export function BookingSection({ stationId }: BookingSectionProps) {
 
         startBookingFlow({
             stationId: stationId,
-            size: selectedSize,
+            size: selectedSize as "S" | "M" | "L",
             expectedEndTime: expectedEndTime.toISOString(),
         });
     };
@@ -99,7 +105,7 @@ export function BookingSection({ stationId }: BookingSectionProps) {
                         select
                         label="Locker Size"
                         value={selectedSize}
-                        onChange={(e) => setSelectedSize(e.target.value)}
+                        onChange={(e) => setSelectedSize(e.target.value as "S" | "M" | "L")}
                         disabled={isLoading}
                         fullWidth
                         sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}

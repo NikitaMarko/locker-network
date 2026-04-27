@@ -20,6 +20,8 @@ export function StationDetailsPage() {
     const navigate = useNavigate();
 
     const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+    // 🔥 1. Добавляем стейт для запоминания размера
+    const [selectedSize, setSelectedSize] = useState<"S" | "M" | "L">("M");
 
     const { data: station } = useQuery<LockerStation>({
         queryKey: ["user-station", id],
@@ -106,7 +108,11 @@ export function StationDetailsPage() {
                                 <Button
                                     variant="contained"
                                     fullWidth
-                                    onClick={() => setIsBookingModalOpen(true)}
+                                    // 🔥 2. Сначала ставим размер в стейт, потом открываем модалку
+                                    onClick={() => {
+                                        if (group?.size) setSelectedSize(group.size);
+                                        setIsBookingModalOpen(true);
+                                    }}
                                     sx={{
                                         mt: 3,
                                         borderRadius: 2,
@@ -138,7 +144,8 @@ export function StationDetailsPage() {
                     </IconButton>
                 </Box>
                 <DialogContent sx={{ p: 0 }}>
-                    {id && <BookingSection stationId={id} />}
+                    {/* 🔥 3. Передаем выбранный размер внутрь секции бронирования */}
+                    {id && <BookingSection stationId={id} initialSize={selectedSize} />}
                 </DialogContent>
             </Dialog>
 
