@@ -28,7 +28,42 @@ function extractConstraintField(error: Prisma.PrismaClientKnownRequestError): st
     return fields?.[0] ?? 'Field';
 }
 
+function isTokenExpiredError(error: unknown) {
+    return error instanceof Error && error.name === "TokenExpiredError";
+}
+
 export class AuthServiceImplPostgres {
+    private async auditLogoutFromExpiredRefreshToken(req: Request, refreshToken: string) {
+        const decoded = jwt.decode(refreshToken) as Partial<TokenPayload> | null;
+        const userId = decoded?.userId;
+        const sessionId = decoded?.sessionId;
+
+        if (!userId || !sessionId) {
+            return;
+        }
+
+        await prismaService.refreshSession.updateMany({
+            where: {
+                id: sessionId,
+                userId,
+                revokedAt: null,
+            },
+            data: {
+                revokedAt: new Date(),
+            },
+        });
+
+        await logAudit({
+            req,
+            action: ActionType.USER_LOGOUT,
+            actorId: userId,
+            entityId: userId,
+            details: {
+                reason: "refresh_token_expired",
+                sessionId,
+            },
+        });
+    }
 
     async auth(res: Response, req: Request, user: { userId: string; role: TokenPayload['role'] }) {
         await prismaService.refreshSession.updateMany({
@@ -276,14 +311,20 @@ export class AuthServiceImplPostgres {
             payload = jwt.verify(refreshToken, env.JWT_REFRESH_SECRET, {
                 algorithms: ['HS256'],
             }) as TokenPayload;
-        } catch {
+        } catch (error) {
+            if (isTokenExpiredError(error)) {
+                await this.auditLogoutFromExpiredRefreshToken(req, refreshToken);
+            }
+
             tokenService.clearCookies(res);
             void logSecurityEvent({
                 req,
                 eventType: SecurityEventType.AUTH_REFRESH_FAILED,
-                reason: "Refresh failed: invalid refresh token signature or format",
+                reason: isTokenExpiredError(error)
+                    ? "Refresh failed: refresh token expired"
+                    : "Refresh failed: invalid refresh token signature or format",
             });
-            throw new HttpError(401, 'Invalid refresh token');
+            throw new HttpError(401, isTokenExpiredError(error) ? 'Token expired' : 'Invalid refresh token');
         }
 
         const session = await prismaService.refreshSession.findUnique({
@@ -321,6 +362,16 @@ export class AuthServiceImplPostgres {
         }
 
         if (session.expiresAt < new Date()) {
+            await logAudit({
+                req,
+                action: ActionType.USER_LOGOUT,
+                actorId: session.userId,
+                entityId: session.userId,
+                details: {
+                    reason: "refresh_session_expired",
+                    sessionId: session.id,
+                },
+            });
             tokenService.clearCookies(res);
             void logSecurityEvent({
                 req,
