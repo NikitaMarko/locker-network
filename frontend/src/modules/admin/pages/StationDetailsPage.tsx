@@ -1,22 +1,23 @@
-import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import {
     Box, Typography, Button, Paper, Chip,
     Dialog, DialogTitle, DialogContent, DialogActions,
     TextField, MenuItem, Stack
-} from '@mui/material';
-import Grid from '@mui/material/GridLegacy';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import AddIcon from '@mui/icons-material/Add';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { stationsApi } from '../../../api/stationsApi';
-import { useAuth } from '../../../hooks/useAuth';
-import { ROLES } from '../../../config/roles/roles';
-import { useLockers } from '../../../hooks/useLockers';
-import type { LockerStation } from '../../../types/index';
-import { getTechnicalStatus } from "../../../types/index";
+} from "@mui/material";
+import Grid from "@mui/material/GridLegacy";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import AddIcon from "@mui/icons-material/Add";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { stationsApi } from "../../../api/stationsApi";
+import { useAuth } from "../../../hooks/useAuth";
+import { ROLES } from "../../../config/roles/roles";
+import { useLockers } from "../../../hooks/useLockers";
+import type { LockerStation } from "../../../types/index";
 
-const getChipColor = (status: string): "success" | "warning" | "default" | "error" => {
+const getChipColor = (
+    status: string
+): "success" | "warning" | "default" | "error" => {
     switch (status) {
         case "ACTIVE": return "success";
         case "READY": return "warning";
@@ -31,13 +32,13 @@ export default function StationDetailsPage() {
     const { stationId } = useParams();
     const navigate = useNavigate();
     const { user } = useAuth();
-    const { changeLockerStatus } = useLockers();
+    const { changeLockerTechnicalStatus } = useLockers();
     const queryClient = useQueryClient();
 
     const [open, setOpen] = useState(false);
     const [lockerData, setLockerData] = useState({
-        code: '',
-        size: 'M' as 'S' | 'M' | 'L'
+        code: "",
+        size: "M" as "S" | "M" | "L"
     });
 
     const { data: station, isLoading } = useQuery<LockerStation>({
@@ -46,16 +47,25 @@ export default function StationDetailsPage() {
         enabled: !!stationId
     });
 
+    const lockers = station?.lockers ?? [];
+
     const handleAdd = async () => {
         if (!stationId || !lockerData.code) return;
-        await stationsApi.addLocker({
-            stationId,
-            code: lockerData.code,
-            size: lockerData.size
-        });
-        queryClient.invalidateQueries({ queryKey: ["station-details", stationId] });
-        setOpen(false);
-        setLockerData({ code: '', size: 'M' });
+
+        try {
+            await stationsApi.addLocker({
+                stationId,
+                code: lockerData.code,
+                size: lockerData.size
+            });
+
+            queryClient.invalidateQueries({ queryKey: ["station-details", stationId] });
+
+            setOpen(false);
+            setLockerData({ code: "", size: "M" });
+        } catch (e) {
+            console.error("Failed to add locker", e);
+        }
     };
 
     if (isLoading) return <Typography>Loading...</Typography>;
@@ -67,9 +77,7 @@ export default function StationDetailsPage() {
             </Button>
 
             <Box display="flex" justifyContent="space-between" mt={2}>
-                <Typography variant="h4" fontWeight={900}>
-                    {station?.address}
-                </Typography>
+                <Typography variant="h4">{station?.address}</Typography>
 
                 {user?.role === ROLES.ADMIN && (
                     <Button variant="contained" startIcon={<AddIcon />} onClick={() => setOpen(true)}>
@@ -79,79 +87,70 @@ export default function StationDetailsPage() {
             </Box>
 
             <Grid container spacing={2} mt={2}>
-                {station?.lockers?.map((locker) => {
-                    const tech = getTechnicalStatus(locker.status);
+                {lockers.map((locker) => (
+                    <Grid item xs={12} sm={6} md={3} key={locker.lockerBoxId}>
+                        <Paper sx={{ p: 2 }}>
+                            <Typography>Box #{locker.code}</Typography>
 
-                    return (
-                        <Grid item xs={12} sm={6} md={3} key={locker.lockerBoxId}>
-                            <Paper sx={{ p: 2 }}>
-                                <Typography fontWeight={700}>
-                                    Box #{locker.code}
-                                </Typography>
+                            <Chip
+                                label={locker.technicalStatus}
+                                color={getChipColor(locker.technicalStatus)}
+                                size="small"
+                                sx={{ mt: 1 }}
+                            />
 
-                                <Chip
-                                    label={tech}
-                                    color={getChipColor(tech)}
-                                    sx={{ mt: 1 }}
-                                    size="small"
-                                />
+                            {user?.role === ROLES.ADMIN && (
+                                <Box mt={2} display="flex" flexDirection="column" gap={1}>
 
-                                {user?.role === ROLES.ADMIN && (
-                                    <Box mt={2} display="flex" flexDirection="column" gap={1}>
-
-                                        {tech === "READY" && (
-                                            <Button
-                                                variant="contained"
-                                                color="success"
-                                                size="small"
-                                                onClick={() =>
-                                                    changeLockerStatus({
+                                    {locker.technicalStatus === "READY" && (
+                                        <Button
+                                            variant="contained"
+                                            size="small"
+                                            onClick={async () => {
+                                                try {
+                                                    await changeLockerTechnicalStatus({
                                                         lockerBoxId: locker.lockerBoxId,
-                                                        status: "ACTIVE"
-                                                    })
+                                                        technicalStatus: "ACTIVE"
+                                                    });
+                                                } catch (e) {
+                                                    console.error(e);
                                                 }
-                                            >
-                                                Activate
-                                            </Button>
-                                        )}
+                                            }}
+                                        >
+                                            Activate
+                                        </Button>
+                                    )}
 
-                                        {tech === "ACTIVE" && (
-                                            <Button
-                                                variant="contained"
-                                                color="error"
-                                                size="small"
-                                                onClick={() =>
-                                                    changeLockerStatus({
+                                    {locker.technicalStatus === "ACTIVE" && (
+                                        <Button
+                                            variant="contained"
+                                            size="small"
+                                            color="error"
+                                            onClick={async () => {
+                                                try {
+                                                    await changeLockerTechnicalStatus({
                                                         lockerBoxId: locker.lockerBoxId,
-                                                        status: "MAINTENANCE"
-                                                    })
+                                                        technicalStatus: "MAINTENANCE"
+                                                    });
+                                                } catch (e) {
+                                                    console.error(e);
                                                 }
-                                            >
-                                                → Maintenance
-                                            </Button>
-                                        )}
-
-                                        {tech === "INACTIVE" && (
-                                            <Typography variant="caption">
-                                                Awaiting operator activation
-                                            </Typography>
-                                        )}
-
-                                        {tech === "MAINTENANCE" && (
-                                            <Typography variant="caption">
-                                                Awaiting operator repair
-                                            </Typography>
-                                        )}
-                                    </Box>
-                                )}
-                            </Paper>
-                        </Grid>
-                    );
-                })}
+                                            }}
+                                        >
+                                            Maintenance
+                                        </Button>
+                                    )}
+                                </Box>
+                            )}
+                        </Paper>
+                    </Grid>
+                ))}
             </Grid>
 
+            {/* ✅ FIXED DIALOG */}
             <Dialog open={open} onClose={() => setOpen(false)}>
                 <DialogTitle>Add Locker</DialogTitle>
+
                 <DialogContent>
                     <Stack spacing={2} sx={{ mt: 1 }}>
                         <TextField
@@ -161,7 +160,9 @@ export default function StationDetailsPage() {
                                 setLockerData({ ...lockerData, code: e.target.value })
                             }
                             fullWidth
+                            required
                         />
+
                         <TextField
                             select
                             label="Size"
@@ -169,19 +170,26 @@ export default function StationDetailsPage() {
                             onChange={(e) =>
                                 setLockerData({
                                     ...lockerData,
-                                    size: e.target.value as 'S' | 'M' | 'L'
+                                    size: e.target.value as "S" | "M" | "L"
                                 })
                             }
+                            fullWidth
                         >
-                            <MenuItem value="S">S</MenuItem>
-                            <MenuItem value="M">M</MenuItem>
-                            <MenuItem value="L">L</MenuItem>
+                            <MenuItem value="S">Small</MenuItem>
+                            <MenuItem value="M">Medium</MenuItem>
+                            <MenuItem value="L">Large</MenuItem>
                         </TextField>
                     </Stack>
                 </DialogContent>
+
                 <DialogActions>
                     <Button onClick={() => setOpen(false)}>Cancel</Button>
-                    <Button onClick={handleAdd} variant="contained">
+
+                    <Button
+                        variant="contained"
+                        onClick={handleAdd}
+                        disabled={!lockerData.code}
+                    >
                         Add
                     </Button>
                 </DialogActions>

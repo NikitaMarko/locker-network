@@ -4,7 +4,7 @@ import type { LockerTechnicalStatus } from "../types/index";
 
 interface ChangeLockerStatusPayload {
     lockerBoxId: string;
-    status: LockerTechnicalStatus;
+    technicalStatus: LockerTechnicalStatus;
 }
 
 export function useLockers() {
@@ -17,37 +17,42 @@ export function useLockers() {
     };
 
     const changeStatus = useMutation({
-        mutationFn: ({ lockerBoxId, status }: ChangeLockerStatusPayload) =>
-            lockersApi.updateLockerStatus(lockerBoxId, status),
-        onSuccess: invalidateAll
+        mutationFn: ({ lockerBoxId, technicalStatus }: ChangeLockerStatusPayload) =>
+            lockersApi.updateLockerTechnicalStatus(lockerBoxId, technicalStatus),
+
+        onSuccess: invalidateAll,
+
+        onError: (error) => {
+            console.error("Locker status update failed", error);
+        }
     });
 
     const setReady = (id: string) =>
-        changeStatus.mutateAsync({ lockerBoxId: id, status: "READY" });
+        changeStatus.mutateAsync({ lockerBoxId: id, technicalStatus: "READY" });
 
     const activate = (id: string) =>
-        changeStatus.mutateAsync({ lockerBoxId: id, status: "ACTIVE" });
+        changeStatus.mutateAsync({ lockerBoxId: id, technicalStatus: "ACTIVE" });
 
     const setMaintenance = (id: string) =>
-        changeStatus.mutateAsync({ lockerBoxId: id, status: "MAINTENANCE" });
+        changeStatus.mutateAsync({ lockerBoxId: id, technicalStatus: "MAINTENANCE" });
 
     const setFaulty = (id: string) =>
-        changeStatus.mutateAsync({ lockerBoxId: id, status: "FAULTY" });
+        changeStatus.mutateAsync({ lockerBoxId: id, technicalStatus: "FAULTY" });
 
     const cancelBookingMutation = useMutation({
         mutationFn: (id: string) => lockersApi.cancelBooking(id),
-        onSuccess: invalidateAll
+        onSuccess: invalidateAll,
+        onError: (e) => console.error("Cancel booking failed", e)
     });
 
-    const cancelBooking = (id: string) =>
-        cancelBookingMutation.mutateAsync(id);
-
     return {
-        changeLockerStatus: changeStatus.mutateAsync,
+        changeLockerTechnicalStatus: changeStatus.mutateAsync,
+        isUpdating: changeStatus.isPending,
+
         setReady,
         activate,
         setMaintenance,
         setFaulty,
-        cancelBooking
+        cancelBooking: cancelBookingMutation.mutateAsync
     };
 }

@@ -10,30 +10,42 @@ export interface ApiResponse<T> {
 
 export const stationsApi = {
 
+    // ===============================
+    // ADMIN
+    // ===============================
+
     getAllStations: async (): Promise<LockerStation[]> => {
-        const { data } = await apiClient.get<ApiResponse<LockerStation[]>>("/lockers/admin/stations");
+        const { data } = await apiClient.get<ApiResponse<LockerStation[]>>(
+            "/lockers/admin/stations"
+        );
         return data.data;
     },
 
-    getActiveStations: async (): Promise<LockerStation[]> => {
-        const { data } = await apiClient.get<ApiResponse<LockerStation[]>>("/lockers/stations", {
-            params: { status: 'ACTIVE' }
-        });
+    getAdminStationById: async (id: string): Promise<LockerStation> => {
+        const { data } = await apiClient.get<ApiResponse<LockerStation>>(
+            `/lockers/admin/stations/${id}`
+        );
         return data.data;
     },
 
-    getStationById: async (id: string): Promise<LockerStation> => {
-        const { data } = await apiClient.get<ApiResponse<LockerStation>>(`/lockers/stations/${id}`);
+    createStation: async (payload: {
+        city: string;
+        address: string;
+        latitude: number;
+        longitude: number;
+    }): Promise<LockerStation> => {
+        const { data } = await apiClient.post<ApiResponse<LockerStation>>(
+            "/lockers/admin/stations",
+            payload
+        );
         return data.data;
     },
 
-    createStation: async (payload: { city: string; address: string; latitude: number; longitude: number }): Promise<any> => {
-        const { data } = await apiClient.post<ApiResponse<any>>("/lockers/admin/stations", payload);
-        return data.data;
-    },
-
-    // 🔴 Админ меняет только ACTIVE / MAINTENANCE
-    updateStationStatusAdmin: async (id: string, status: StationStatus): Promise<LockerStation> => {
+    // ✅ Админ управляет ТОЛЬКО статусом станции (не locker)
+    updateStationStatusAdmin: async (
+        id: string,
+        status: Extract<StationStatus, "ACTIVE" | "MAINTENANCE">
+    ): Promise<LockerStation> => {
         const { data } = await apiClient.patch<ApiResponse<LockerStation>>(
             `/lockers/admin/stations/${id}/status`,
             { status }
@@ -41,8 +53,16 @@ export const stationsApi = {
         return data.data;
     },
 
-    // 🟡 Оператор меняет INACTIVE → READY и MAINTENANCE → READY
-    updateStationStatusOperator: async (id: string, status: StationStatus): Promise<LockerStation> => {
+    // ===============================
+    // OPERATOR
+    // ===============================
+
+    // ❗ ВАЖНО: ЭТОГО эндпоинта НЕТ в твоем Postman
+    // Если бэк не добавит — будет 404
+    updateStationStatusOperator: async (
+        id: string,
+        status: Extract<StationStatus, "READY">
+    ): Promise<LockerStation> => {
         const { data } = await apiClient.patch<ApiResponse<LockerStation>>(
             `/lockers/oper/stations/${id}/status`,
             { status }
@@ -50,18 +70,45 @@ export const stationsApi = {
         return data.data;
     },
 
-    addLocker: async (payload: { stationId: string; code: string; size: 'S' | 'M' | 'L' }): Promise<any> => {
-        const { data } = await apiClient.post<ApiResponse<any>>(`/lockers/admin/boxes`, payload);
+    deleteStation: async (id: string): Promise<void> => {
+        await apiClient.patch(`/lockers/oper/stations/${id}/delete`);
+    },
+
+    // ===============================
+    // PUBLIC / USER
+    // ===============================
+
+    getActiveStations: async (): Promise<LockerStation[]> => {
+        const { data } = await apiClient.get<ApiResponse<LockerStation[]>>(
+            "/lockers/stations",
+            {
+                params: { status: "ACTIVE" }
+            }
+        );
         return data.data;
     },
 
-    deleteStation: async (id: string): Promise<any> => {
-        const { data } = await apiClient.patch<ApiResponse<any>>(`/lockers/oper/stations/${id}/delete`);
+    getStationById: async (id: string): Promise<LockerStation> => {
+        const { data } = await apiClient.get<ApiResponse<LockerStation>>(
+            `/lockers/stations/${id}`
+        );
         return data.data;
     },
 
-    getAdminStationById: async (id: string): Promise<LockerStation> => {
-        const { data } = await apiClient.get<ApiResponse<LockerStation>>(`/lockers/admin/stations/${id}`);
+    // ===============================
+    // LOCKERS (через station)
+    // ===============================
+
+    // ✅ ВСЕ новые боксы = INACTIVE (логика на backend)
+    addLocker: async (payload: {
+        stationId: string;
+        code: string;
+        size: "S" | "M" | "L";
+    }): Promise<any> => {
+        const { data } = await apiClient.post<ApiResponse<any>>(
+            `/lockers/admin/boxes`,
+            payload
+        );
         return data.data;
-    },
+    }
 };

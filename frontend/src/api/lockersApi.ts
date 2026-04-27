@@ -1,7 +1,5 @@
 import { apiClient } from "./apiClient";
-import type {
-    LockerBox
-} from "../types/index";
+import type { LockerBox, LockerTechnicalStatus } from "../types";
 
 export interface ApiResponse<T> {
     success: boolean;
@@ -14,47 +12,53 @@ export interface ApiResponse<T> {
 }
 
 export const lockersApi = {
-    getLockers: async (params?: { stationId?: string; size?: string; status?: string }): Promise<LockerBox[]> => {
-        const { data } = await apiClient.get<ApiResponse<LockerBox[]>>("/lockers/boxes", { params });
+
+    getLockers: async (params?: {
+        stationId?: string;
+        size?: string;
+        status?: string;
+    }): Promise<LockerBox[]> => {
+        const { data } = await apiClient.get<ApiResponse<LockerBox[]>>(
+            "/lockers/boxes",
+            { params }
+        );
         return data.data;
     },
 
     getLockerById: async (id: string): Promise<LockerBox> => {
-        const { data } = await apiClient.get<ApiResponse<LockerBox>>(`/lockers/boxes/${id}`);
+        const { data } = await apiClient.get<ApiResponse<LockerBox>>(
+            `/lockers/boxes/${id}`
+        );
         return data.data;
     },
 
-    // только technicalStatus
-    updateLockerStatus: async (
+    // ✅ ЕДИНСТВЕННЫЙ правильный метод
+    updateLockerTechnicalStatus: async (
         id: string,
-        status: string
+        technicalStatus: LockerTechnicalStatus
     ): Promise<LockerBox> => {
-        const isBusinessStatus = ["AVAILABLE", "RESERVED", "OCCUPIED"].includes(status);
-        const payload = isBusinessStatus
-            ? { status: status }
-            : { technicalStatus: status };
-
         const { data } = await apiClient.patch<ApiResponse<LockerBox>>(
-            `/lockers/admin/boxes/${id}/status`,
-            payload
+            `/lockers/admin/boxes/${id}/tech-status`,
+            { technicalStatus }
         );
         return data.data;
     },
 
     getAdminLockers: async (): Promise<LockerBox[]> => {
-        const { data } = await apiClient.get<ApiResponse<LockerBox[]>>("/lockers/admin/boxes");
+        const { data } = await apiClient.get<ApiResponse<LockerBox[]>>(
+            "/lockers/admin/boxes"
+        );
         return data.data;
     },
 
     cancelBooking: async (bookingId: string) => {
-        const response = await apiClient.post(`/bookings/${bookingId}/cancel`);
+        const response = await apiClient.post(
+            `/bookings/${bookingId}/cancel`
+        );
         return response.data;
     },
 
-    deleteLocker: async (id: string): Promise<any> => {
-        const { data } = await apiClient.patch<ApiResponse<any>>(
-            `/lockers/oper/boxes/${id}/delete`
-        );
-        return data.data;
+    deleteLocker: async (id: string): Promise<void> => {
+        await apiClient.patch(`/lockers/oper/boxes/${id}/delete`);
     }
 };
