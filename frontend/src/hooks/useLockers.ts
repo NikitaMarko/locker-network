@@ -1,10 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { lockersApi } from "../api/lockersApi";
-import type { LockerTechnicalStatus } from "../types/index";
+import type { LockertechStatus } from "../types/index";
 
 interface ChangeLockerStatusPayload {
     lockerBoxId: string;
-    technicalStatus: LockerTechnicalStatus;
+    techStatus: LockertechStatus;
 }
 
 export function useLockers() {
@@ -17,8 +17,8 @@ export function useLockers() {
     };
 
     const changeStatus = useMutation({
-        mutationFn: ({ lockerBoxId, technicalStatus }: ChangeLockerStatusPayload) =>
-            lockersApi.updateLockerTechnicalStatus(lockerBoxId, technicalStatus),
+        mutationFn: ({ lockerBoxId, techStatus }: ChangeLockerStatusPayload) =>
+            lockersApi.updateLockertechStatus(lockerBoxId, techStatus),
 
         onSuccess: invalidateAll,
 
@@ -28,16 +28,16 @@ export function useLockers() {
     });
 
     const setReady = (id: string) =>
-        changeStatus.mutateAsync({ lockerBoxId: id, technicalStatus: "READY" });
+        changeStatus.mutateAsync({ lockerBoxId: id, techStatus: "READY" });
 
     const activate = (id: string) =>
-        changeStatus.mutateAsync({ lockerBoxId: id, technicalStatus: "ACTIVE" });
+        changeStatus.mutateAsync({ lockerBoxId: id, techStatus: "ACTIVE" });
 
     const setMaintenance = (id: string) =>
-        changeStatus.mutateAsync({ lockerBoxId: id, technicalStatus: "MAINTENANCE" });
+        changeStatus.mutateAsync({ lockerBoxId: id, techStatus: "MAINTENANCE" });
 
     const setFaulty = (id: string) =>
-        changeStatus.mutateAsync({ lockerBoxId: id, technicalStatus: "FAULTY" });
+        changeStatus.mutateAsync({ lockerBoxId: id, techStatus: "FAULTY" });
 
     const cancelBookingMutation = useMutation({
         mutationFn: (id: string) => lockersApi.cancelBooking(id),
@@ -46,7 +46,7 @@ export function useLockers() {
     });
 
     return {
-        changeLockerTechnicalStatus: changeStatus.mutateAsync,
+        changeLockertechStatus: changeStatus.mutateAsync,
         isUpdating: changeStatus.isPending,
 
         setReady,

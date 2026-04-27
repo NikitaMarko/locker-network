@@ -14,15 +14,15 @@ export type StationStatus =
 
 export type LockerSize = "S" | "M" | "L";
 
-// 👇 статус для пользователя
+// статус для пользователя
 export type LockerUserStatus =
     | "AVAILABLE"
     | "RESERVED"
     | "OCCUPIED"
     | "EXPIRED";
 
-// 👇 технический статус (админ/оператор)
-export type LockerTechnicalStatus =
+// технический статус (админ/оператор)
+export type LockertechStatus =
     | "INACTIVE"
     | "READY"
     | "ACTIVE"
@@ -46,7 +46,7 @@ export interface LockerBox {
 
     // РАЗДЕЛЕНИЕ СТАТУСОВ
     status: LockerUserStatus | null;
-    technicalStatus: LockerTechnicalStatus;
+    techStatus: LockertechStatus;
 }
 
 export interface LockerStation {

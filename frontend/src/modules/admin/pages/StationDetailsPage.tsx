@@ -32,7 +32,7 @@ export default function StationDetailsPage() {
     const { stationId } = useParams();
     const navigate = useNavigate();
     const { user } = useAuth();
-    const { changeLockerTechnicalStatus } = useLockers();
+    const { changeLockertechStatus } = useLockers();
     const queryClient = useQueryClient();
 
     const [open, setOpen] = useState(false);
@@ -93,8 +93,8 @@ export default function StationDetailsPage() {
                             <Typography>Box #{locker.code}</Typography>
 
                             <Chip
-                                label={locker.technicalStatus}
-                                color={getChipColor(locker.technicalStatus)}
+                                label={locker.techStatus}
+                                color={getChipColor(locker.techStatus)}
                                 size="small"
                                 sx={{ mt: 1 }}
                             />
@@ -102,15 +102,15 @@ export default function StationDetailsPage() {
                             {user?.role === ROLES.ADMIN && (
                                 <Box mt={2} display="flex" flexDirection="column" gap={1}>
 
-                                    {locker.technicalStatus === "READY" && (
+                                    {locker.techStatus === "READY" && (
                                         <Button
                                             variant="contained"
                                             size="small"
                                             onClick={async () => {
                                                 try {
-                                                    await changeLockerTechnicalStatus({
+                                                    await changeLockertechStatus({
                                                         lockerBoxId: locker.lockerBoxId,
-                                                        technicalStatus: "ACTIVE"
+                                                        techStatus: "ACTIVE"
                                                     });
                                                 } catch (e) {
                                                     console.error(e);
@@ -121,16 +121,16 @@ export default function StationDetailsPage() {
                                         </Button>
                                     )}
 
-                                    {locker.technicalStatus === "ACTIVE" && (
+                                    {locker.techStatus === "ACTIVE" && (
                                         <Button
                                             variant="contained"
                                             size="small"
                                             color="error"
                                             onClick={async () => {
                                                 try {
-                                                    await changeLockerTechnicalStatus({
+                                                    await changeLockertechStatus({
                                                         lockerBoxId: locker.lockerBoxId,
-                                                        technicalStatus: "MAINTENANCE"
+                                                        techStatus: "MAINTENANCE"
                                                     });
                                                 } catch (e) {
                                                     console.error(e);
@@ -147,7 +147,7 @@ export default function StationDetailsPage() {
                 ))}
             </Grid>
 
-            {/* ✅ FIXED DIALOG */}
+            {/* FIXED DIALOG */}
             <Dialog open={open} onClose={() => setOpen(false)}>
                 <DialogTitle>Add Locker</DialogTitle>
 

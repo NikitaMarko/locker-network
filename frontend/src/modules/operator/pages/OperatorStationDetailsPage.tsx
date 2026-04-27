@@ -44,14 +44,14 @@ export default function OperatorStationDetailsPage() {
                             <Typography>Box #{locker.code}</Typography>
 
                             <Chip
-                                label={locker.technicalStatus}
-                                color={getChipColor(locker.technicalStatus)}
+                                label={locker.techStatus}
+                                color={getChipColor(locker.techStatus)}
                                 size="small"
                                 sx={{ mt: 1 }}
                             />
 
                             <Box mt={2}>
-                                {locker.technicalStatus === "INACTIVE" && (
+                                {locker.techStatus === "INACTIVE" && (
                                     <Button
                                         variant="contained"
                                         size="small"
@@ -61,7 +61,7 @@ export default function OperatorStationDetailsPage() {
                                     </Button>
                                 )}
 
-                                {locker.technicalStatus === "MAINTENANCE" && (
+                                {locker.techStatus === "MAINTENANCE" && (
                                     <Button
                                         variant="contained"
                                         size="small"
