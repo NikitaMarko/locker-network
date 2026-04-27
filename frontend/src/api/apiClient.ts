@@ -1,6 +1,6 @@
 import axios, { AxiosError } from "axios";
 import { SERVER_URL } from "../config/env/env.ts";
-import { logoutApi, refreshTokenRequest } from "./authApi.ts";
+import { refreshTokenRequest } from "./authApi.ts";
 
 let isRefreshing = false;
 let failedQueue: Array<{

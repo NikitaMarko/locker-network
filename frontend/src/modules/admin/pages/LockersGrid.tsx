@@ -55,7 +55,7 @@ const LockersGrid: React.FC<LockersGridProps> = ({ stationId }) => {
 
                         <Box mt={2} display="flex" flexDirection="column" gap={1}>
                             {/* OPERATOR: INACTIVE → READY */}
-                            {user?.role === "OPERATOR" && locker.status === "INACTIVE" && (
+                            {user?.role === "OPERATOR" && locker.techStatus === "INACTIVE" && (
                                 <Button
                                     variant="contained"
                                     size="small"
@@ -66,7 +66,7 @@ const LockersGrid: React.FC<LockersGridProps> = ({ stationId }) => {
                             )}
 
                             {/* OPERATOR: MAINTENANCE → READY */}
-                            {user?.role === "OPERATOR" && locker.status === "MAINTENANCE" && (
+                            {user?.role === "OPERATOR" && locker.techStatus === "MAINTENANCE" && (
                                 <Button
                                     variant="contained"
                                     size="small"
@@ -77,7 +77,7 @@ const LockersGrid: React.FC<LockersGridProps> = ({ stationId }) => {
                             )}
 
                             {/* ADMIN: READY → ACTIVE */}
-                            {user?.role === "ADMIN" && locker.status === "READY" && (
+                            {user?.role === "ADMIN" && locker.techStatus === "READY" && (
                                 <Button
                                     variant="contained"
                                     color="success"
@@ -89,7 +89,7 @@ const LockersGrid: React.FC<LockersGridProps> = ({ stationId }) => {
                             )}
 
                             {/* ADMIN: ACTIVE → MAINTENANCE */}
-                            {user?.role === "ADMIN" && locker.status === "ACTIVE" && (
+                            {user?.role === "ADMIN" && locker.techStatus === "ACTIVE" && (
                                 <Button
                                     variant="contained"
                                     color="error"
@@ -101,14 +101,14 @@ const LockersGrid: React.FC<LockersGridProps> = ({ stationId }) => {
                             )}
 
                             {/* ADMIN: INACTIVE — ждём оператора */}
-                            {user?.role === "ADMIN" && locker.status === "INACTIVE" && (
+                            {user?.role === "ADMIN" && locker.techStatus === "INACTIVE" && (
                                 <Typography variant="caption" color="text.secondary">
                                     Awaiting operator activation
                                 </Typography>
                             )}
 
                             {/* ADMIN: MAINTENANCE — ждём оператора */}
-                            {user?.role === "ADMIN" && locker.status === "MAINTENANCE" && (
+                            {user?.role === "ADMIN" && locker.techStatus === "MAINTENANCE" && (
                                 <Typography variant="caption" color="text.secondary">
                                     Awaiting operator repair
                                 </Typography>

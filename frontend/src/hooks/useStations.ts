@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { stationsApi } from "../api/stationsApi";
-import { lockersApi } from "../api/lockersApi";
 import type { LockerStation, StationStatus } from "../types/index";
 
 interface ChangeStationStatusPayload {
@@ -21,7 +20,9 @@ export function useStations(options?: { publicOnly?: boolean }) {
 
     const query = useQuery<LockerStation[]>({
         queryKey: ["stations", isPublic ? "active" : "all"],
-        queryFn: isPublic ? stationsApi.getActiveStations : stationsApi.getAllStations,
+        queryFn: isPublic
+            ? stationsApi.getActiveStations
+            : stationsApi.getAllStations,
     });
 
     const invalidateAll = () => {
@@ -35,46 +36,35 @@ export function useStations(options?: { publicOnly?: boolean }) {
     const create = useMutation({
         mutationFn: (payload: CreateStationPayload) =>
             stationsApi.createStation(payload),
-        onSuccess: invalidateAll
+        onSuccess: invalidateAll,
     });
 
     const remove = useMutation({
         mutationFn: (id: string) => stationsApi.deleteStation(id),
-        onSuccess: invalidateAll
+        onSuccess: invalidateAll,
     });
-
 
     const changeStatus = useMutation({
         mutationFn: ({ id, status }: ChangeStationStatusPayload) => {
-
-            // Оператор делает READY
             if (status === "READY") {
                 return stationsApi.updateStationStatusOperator(id, status);
             }
 
-            // Админ делает ACTIVE или MAINTENANCE
             if (status === "ACTIVE" || status === "MAINTENANCE") {
                 return stationsApi.updateStationStatusAdmin(id, status);
             }
 
             throw new Error("Invalid status transition");
         },
-        onSuccess: invalidateAll
-    });
-
-    const addLocker = useMutation({
-        mutationFn: (payload: { stationId: string; code: string; size: "S" | "M" | "L" }) =>
-            stationsApi.addLocker(payload),
-        onSuccess: invalidateAll
-    });
-
-    const book = useMutation({
-        mutationFn: (lockerBoxId: string) => lockersApi.updateLockerStatus(lockerBoxId, "RESERVED"),
         onSuccess: invalidateAll,
     });
 
-    const cancel = useMutation({
-        mutationFn: (lockerBoxId: string) => lockersApi.updateLockerStatus(lockerBoxId, "AVAILABLE" ),
+    const addLocker = useMutation({
+        mutationFn: (payload: {
+            stationId: string;
+            code: string;
+            size: "S" | "M" | "L";
+        }) => stationsApi.addLocker(payload),
         onSuccess: invalidateAll,
     });
 
@@ -82,12 +72,12 @@ export function useStations(options?: { publicOnly?: boolean }) {
         stations: query.data ?? [],
         isLoading: query.isLoading,
         error: query.error,
+
         createStation: create.mutateAsync,
         deleteStation: remove.mutate,
         changeStationStatus: changeStatus.mutate,
         addLocker: addLocker.mutateAsync,
-        bookLockerAsync: book.mutateAsync,
-        cancelBooking: cancel.mutate,
-        refresh: invalidateAll
+
+        refresh: invalidateAll,
     };
 }
