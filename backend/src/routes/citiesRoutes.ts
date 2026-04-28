@@ -6,13 +6,17 @@ import * as auth from "../middleware/authMiddleware";
 import {authorize} from "../middleware/authMiddleware";
 import {validateRequest} from "../middleware/validateRequest";
 import {createCitySchema} from "../validation/citiesSchema";
+import * as adminActionsController from "../controllers/adminActionsController";
+import {adminRoutes} from "./adminRoutes";
 
 
 
 
 export const citiesRoutes = express.Router();
 
-citiesRoutes.get('/', citiesController.getAllCities);
+citiesRoutes.get('/',citiesController.getAllCities);
+citiesRoutes.post('/',auth.protect,authorize(Role.ADMIN),citiesController.createCities)
+//citiesRoutes.patch('/',auth.protect,authorize(Role.ADMIN),citiesController.changeCities);
+//citiesRoutes.delete('/',auth.protect,authorize(Role.ADMIN),citiesController.deleteCities);
 
 citiesRoutes.use(auth.protect);
-citiesRoutes.post('/', authorize(Role.ADMIN), validateRequest(createCitySchema), citiesController.createCities);
