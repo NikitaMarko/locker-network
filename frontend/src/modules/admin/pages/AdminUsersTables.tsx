@@ -8,6 +8,7 @@ import {
 import {getUsers, updateRole} from "../../../api/adminApi.ts";
 import type {User} from "../../../types/user/user.ts";
 import {DataGrid} from "@mui/x-data-grid";
+import {type Role, ROLES} from "../../../config/roles/roles.ts";
 
 const AdminUsersTables = () => {
     const [error, setError] = useState<string | null>(null);
@@ -16,7 +17,7 @@ const AdminUsersTables = () => {
 
 
     const columns = [
-        { field: 'id', headerName: 'ID', width: 90  },
+        { field: 'userId', headerName: 'ID', width: 90  },
         { field: 'email', headerName: 'Email', flex: 1 },
         // { field: 'password', headerName: 'Password', width: 150 },
         { field: 'phone', headerName: 'Phone', width: 110 },
@@ -27,42 +28,13 @@ const AdminUsersTables = () => {
         // { field: 'updatedAt', headerName: 'Update dAt', width: 90 } ,
         // { field: 'isDeleted', headerName: 'Is Deleted', width: 90 },
         // { field: 'deletedAt', headerName: 'Delete dAt', width: 90 } ,
-
     ];
 
-
-    // const mockUsers: User[] = [
-    //     {
-    //         userId: "1",
-    //         name:"asd",
-    //         email: "admin@test.com",
-    //         phone: "+972501112233",
-    //         role: "ADMIN",
-    //         isDeleted: false,
-    //         createdAt: "2025-01-10T10:00:00Z",
-    //         updatedAt: "2025-02-01T12:00:00Z",
-    //     },
-    //     {
-    //         userId: "2",
-    //         name:"asd",
-    //         email: "user@test.com",
-    //         phone: "+972509998877",
-    //         role: "USER",
-    //         isDeleted: false,
-    //         createdAt: "2025-03-15T09:30:00Z",
-    //         updatedAt: "2025-03-20T11:45:00Z",
-    //     },
-    // ];
-
-
     useEffect(() => {
-
         getUsers().then((resp)=> setUsers(resp))
             .catch((err)=>setError(err instanceof Error ? err.message : 'Unknown error'))
             .finally(() => setLoading(false));
 
-        // setUsers(mockUsers)
-        // setLoading(false)
     }, []);
 
     return (
@@ -87,14 +59,23 @@ const AdminUsersTables = () => {
                     disableRowSelectionOnClick
                     processRowUpdate={async (newRow, oldRow) => {
                         try {
-                            const updatedUser = await updateRole(newRow);
-                            setUsers((prev) =>
-                                prev.map((u) =>
-                                    u.userId === updatedUser.userId ? updatedUser : u
-                                )
-                            );
 
-                            return updatedUser;
+                            if(Object.values(ROLES).includes(newRow.role.trim().toUpperCase() as Role)){
+                                newRow.role = newRow.role.trim().toUpperCase() as Role;
+                                await updateRole(newRow);
+                                setError(null);
+
+                                setUsers((prev) =>
+                                    prev.map((u) =>
+                                        u.userId === newRow.userId ? { ...u, role: newRow.role } : u
+                                    )
+                                );
+
+
+                                return newRow;
+                            }
+                            throw new Error("Invalid role. Allowed roles: " + Object.values(ROLES));
+
                         } catch (err) {
                             setError(
                                 err instanceof Error ? err.message : "Update failed"

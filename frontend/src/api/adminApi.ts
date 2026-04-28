@@ -10,5 +10,9 @@ export const getUsers = async ():Promise<User[]>  => {
 
 export const updateRole = async (user:User):Promise<User> => {
     const response = await apiClient.patch(`/admin/users/${user.userId}`, {"role": user.role})
-    return response.data;
+    const data = response.data;
+    if (data.id && !data.userId) {
+        data.userId = data.id;
+    }
+    return data;
 };
