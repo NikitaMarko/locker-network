@@ -7,7 +7,7 @@ import {
 
 import {getUsers, updateRole} from "../../../api/adminApi.ts";
 import type {User} from "../../../types/user/user.ts";
-import {DataGrid} from "@mui/x-data-grid";
+import {DataGrid, type GridColDef} from "@mui/x-data-grid";
 import {type Role, ROLES} from "../../../config/roles/roles.ts";
 
 const AdminUsersTables = () => {
@@ -15,26 +15,26 @@ const AdminUsersTables = () => {
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
 
-
-    const columns = [
+    const columns: GridColDef[] = [
         { field: 'userId', headerName: 'ID', width: 90  },
         { field: 'email', headerName: 'Email', flex: 1 },
-        // { field: 'password', headerName: 'Password', width: 150 },
         { field: 'phone', headerName: 'Phone', width: 110 },
         { field: 'bookings', headerName: 'Bookings', flex: 1  },
-        { field: 'role', headerName: 'Role', width: 150  ,editable: true},
-        // { field: 'passwordChangedAt', headerName: 'Password ChangedAt', width: 90 },
-        // { field: 'createdAt', headerName: 'Created At', width: 90 },
-        // { field: 'updatedAt', headerName: 'Update dAt', width: 90 } ,
-        // { field: 'isDeleted', headerName: 'Is Deleted', width: 90 },
-        // { field: 'deletedAt', headerName: 'Delete dAt', width: 90 } ,
+
+        {
+            field: 'role',
+            headerName: 'Role',
+            width: 150,
+            editable: true,
+            type: 'singleSelect',
+            valueOptions: Object.values(ROLES)
+        },
     ];
 
     useEffect(() => {
         getUsers().then((resp)=> setUsers(resp))
             .catch((err)=>setError(err instanceof Error ? err.message : 'Unknown error'))
             .finally(() => setLoading(false));
-
     }, []);
 
     return (
@@ -59,7 +59,6 @@ const AdminUsersTables = () => {
                     disableRowSelectionOnClick
                     processRowUpdate={async (newRow, oldRow) => {
                         try {
-
                             if(Object.values(ROLES).includes(newRow.role.trim().toUpperCase() as Role)){
                                 newRow.role = newRow.role.trim().toUpperCase() as Role;
                                 await updateRole(newRow);
@@ -70,7 +69,6 @@ const AdminUsersTables = () => {
                                         u.userId === newRow.userId ? { ...u, role: newRow.role } : u
                                     )
                                 );
-
 
                                 return newRow;
                             }
