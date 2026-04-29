@@ -83,6 +83,12 @@ export class PricingServiceImplPostgres {
 
                 try {
                     const result = await prismaService.$transaction(async (tx) => {
+                        const city = await tx.city.findUnique({
+                            where: {cityId}
+                        })
+                        if (!city){
+                            throw new HttpError(404, "City not found");
+                        }
                         const priceExist = await tx.pricing.findUnique({
                             where: {
                                 cityId_size : {cityId, size}}
