@@ -53,7 +53,7 @@ export function BookingSection({ stationId, initialSize = "M" }: BookingSectionP
 
     const expectedEndTime = new Date(`${selectedDate}T${selectedTime}:00`);
     const diffMs = expectedEndTime.getTime() - currentTime;
-    const MINIMUM_BOOKING_MS = 3 * 60 * 60 * 1000;
+    const MINIMUM_BOOKING_MS = 5 * 60 * 1000;
 
     let validationError: string | null = null;
     let durationText = '';
@@ -61,7 +61,7 @@ export function BookingSection({ stationId, initialSize = "M" }: BookingSectionP
     if (diffMs <= 0) {
         validationError = 'Please select a future time.';
     } else if (diffMs < MINIMUM_BOOKING_MS - 60000) {
-        validationError = 'Primary booking requires a minimum of 3 hours.';
+        validationError = 'Primary booking requires a minimum of 5 minutes.';
     } else {
         const h = Math.floor(diffMs / 3600000);
         const m = Math.floor((diffMs / 60000) % 60);
